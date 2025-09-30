@@ -1,0 +1,28 @@
+{
+  "name": "psychology-institute",
+  "version": "1.0.0",
+  "description": "Psychology Institute - Django + React Application",
+  "scripts": {
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "backend": "cd . && python manage.py runserver",
+    "frontend": "cd frontend && npm start",
+    "build": "cd frontend && npm run build",
+    "install-deps": "cd frontend && npm install",
+    "migrate": "python manage.py migrate",
+    "collectstatic": "python manage.py collectstatic --noinput",
+    "superuser": "python manage.py createsuperuser"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "django",
+    "react",
+    "psychology",
+    "counseling",
+    "persian",
+    "farsi"
+  ],
+  "author": "Sarmad Clinic",
+  "license": "MIT"
+}

@@ -1,0 +1,215 @@
+# Persian translations for Django
+# Copyright (C) 2024 Psychology Institute
+# This file is distributed under the same license as the Django package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Psychology Institute\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-09-23 20:00+0000\n"
+"PO-Revision-Date: 2024-09-23 20:00+0000\n"
+"Last-Translator: Psychology Institute\n"
+"Language-Team: Persian\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: fa\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+# Password validation messages
+msgid "This password is too short. It must contain at least %(min_length)d characters."
+msgstr "این رمز عبور خیلی کوتاه است. باید حداقل %(min_length)d کاراکتر داشته باشد."
+
+msgid "This password is too common."
+msgstr "این رمز عبور خیلی رایج است."
+
+msgid "This password is entirely numeric."
+msgstr "این رمز عبور کاملاً عددی است."
+
+msgid "The password is too similar to the %(verbose_name)s."
+msgstr "رمز عبور خیلی شبیه به %(verbose_name)s است."
+
+msgid "The two password fields didn't match."
+msgstr "دو فیلد رمز عبور با هم مطابقت ندارند."
+
+# Form validation messages
+msgid "This field is required."
+msgstr "این فیلد الزامی است."
+
+msgid "Enter a valid email address."
+msgstr "لطفاً یک آدرس ایمیل معتبر وارد کنید."
+
+msgid "Enter a valid phone number."
+msgstr "لطفاً یک شماره تلفن معتبر وارد کنید."
+
+msgid "Enter a valid date."
+msgstr "لطفاً یک تاریخ معتبر وارد کنید."
+
+msgid "Enter a valid time."
+msgstr "لطفاً یک زمان معتبر وارد کنید."
+
+msgid "Enter a valid date and time."
+msgstr "لطفاً یک تاریخ و زمان معتبر وارد کنید."
+
+msgid "Enter a valid URL."
+msgstr "لطفاً یک آدرس اینترنتی معتبر وارد کنید."
+
+msgid "Enter a valid integer."
+msgstr "لطفاً یک عدد صحیح معتبر وارد کنید."
+
+msgid "Enter a valid decimal number."
+msgstr "لطفاً یک عدد اعشاری معتبر وارد کنید."
+
+msgid "Enter a valid number."
+msgstr "لطفاً یک عدد معتبر وارد کنید."
+
+msgid "Enter a valid JSON."
+msgstr "لطفاً یک JSON معتبر وارد کنید."
+
+msgid "Enter a valid UUID."
+msgstr "لطفاً یک UUID معتبر وارد کنید."
+
+msgid "Enter a valid slug."
+msgstr "لطفاً یک slug معتبر وارد کنید."
+
+msgid "Enter a valid IPv4 address."
+msgstr "لطفاً یک آدرس IPv4 معتبر وارد کنید."
+
+msgid "Enter a valid IPv6 address."
+msgstr "لطفاً یک آدرس IPv6 معتبر وارد کنید."
+
+msgid "Enter a valid IPv4 or IPv6 address."
+msgstr "لطفاً یک آدرس IPv4 یا IPv6 معتبر وارد کنید."
+
+msgid "Enter a valid IPv4 or IPv6 address or a domain name."
+msgstr "لطفاً یک آدرس IPv4 یا IPv6 معتبر یا نام دامنه وارد کنید."
+
+msgid "Enter a valid IPv4 or IPv6 address or a CIDR notation."
+msgstr "لطفاً یک آدرس IPv4 یا IPv6 معتبر یا نماد CIDR وارد کنید."
+
+msgid "Enter a valid IPv4 or IPv6 address or a CIDR notation or a domain name."
+msgstr "لطفاً یک آدرس IPv4 یا IPv6 معتبر یا نماد CIDR یا نام دامنه وارد کنید."
+
+# User model fields
+msgid "First name"
+msgstr "نام"
+
+msgid "Last name"
+msgstr "نام خانوادگی"
+
+msgid "Email address"
+msgstr "آدرس ایمیل"
+
+msgid "Phone number"
+msgstr "شماره تلفن"
+
+msgid "Birth date"
+msgstr "تاریخ تولد"
+
+msgid "Gender"
+msgstr "جنسیت"
+
+msgid "Address"
+msgstr "آدرس"
+
+msgid "City"
+msgstr "شهر"
+
+msgid "Postal code"
+msgstr "کد پستی"
+
+msgid "Bio"
+msgstr "بیوگرافی"
+
+msgid "Profile image"
+msgstr "تصویر پروفایل"
+
+msgid "User type"
+msgstr "نوع کاربر"
+
+msgid "Terms accepted"
+msgstr "موافقت با شرایط"
+
+# Gender choices
+msgid "Male"
+msgstr "مرد"
+
+msgid "Female"
+msgstr "زن"
+
+msgid "Other"
+msgstr "سایر"
+
+# User types
+msgid "Client"
+msgstr "مراجع"
+
+msgid "Therapist"
+msgstr "درمانگر"
+
+msgid "Admin"
+msgstr "مدیر"
+
+# Common messages
+msgid "Save"
+msgstr "ذخیره"
+
+msgid "Cancel"
+msgstr "لغو"
+
+msgid "Delete"
+msgstr "حذف"
+
+msgid "Edit"
+msgstr "ویرایش"
+
+msgid "Create"
+msgstr "ایجاد"
+
+msgid "Update"
+msgstr "به‌روزرسانی"
+
+msgid "Submit"
+msgstr "ارسال"
+
+msgid "Reset"
+msgstr "بازنشانی"
+
+msgid "Search"
+msgstr "جستجو"
+
+msgid "Filter"
+msgstr "فیلتر"
+
+msgid "Clear"
+msgstr "پاک کردن"
+
+msgid "Yes"
+msgstr "بله"
+
+msgid "No"
+msgstr "خیر"
+
+msgid "Loading..."
+msgstr "در حال بارگذاری..."
+
+msgid "Please wait..."
+msgstr "لطفاً صبر کنید..."
+
+msgid "Success"
+msgstr "موفقیت"
+
+msgid "Error"
+msgstr "خطا"
+
+msgid "Warning"
+msgstr "هشدار"
+
+msgid "Info"
+msgstr "اطلاعات"
+
+msgid "Required field"
+msgstr "فیلد الزامی"
+
+msgid "Optional field"
+msgstr "فیلد اختیاری"
