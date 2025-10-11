@@ -109,6 +109,35 @@ class UserProfile(models.Model):
         return f"Profile for {self.user.full_name}"
 
 
+class Activity(models.Model):
+    """User activity tracking"""
+    
+    ACTIVITY_TYPES = [
+        ('login', _('Login')),
+        ('logout', _('Logout')),
+        ('course_enrollment', _('Course Enrollment')),
+        ('session_booking', _('Session Booking')),
+        ('payment', _('Payment')),
+        ('profile_update', _('Profile Update')),
+        ('other', _('Other')),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='activities')
+    activity_type = models.CharField(max_length=50, choices=ACTIVITY_TYPES)
+    description = models.TextField()
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = _('Activity')
+        verbose_name_plural = _('Activities')
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.get_activity_type_display()}"
+
+
 class Notification(models.Model):
     """User notifications system"""
     

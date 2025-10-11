@@ -23,7 +23,7 @@ urlpatterns = [
     
     # Payment processing
     path('payment/<int:pk>/', views.PaymentView.as_view(), name='payment'),
-    path('payment/<int:pk>/verify/', views.PaymentVerifyView.as_view(), name='payment_verify'),
+    path('payment/verify/', views.PaymentVerifyView.as_view(), name='payment_verify'),
     path('payment/callback/', views.PaymentCallbackView.as_view(), name='payment_callback'),
     
     # Coupons

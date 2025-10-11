@@ -6,6 +6,49 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 User = get_user_model()
 
 
+class Therapist(models.Model):
+    """Therapist profile extending User model"""
+    
+    SPECIALIZATION_CHOICES = [
+        ('individual', _('Individual Therapy')),
+        ('couple', _('Couple Therapy')),
+        ('family', _('Family Therapy')),
+        ('group', _('Group Therapy')),
+        ('child', _('Child Therapy')),
+        ('adolescent', _('Adolescent Therapy')),
+        ('addiction', _('Addiction Therapy')),
+        ('trauma', _('Trauma Therapy')),
+        ('anxiety', _('Anxiety Therapy')),
+        ('depression', _('Depression Therapy')),
+        ('other', _('Other')),
+    ]
+    
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='therapist_profile', verbose_name=_('User'))
+    specialization = models.CharField(max_length=50, choices=SPECIALIZATION_CHOICES, verbose_name=_('Specialization'))
+    bio = models.TextField(blank=True, null=True, verbose_name=_('Bio'))
+    education = models.TextField(blank=True, null=True, verbose_name=_('Education'))
+    certifications = models.TextField(blank=True, null=True, verbose_name=_('Certifications'))
+    experience_start_date = models.DateField(blank=True, null=True, verbose_name=_('Experience Start Date'))
+    hourly_rate = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name=_('Hourly Rate'))
+    is_available = models.BooleanField(default=True, verbose_name=_('Is Available'))
+    profile_image = models.ImageField(upload_to='therapist_profiles/', blank=True, null=True, verbose_name=_('Profile Image'))
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = _('Therapist')
+        verbose_name_plural = _('Therapists')
+        ordering = ['user__first_name', 'user__last_name']
+    
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.get_specialization_display()}"
+    
+    def get_full_name(self):
+        return self.user.get_full_name()
+    
+    def get_specialization_display(self):
+        return dict(self.SPECIALIZATION_CHOICES).get(self.specialization, self.specialization)
+
+
 class SessionType(models.Model):
     """Types of therapy sessions"""
     
@@ -38,7 +81,7 @@ class TherapistAvailability(models.Model):
         ('sunday', _('Sunday')),
     ]
     
-    therapist = models.ForeignKey(User, on_delete=models.CASCADE, related_name='availability', verbose_name=_('Therapist'))
+    therapist = models.ForeignKey(Therapist, on_delete=models.CASCADE, related_name='availability', verbose_name=_('Therapist'))
     day_of_week = models.CharField(max_length=10, choices=DAYS_OF_WEEK, verbose_name=_('Day of Week'))
     start_time = models.TimeField(verbose_name=_('Start Time'))
     end_time = models.TimeField(verbose_name=_('End Time'))
@@ -74,7 +117,7 @@ class Session(models.Model):
     ]
     
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='client_sessions', verbose_name=_('Client'))
-    therapist = models.ForeignKey(User, on_delete=models.CASCADE, related_name='therapist_sessions', verbose_name=_('Therapist'))
+    therapist = models.ForeignKey(Therapist, on_delete=models.CASCADE, related_name='therapist_sessions', verbose_name=_('Therapist'))
     session_type = models.ForeignKey(SessionType, on_delete=models.CASCADE, related_name='sessions', verbose_name=_('Session Type'))
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='scheduled', verbose_name=_('Status'))
     mode = models.CharField(max_length=20, choices=SESSION_MODES, verbose_name=_('Mode'))
@@ -216,3 +259,102 @@ class SessionReminder(models.Model):
     
     def __str__(self):
         return f"Reminder for {self.session} - {self.get_reminder_type_display()}"
+
+
+class SessionBooking(models.Model):
+    """Session booking requests (therapist confirmation required)"""
+    
+    STATUS_CHOICES = [
+        ('pending', _('Pending')),
+        ('confirmed', _('Confirmed')),
+        ('rejected', _('Rejected')),
+        ('expired', _('Expired')),
+    ]
+    
+    SESSION_MODES = [
+        ('online', _('Online')),
+        ('in_person', _('In Person')),
+        ('phone', _('Phone Call')),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='session_bookings', verbose_name=_('User'))
+    therapist = models.ForeignKey(Therapist, on_delete=models.CASCADE, related_name='booking_requests', verbose_name=_('Therapist'))
+    session_type = models.ForeignKey(SessionType, on_delete=models.CASCADE, related_name='bookings', verbose_name=_('Session Type'))
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name=_('Status'))
+    mode = models.CharField(max_length=20, choices=SESSION_MODES, verbose_name=_('Mode'))
+    
+    # Preferred scheduling
+    preferred_date = models.DateField(verbose_name=_('Preferred Date'))
+    preferred_time = models.TimeField(verbose_name=_('Preferred Time'))
+    alternative_dates = models.JSONField(default=list, verbose_name=_('Alternative Dates'))
+    
+    # Session details
+    goals = models.TextField(blank=True, null=True, verbose_name=_('Session Goals'))
+    notes = models.TextField(blank=True, null=True, verbose_name=_('Additional Notes'))
+    location = models.CharField(max_length=200, blank=True, null=True, verbose_name=_('Location'))
+    
+    # Pricing
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Price'))
+    
+    # Confirmation details
+    confirmed_date = models.DateField(blank=True, null=True, verbose_name=_('Confirmed Date'))
+    confirmed_time = models.TimeField(blank=True, null=True, verbose_name=_('Confirmed Time'))
+    confirmation_notes = models.TextField(blank=True, null=True, verbose_name=_('Confirmation Notes'))
+    confirmed_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Confirmed At'))
+    confirmed_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='confirmed_bookings', verbose_name=_('Confirmed By'))
+    
+    # Croom integration
+    croom_class_id = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Croom Class ID'))
+    croom_class_url = models.URLField(blank=True, null=True, verbose_name=_('Croom Class URL'))
+    croom_meeting_id = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Croom Meeting ID'))
+    croom_password = models.CharField(max_length=50, blank=True, null=True, verbose_name=_('Croom Password'))
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    expires_at = models.DateTimeField(verbose_name=_('Expires At'))
+    
+    class Meta:
+        verbose_name = _('Session Booking')
+        verbose_name_plural = _('Session Bookings')
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Booking by {self.user.full_name} with {self.therapist.full_name} - {self.preferred_date}"
+    
+    @property
+    def is_expired(self):
+        from django.utils import timezone
+        return timezone.now() > self.expires_at
+    
+    def confirm_booking(self, confirmed_date, confirmed_time, confirmed_by, notes=''):
+        """Confirm the booking and create session"""
+        from django.utils import timezone
+        
+        self.status = 'confirmed'
+        self.confirmed_date = confirmed_date
+        self.confirmed_time = confirmed_time
+        self.confirmed_by = confirmed_by
+        self.confirmation_notes = notes
+        self.confirmed_at = timezone.now()
+        self.save()
+        
+        # Create the actual session
+        session = Session.objects.create(
+            client=self.user,
+            therapist=self.therapist,
+            session_type=self.session_type,
+            status='scheduled',
+            mode=self.mode,
+            scheduled_date=confirmed_date,
+            scheduled_time=confirmed_time,
+            duration_minutes=self.session_type.duration_minutes,
+            location=self.location,
+            goals=self.goals,
+            price=self.price,
+            meeting_link=self.croom_class_url,
+            meeting_id=self.croom_meeting_id,
+            meeting_password=self.croom_password
+        )
+        
+        return session

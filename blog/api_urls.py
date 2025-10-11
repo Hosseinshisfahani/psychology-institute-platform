@@ -21,4 +21,8 @@ urlpatterns = [
     # Newsletter
     path('newsletter/subscribe/', api_views.newsletter_subscribe, name='newsletter_subscribe'),
     path('newsletter/unsubscribe/', api_views.newsletter_unsubscribe, name='newsletter_unsubscribe'),
+    
+    # RSS and Sitemap
+    path('rss/', api_views.blog_rss_feed, name='blog_rss'),
+    path('sitemap.xml', api_views.blog_sitemap, name='blog_sitemap'),
 ]

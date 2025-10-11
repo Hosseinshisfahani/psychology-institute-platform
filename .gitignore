@@ -161,3 +161,27 @@ staticfiles/
 
 # Media files
 media/
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Production environment files
+.env.production
+.env.local
+.env.staging
+
+# Backup files
+backups/
+*.sql
+*.dump
+
+# Logs
+logs/
+*.log
+
+# SSL certificates
+*.pem
+*.crt
+*.key
+

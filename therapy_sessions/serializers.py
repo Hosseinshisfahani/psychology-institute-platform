@@ -47,7 +47,7 @@ class TherapistSerializer(serializers.ModelSerializer):
 class SessionTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = SessionType
-        fields = ['id', 'name', 'description', 'duration', 'price', 'is_available']
+        fields = ['id', 'name', 'description', 'duration_minutes', 'price', 'is_active']
 
 class SessionBookingSerializer(serializers.ModelSerializer):
     therapist_name = serializers.CharField(source='therapist.get_full_name', read_only=True)

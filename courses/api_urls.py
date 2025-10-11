@@ -4,7 +4,11 @@ from .api_views import (
     mark_lesson_complete, 
     update_watch_time,
     enroll_course,
-    UserCoursesAPIView
+    UserCoursesAPIView,
+    add_to_cart,
+    validate_coupon,
+    user_purchases,
+    purchase_course
 )
 
 urlpatterns = [
@@ -13,4 +17,10 @@ urlpatterns = [
     path('lesson/<int:lesson_id>/watch-time/', update_watch_time, name='api_update_watch_time'),
     path('enroll/<slug:course_slug>/', enroll_course, name='api_enroll_course'),
     path('my-courses/', UserCoursesAPIView.as_view(), name='api_user_courses'),
+    
+    # Purchase and cart
+    path('add-to-cart/<slug:course_slug>/', add_to_cart, name='api_add_to_cart'),
+    path('purchase/<slug:course_slug>/', purchase_course, name='api_purchase_course'),
+    path('validate-coupon/', validate_coupon, name='api_validate_coupon'),
+    path('my-purchases/', user_purchases, name='api_user_purchases'),
 ]

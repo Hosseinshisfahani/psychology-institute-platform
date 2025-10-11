@@ -19,10 +19,29 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import RedirectView
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from django.middleware.csrf import get_token
+
+# Health check view
+@require_http_methods(["GET"])
+def health_check(request):
+    """Health check endpoint for Docker and load balancers"""
+    return JsonResponse({
+        'status': 'healthy',
+        'service': 'psychology-institute',
+        'version': '1.0.0'
+    })
 
 urlpatterns = [
+    # Health check
+    path('health/', health_check, name='health_check'),
+    
     # Admin
     path('admin/', admin.site.urls),
+
+    # CSRF token endpoint for SPA frontends
+    path('csrf/', lambda request: JsonResponse({'csrfToken': get_token(request)}), name='csrf_token'),
     
     # Authentication (Custom views)
     path('accounts/', include('dashboard.auth_urls')),

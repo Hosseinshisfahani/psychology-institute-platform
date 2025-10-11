@@ -2,13 +2,15 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import ListView, DetailView, CreateView, TemplateView
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseRedirect
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.db import transaction
 from django.utils import timezone
-from .models import Cart, CartItem, Order, Payment, PaymentMethod
+from django.urls import reverse
+from .models import Cart, CartItem, Order, Payment, PaymentMethod, OrderItem
 from .forms import CartItemForm, CheckoutForm
+from .zarinpal import ZarinpalPayment
 
 
 class CartView(LoginRequiredMixin, ListView):
@@ -66,16 +68,63 @@ class CartClearView(CreateView):
         return render(request, self.template_name)
 
 
-class CheckoutView(CreateView):
-    """Checkout view"""
+class CheckoutView(LoginRequiredMixin, CreateView):
+    """Checkout view with Zarinpal integration"""
     model = Order
     fields = ['payment_method']
     template_name = 'payment/checkout.html'
     
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        cart, created = Cart.objects.get_or_create(user=self.request.user)
+        context['cart'] = cart
+        context['cart_items'] = cart.items.all()
+        context['payment_methods'] = PaymentMethod.objects.filter(is_active=True)
+        return context
+    
     def form_valid(self, form):
-        form.instance.user = self.request.user
-        response = super().form_valid(form)
-        return response
+        with transaction.atomic():
+            cart, created = Cart.objects.get_or_create(user=self.request.user)
+            
+            if not cart.items.exists():
+                messages.error(self.request, 'سبد خرید شما خالی است')
+                return redirect('payment:cart')
+            
+            # Create order
+            order = form.save(commit=False)
+            order.user = self.request.user
+            order.subtotal = cart.total_amount
+            order.total_amount = cart.total_amount
+            order.save()
+            
+            # Create order items
+            for cart_item in cart.items.all():
+                OrderItem.objects.create(
+                    order=order,
+                    item_type=cart_item.item_type,
+                    item_id=cart_item.item_id,
+                    item_title=f"Item {cart_item.item_id}",  # This should be fetched from actual item
+                    quantity=cart_item.quantity,
+                    unit_price=cart_item.unit_price,
+                    total_price=cart_item.total_price
+                )
+            
+            # Initialize Zarinpal payment
+            zarinpal = ZarinpalPayment()
+            payment_result = zarinpal.create_payment_request(
+                order, 
+                f"پرداخت سفارش {order.order_number}"
+            )
+            
+            if payment_result['success']:
+                # Clear cart
+                cart.items.all().delete()
+                
+                # Redirect to Zarinpal
+                return HttpResponseRedirect(payment_result['payment_url'])
+            else:
+                messages.error(self.request, f"خطا در ایجاد درخواست پرداخت: {payment_result['error']}")
+                return redirect('payment:cart')
 
 
 class CheckoutSuccessView(DetailView):
@@ -131,13 +180,57 @@ class PaymentView(DetailView):
     context_object_name = 'payment'
 
 
-class PaymentVerifyView(CreateView):
-    """Payment verification view"""
+class PaymentVerifyView(LoginRequiredMixin, TemplateView):
+    """Payment verification view with Zarinpal callback"""
     template_name = 'payment/payment_verify.html'
     
     def get(self, request, *args, **kwargs):
-        payment = get_object_or_404(Payment, pk=kwargs['pk'])
-        return render(request, self.template_name, {'payment': payment})
+        authority = request.GET.get('Authority')
+        status = request.GET.get('Status')
+        
+        if status == 'OK' and authority:
+            try:
+                # Find payment by authority
+                payment = get_object_or_404(
+                    Payment, 
+                    gateway_transaction_id=authority,
+                    order__user=request.user
+                )
+                
+                # Verify payment with Zarinpal
+                zarinpal = ZarinpalPayment()
+                verify_result = zarinpal.verify_payment(authority, payment.amount)
+                
+                if verify_result['success']:
+                    # Update payment and order status
+                    payment.status = 'completed'
+                    payment.gateway_response = verify_result
+                    payment.completed_at = timezone.now()
+                    payment.save()
+                    
+                    # Update order
+                    payment.order.status = 'paid'
+                    payment.order.payment_status = 'completed'
+                    payment.order.paid_at = timezone.now()
+                    payment.order.transaction_id = verify_result.get('ref_id', '')
+                    payment.order.save()
+                    
+                    messages.success(request, 'پرداخت با موفقیت انجام شد')
+                    return redirect('payment:checkout_success', pk=payment.order.pk)
+                else:
+                    payment.status = 'failed'
+                    payment.gateway_response = verify_result
+                    payment.save()
+                    
+                    messages.error(request, f'خطا در تایید پرداخت: {verify_result["error"]}')
+                    return redirect('payment:checkout_cancel')
+                    
+            except Exception as e:
+                messages.error(request, f'خطا در پردازش پرداخت: {str(e)}')
+                return redirect('payment:checkout_cancel')
+        else:
+            messages.error(request, 'پرداخت لغو شد')
+            return redirect('payment:checkout_cancel')
 
 
 class PaymentCallbackView(CreateView):

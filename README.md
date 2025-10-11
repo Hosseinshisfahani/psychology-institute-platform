@@ -1,5 +1,7 @@
 # مرکز مشاوره و خدمات روانشناسی سرمد - Psychology Institute
 
+[![CI](https://github.com/your-username/Emamy-project/workflows/CI/badge.svg)](https://github.com/your-username/Emamy-project/actions)
+
 یک پلتفرم جامع برای ارائه خدمات روانشناسی و مشاوره آنلاین با طراحی حرفه‌ای و پشتیبانی کامل از زبان فارسی.
 
 ## ویژگی‌های اصلی
@@ -81,12 +83,79 @@
 
 ## نصب و راه‌اندازی
 
-### پیش‌نیازها
+### روش 1: Docker (توصیه شده)
+
+#### پیش‌نیازها
+- Docker
+- Docker Compose
+- Git
+
+#### مراحل نصب با Docker
+
+1. **کلون کردن پروژه**
+```bash
+git clone <repository-url>
+cd psychology-institute
+```
+
+2. **راه‌اندازی محیط توسعه**
+```bash
+# اجرای تمام سرویس‌ها
+docker-compose up --build
+
+# یا در پس‌زمینه
+docker-compose up -d --build
+```
+
+3. **دسترسی به اپلیکیشن**
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8000
+- Admin: http://localhost:8000/admin/
+
+4. **ایجاد ابرکاربر**
+```bash
+docker-compose exec django python manage.py createsuperuser
+```
+
+#### راه‌اندازی Production
+
+1. **تنظیم متغیرهای محیطی**
+```bash
+# کپی کردن فایل نمونه
+cp env.production.example .env.production
+
+# ویرایش فایل با اطلاعات واقعی
+nano .env.production
+```
+
+2. **تولید کلید مخفی Django**
+```bash
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+```
+
+3. **راه‌اندازی Production**
+```bash
+# راه‌اندازی اولیه
+docker-compose -f docker-compose.prod.yml up -d --build
+
+# یا استفاده از اسکریپت deployment
+./deploy.sh production
+```
+
+4. **دسترسی به اپلیکیشن Production**
+- Website: http://mrbone.ir (یا IP سرور)
+- Admin: http://mrbone.ir/admin/
+
+### روش 2: نصب دستی (Development)
+
+#### پیش‌نیازها
 - Python 3.9+
 - pip
 - Git
+- PostgreSQL (اختیاری)
+- Redis (اختیاری)
 
-### مراحل نصب
+#### مراحل نصب
 
 1. **کلون کردن پروژه**
 ```bash
@@ -131,6 +200,81 @@ python manage.py populate_sample_data
 python manage.py runserver
 ```
 
+## Docker Deployment
+
+### دستورات مفید Docker
+
+#### Development
+```bash
+# اجرای سرویس‌ها
+docker-compose up --build
+
+# اجرا در پس‌زمینه
+docker-compose up -d --build
+
+# مشاهده لاگ‌ها
+docker-compose logs -f
+
+# توقف سرویس‌ها
+docker-compose down
+
+# دسترسی به Django shell
+docker-compose exec django python manage.py shell
+
+# اجرای مایگریشن
+docker-compose exec django python manage.py migrate
+
+# جمع‌آوری فایل‌های استاتیک
+docker-compose exec django python manage.py collectstatic
+```
+
+#### Production
+```bash
+# راه‌اندازی اولیه
+docker-compose -f docker-compose.prod.yml up -d --build
+
+# استفاده از اسکریپت deployment
+./deploy.sh production
+
+# مشاهده لاگ‌ها
+docker-compose -f docker-compose.prod.yml logs -f
+
+# بک‌آپ دیتابیس
+docker-compose -f docker-compose.prod.yml exec postgres pg_dump -U postgres psychology_institute > backup.sql
+
+# توقف سرویس‌ها
+docker-compose -f docker-compose.prod.yml down
+
+# راه‌اندازی مجدد
+docker-compose -f docker-compose.prod.yml restart
+```
+
+### تنظیم SSL (HTTPS)
+
+برای فعال‌سازی HTTPS با Let's Encrypt:
+
+1. **نصب Certbot**
+```bash
+sudo apt update
+sudo apt install certbot
+```
+
+2. **دریافت گواهی SSL**
+```bash
+sudo certbot certonly --webroot -w /var/www/certbot -d mrbone.ir -d www.mrbone.ir
+```
+
+3. **فعال‌سازی HTTPS در Nginx**
+```bash
+# ویرایش فایل nginx/nginx.conf
+# حذف کامنت از بخش HTTPS server
+```
+
+4. **راه‌اندازی مجدد Nginx**
+```bash
+docker-compose -f docker-compose.prod.yml restart nginx
+```
+
 ## ساختار پروژه
 
 ```
@@ -145,7 +289,13 @@ psychology_institute/
 ├── sales/                   # فروش به موسسات
 ├── templates/               # قالب‌های HTML
 ├── static/                  # فایل‌های استاتیک
-└── media/                   # فایل‌های رسانه‌ای
+├── media/                   # فایل‌های رسانه‌ای
+├── nginx/                   # تنظیمات Nginx
+├── scripts/                 # اسکریپت‌های کمکی
+├── Dockerfile               # Docker برای Backend
+├── docker-compose.yml       # Docker Compose برای Development
+├── docker-compose.prod.yml  # Docker Compose برای Production
+└── deploy.sh                # اسکریپت Deployment
 ```
 
 ## تنظیمات مهم

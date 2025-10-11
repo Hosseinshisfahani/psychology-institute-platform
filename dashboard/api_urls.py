@@ -4,6 +4,11 @@ from . import api_views
 app_name = 'dashboard_api'
 
 urlpatterns = [
+    # Authentication API
+    path('login/', api_views.api_login, name='api_login'),
+    path('signup/', api_views.api_signup, name='api_signup'),
+    path('logout/', api_views.api_logout, name='api_logout'),
+    
     # User profile
     path('profile/', api_views.UserProfileView.as_view(), name='user_profile'),
     

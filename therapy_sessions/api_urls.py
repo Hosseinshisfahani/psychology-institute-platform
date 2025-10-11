@@ -3,7 +3,8 @@ from .api_views import (
     TherapistListAPIView, TherapistDetailAPIView, SessionTypeListAPIView,
     SessionBookingCreateAPIView, UserSessionListAPIView, SessionDetailAPIView,
     SessionRatingAPIView, therapist_availability, confirm_session,
-    cancel_session, TherapistStatsAPIView
+    cancel_session, TherapistStatsAPIView, create_session_booking,
+    user_bookings, confirm_booking, reject_booking, therapist_bookings
 )
 
 urlpatterns = [
@@ -16,9 +17,16 @@ urlpatterns = [
     # Session Types
     path('session-types/', SessionTypeListAPIView.as_view(), name='api_session_types'),
     
-    # Bookings
+    # New booking flow (therapist confirmation required)
+    path('bookings/create/', create_session_booking, name='api_create_session_booking'),
+    path('bookings/my-bookings/', user_bookings, name='api_user_bookings'),
+    path('bookings/<int:booking_id>/confirm/', confirm_booking, name='api_confirm_booking'),
+    path('bookings/<int:booking_id>/reject/', reject_booking, name='api_reject_booking'),
+    path('therapist/bookings/', therapist_bookings, name='api_therapist_bookings'),
+    
+    # Legacy bookings (for backward compatibility)
     path('bookings/', SessionBookingCreateAPIView.as_view(), name='api_session_booking'),
-    path('bookings/<int:booking_id>/confirm/', confirm_session, name='api_confirm_session'),
+    path('bookings/<int:booking_id>/confirm-legacy/', confirm_session, name='api_confirm_session'),
     
     # Sessions
     path('sessions/', UserSessionListAPIView.as_view(), name='api_user_sessions'),

@@ -3,6 +3,11 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
+from django.http import HttpResponse
+from django.contrib.sitemaps import Sitemap
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.feedgenerator import Rss201rev2Feed
 from .models import Post, Category, Tag, Comment, PostLike, NewsletterSubscription
 from .serializers import (
     PostListSerializer, PostDetailSerializer, CategorySerializer,
@@ -14,6 +19,7 @@ class PostListView(generics.ListAPIView):
     """List all published posts with filtering and search"""
     serializer_class = PostListSerializer
     permission_classes = [permissions.AllowAny]
+    pagination_class = None  # We'll add custom pagination
     
     def get_queryset(self):
         queryset = Post.objects.filter(status='published').select_related('author', 'category').prefetch_related('tags')
@@ -38,6 +44,31 @@ class PostListView(generics.ListAPIView):
             queryset = queryset.filter(tags__slug=tag)
         
         return queryset.order_by('-created_at')
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        
+        # Custom pagination
+        page_size = int(request.query_params.get('page_size', 12))
+        page = int(request.query_params.get('page', 1))
+        
+        start = (page - 1) * page_size
+        end = start + page_size
+        
+        posts = queryset[start:end]
+        total_count = queryset.count()
+        
+        serializer = self.get_serializer(posts, many=True)
+        
+        return Response({
+            'results': serializer.data,
+            'count': total_count,
+            'next': f"?page={page + 1}&page_size={page_size}" if end < total_count else None,
+            'previous': f"?page={page - 1}&page_size={page_size}" if page > 1 else None,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': (total_count + page_size - 1) // page_size
+        })
 
 
 class PostDetailView(generics.RetrieveAPIView):
@@ -152,3 +183,68 @@ def newsletter_unsubscribe(request):
         return Response({'message': 'Successfully unsubscribed'}, status=status.HTTP_200_OK)
     except NewsletterSubscription.DoesNotExist:
         return Response({'error': 'Email not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# RSS Feed
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def blog_rss_feed(request):
+    """RSS feed for blog posts"""
+    posts = Post.objects.filter(status='published').order_by('-published_at')[:20]
+    
+    feed = Rss201rev2Feed(
+        title="مرکز مشاوره و خدمات روانشناسی سرمد - بلاگ",
+        link=request.build_absolute_uri('/blog/'),
+        description="آخرین مقالات و مطالب روانشناسی",
+        language='fa'
+    )
+    
+    for post in posts:
+        feed.add_item(
+            title=post.title,
+            link=request.build_absolute_uri(post.get_absolute_url()),
+            description=post.excerpt,
+            pubdate=post.published_at or post.created_at,
+            author_name=post.author.full_name,
+        )
+    
+    response = HttpResponse(feed.writeString('utf-8'), content_type='application/rss+xml; charset=utf-8')
+    return response
+
+
+# Sitemap
+class BlogSitemap(Sitemap):
+    changefreq = "weekly"
+    priority = 0.8
+    
+    def items(self):
+        return Post.objects.filter(status='published')
+    
+    def lastmod(self, obj):
+        return obj.updated_at
+    
+    def location(self, obj):
+        return obj.get_absolute_url()
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def blog_sitemap(request):
+    """Generate sitemap for blog posts"""
+    posts = Post.objects.filter(status='published')
+    
+    sitemap_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    sitemap_content += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    
+    for post in posts:
+        sitemap_content += f'  <url>\n'
+        sitemap_content += f'    <loc>{request.build_absolute_uri(post.get_absolute_url())}</loc>\n'
+        sitemap_content += f'    <lastmod>{post.updated_at.strftime("%Y-%m-%d")}</lastmod>\n'
+        sitemap_content += f'    <changefreq>weekly</changefreq>\n'
+        sitemap_content += f'    <priority>0.8</priority>\n'
+        sitemap_content += f'  </url>\n'
+    
+    sitemap_content += '</urlset>'
+    
+    response = HttpResponse(sitemap_content, content_type='application/xml')
+    return response

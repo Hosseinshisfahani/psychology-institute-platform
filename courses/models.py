@@ -229,15 +229,83 @@ class CourseReview(models.Model):
         return f"Review for {self.enrollment.course.title} by {self.enrollment.user.full_name}"
 
 
+class Coupon(models.Model):
+    """Discount coupons for courses"""
+    
+    COUPON_TYPES = [
+        ('percentage', _('Percentage')),
+        ('fixed', _('Fixed Amount')),
+    ]
+    
+    code = models.CharField(max_length=50, unique=True, verbose_name=_('Coupon Code'))
+    title = models.CharField(max_length=200, verbose_name=_('Title'))
+    description = models.TextField(blank=True, null=True, verbose_name=_('Description'))
+    coupon_type = models.CharField(max_length=20, choices=COUPON_TYPES, verbose_name=_('Coupon Type'))
+    discount_value = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Discount Value'))
+    min_order_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_('Minimum Order Amount'))
+    max_discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name=_('Maximum Discount Amount'))
+    
+    # Usage limits
+    usage_limit = models.PositiveIntegerField(blank=True, null=True, verbose_name=_('Usage Limit'))
+    used_count = models.PositiveIntegerField(default=0, verbose_name=_('Used Count'))
+    
+    # Validity
+    is_active = models.BooleanField(default=True, verbose_name=_('Is Active'))
+    valid_from = models.DateTimeField(verbose_name=_('Valid From'))
+    valid_until = models.DateTimeField(verbose_name=_('Valid Until'))
+    
+    # Applicable courses
+    applicable_courses = models.ManyToManyField(Course, blank=True, related_name='coupons', verbose_name=_('Applicable Courses'))
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = _('Coupon')
+        verbose_name_plural = _('Coupons')
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.code} - {self.title}"
+    
+    def is_valid(self):
+        from django.utils import timezone
+        now = timezone.now()
+        return (
+            self.is_active and
+            self.valid_from <= now <= self.valid_until and
+            (self.usage_limit is None or self.used_count < self.usage_limit)
+        )
+    
+    def calculate_discount(self, order_amount):
+        """Calculate discount amount for given order amount"""
+        if not self.is_valid() or order_amount < self.min_order_amount:
+            return 0
+        
+        if self.coupon_type == 'percentage':
+            discount = (order_amount * self.discount_value) / 100
+        else:  # fixed
+            discount = self.discount_value
+        
+        if self.max_discount_amount:
+            discount = min(discount, self.max_discount_amount)
+        
+        return min(discount, order_amount)
+
+
 class CoursePurchase(models.Model):
     """Course purchases"""
     
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='course_purchases', verbose_name=_('User'))
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='purchases', verbose_name=_('Course'))
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Amount Paid'))
+    original_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_('Original Price'))
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_('Discount Amount'))
+    coupon = models.ForeignKey(Coupon, on_delete=models.SET_NULL, blank=True, null=True, verbose_name=_('Coupon Used'))
     purchased_at = models.DateTimeField(auto_now_add=True, verbose_name=_('Purchased At'))
     payment_method = models.CharField(max_length=50, verbose_name=_('Payment Method'))
     transaction_id = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Transaction ID'))
+    order = models.ForeignKey('payment.Order', on_delete=models.SET_NULL, blank=True, null=True, verbose_name=_('Order'))
     
     class Meta:
         verbose_name = _('Course Purchase')
