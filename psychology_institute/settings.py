@@ -64,6 +64,8 @@ INSTALLED_APPS = [
     'reports',
     'sales',
     'admin_panel',
+    'workshops',
+    'packages',
 ]
 
 MIDDLEWARE = [
@@ -287,3 +289,7 @@ except (ImportError, redis.ConnectionError, redis.RedisError):
     SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
 SESSION_COOKIE_AGE = 86400  # 24 hours
+
+# Croom Integration
+CROOM_API_KEY = config('CROOM_API_KEY', default='')
+CROOM_API_URL = config('CROOM_API_URL', default='')

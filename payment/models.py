@@ -62,6 +62,7 @@ class CartItem(models.Model):
         ('test', _('Test')),
         ('session', _('Session')),
         ('package', _('Package')),
+        ('workshop', _('Workshop')),
     ]
     
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items', verbose_name=_('Cart'))
@@ -140,6 +141,7 @@ class OrderItem(models.Model):
         ('test', _('Test')),
         ('session', _('Session')),
         ('package', _('Package')),
+        ('workshop', _('Workshop')),
     ]
     
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items', verbose_name=_('Order'))
@@ -195,3 +197,27 @@ class Payment(models.Model):
     
     def __str__(self):
         return f"Payment for Order {self.order.order_number} - {self.amount}"
+
+
+class InstallmentSchedule(models.Model):
+    """Installment schedule for orders"""
+    
+    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='installment_schedule', verbose_name=_('Order'))
+    total_installments = models.PositiveIntegerField(verbose_name=_('Total Installments'))
+    current_installment = models.PositiveIntegerField(default=0, verbose_name=_('Current Installment'))
+    next_due_date = models.DateField(blank=True, null=True, verbose_name=_('Next Due Date'))
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = _('Installment Schedule')
+        verbose_name_plural = _('Installment Schedules')
+    
+    def __str__(self):
+        return f"Installment Schedule for {self.order.order_number}"
+    
+    @property
+    def is_completed(self):
+        """Check if all installments are paid"""
+        return self.current_installment >= self.total_installments

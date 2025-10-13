@@ -10,9 +10,10 @@ from django.contrib.auth.views import LoginView as BaseLoginView
 from django.contrib.auth.views import LogoutView as BaseLogoutView
 from .models import User, UserProfile, Notification
 from .forms import CustomSignupForm, CustomLoginForm, ProfileEditForm
-from courses.models import Enrollment
+from courses.models import Enrollment, CoursePurchase
 from tests.models import TestResult
 from therapy_sessions.models import Session
+from payment.models import Order
 
 
 class DashboardView(LoginRequiredMixin, ListView):
@@ -262,3 +263,79 @@ class CustomLogoutView(BaseLogoutView):
         if request.user.is_authenticated:
             messages.info(request, 'با موفقیت از حساب کاربری خود خارج شدید.')
         return super().dispatch(request, *args, **kwargs)
+
+
+class FinancialReportView(LoginRequiredMixin, ListView):
+    """User financial report view showing all purchases and installments"""
+    template_name = 'dashboard/financial_report.html'
+    context_object_name = 'orders'
+    paginate_by = 20
+    
+    def get_queryset(self):
+        return Order.objects.filter(user=self.request.user).order_by('-created_at')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        
+        # Import models here to avoid circular imports
+        try:
+            from workshops.models import WorkshopRegistration, InstallmentPayment
+            from packages.models import PackagePurchase
+            
+            # Get all workshop registrations with installment plans
+            workshop_registrations = WorkshopRegistration.objects.filter(
+                user=user
+            ).select_related('workshop', 'installment_plan').prefetch_related(
+                'installment_plan__payments'
+            )
+            
+            # Get all package purchases
+            package_purchases = PackagePurchase.objects.filter(
+                user=user
+            ).select_related('package').order_by('-purchased_at')
+            
+            # Get installment payments
+            installment_payments = []
+            for registration in workshop_registrations:
+                if hasattr(registration, 'installment_plan'):
+                    plan = registration.installment_plan
+                    payments = plan.payments.all().order_by('installment_number')
+                    installment_payments.extend(payments)
+            
+            context['workshop_registrations'] = workshop_registrations
+            context['package_purchases'] = package_purchases
+            context['installment_payments'] = installment_payments
+            
+        except ImportError:
+            # Workshops and packages apps not yet installed
+            context['workshop_registrations'] = []
+            context['package_purchases'] = []
+            context['installment_payments'] = []
+        
+        # Get course purchases
+        course_purchases = CoursePurchase.objects.filter(
+            user=user
+        ).select_related('course').order_by('-purchased_at')
+        context['course_purchases'] = course_purchases
+        
+        # Calculate financial summary
+        total_spent = sum(order.total_amount for order in self.get_queryset())
+        
+        # Count pending installments
+        pending_installments_count = sum(
+            1 for payment in context['installment_payments']
+            if payment.status == 'pending'
+        )
+        
+        overdue_installments_count = sum(
+            1 for payment in context['installment_payments']
+            if payment.status == 'overdue'
+        )
+        
+        context['total_spent'] = total_spent
+        context['pending_installments_count'] = pending_installments_count
+        context['overdue_installments_count'] = overdue_installments_count
+        context['total_orders'] = self.get_queryset().count()
+        
+        return context

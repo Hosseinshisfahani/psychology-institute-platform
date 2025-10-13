@@ -1,252 +1,181 @@
-from rest_framework import generics, status, permissions
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework import generics, permissions
 from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
 from django.shortcuts import get_object_or_404
-from django.db.models import Count, Q
-from django.utils import timezone
-from django.contrib.auth import authenticate, login, logout
-from django.views.decorators.csrf import ensure_csrf_cookie
-from .models import User, UserProfile, Notification
-from .serializers import (
-    UserSerializer, UserProfileSerializer, NotificationSerializer,
-    DashboardStatsSerializer, EnrollmentSerializer, TestResultSerializer, SessionSerializer
-)
-from courses.models import Enrollment
-from tests.models import TestResult
-from therapy_sessions.models import Session
-
-
-# Authentication API Views
-@api_view(['POST'])
-@permission_classes([permissions.AllowAny])
-def api_login(request):
-    """API login endpoint that accepts JSON"""
-    email = request.data.get('email')
-    password = request.data.get('password')
-    
-    if not email or not password:
-        return Response(
-            {'success': False, 'message': 'ایمیل و رمز عبور الزامی است'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    user = authenticate(request, username=email, password=password)
-    
-    if user is not None:
-        login(request, user)
-        return Response({
-            'success': True,
-            'message': f'خوش آمدید {user.full_name}!',
-            'user': UserSerializer(user).data
-        })
-    else:
-        return Response(
-            {'success': False, 'message': 'ایمیل یا رمز عبور اشتباه است'},
-            status=status.HTTP_401_UNAUTHORIZED
-        )
-
-
-@api_view(['POST'])
-@permission_classes([permissions.AllowAny])
-def api_signup(request):
-    """API signup endpoint that accepts JSON"""
-    email = request.data.get('email')
-    password1 = request.data.get('password1')
-    password2 = request.data.get('password2')
-    first_name = request.data.get('first_name')
-    last_name = request.data.get('last_name')
-    
-    # Validate required fields
-    if not all([email, password1, password2, first_name, last_name]):
-        return Response(
-            {'success': False, 'message': 'تمام فیلدها الزامی هستند'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    # Validate passwords match
-    if password1 != password2:
-        return Response(
-            {'success': False, 'message': 'رمزهای عبور مطابقت ندارند'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    # Check if user already exists
-    if User.objects.filter(email=email).exists():
-        return Response(
-            {'success': False, 'message': 'کاربری با این ایمیل قبلاً ثبت‌نام کرده است'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    # Create user
-    try:
-        user = User.objects.create_user(
-            email=email,
-            password=password1,
-            first_name=first_name,
-            last_name=last_name,
-            user_type='client'
-        )
-        
-        # Log the user in
-        login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-        
-        return Response({
-            'success': True,
-            'message': f'حساب کاربری شما با موفقیت ایجاد شد! خوش آمدید {user.full_name}',
-            'user': UserSerializer(user).data
-        })
-    except Exception as e:
-        return Response(
-            {'success': False, 'message': f'خطا در ایجاد حساب کاربری: {str(e)}'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def api_logout(request):
-    """API logout endpoint"""
-    logout(request)
-    return Response({'success': True, 'message': 'با موفقیت خارج شدید'})
-
-
-class UserProfileView(generics.RetrieveUpdateAPIView):
-    """Get and update user profile"""
-    serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def get_object(self):
-        return self.request.user
-
-
-class NotificationListView(generics.ListAPIView):
-    """List user notifications"""
-    serializer_class = NotificationSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def get_queryset(self):
-        return Notification.objects.filter(user=self.request.user).order_by('-created_at')
+from .models import User, Notification
+from courses.models import CoursePurchase
+from payment.models import Order
 
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
-def dashboard_stats(request):
-    """Get dashboard statistics for the user"""
+def financial_report_api(request):
+    """
+    API endpoint for financial report data
+    """
     user = request.user
     
-    # Get counts
-    enrolled_courses_count = Enrollment.objects.filter(user=user).count()
-    completed_tests_count = TestResult.objects.filter(session__user=user).count()
-    upcoming_sessions_count = Session.objects.filter(
-        client=user, 
-        scheduled_date__gte=timezone.now(),
-        status='scheduled'
-    ).count()
-    certificates_count = Enrollment.objects.filter(
-        user=user, 
-        status='completed'
-    ).count()
-    unread_notifications_count = Notification.objects.filter(
-        user=user, 
-        is_read=False
-    ).count()
+    # Import models here to avoid circular imports
+    try:
+        from workshops.models import WorkshopRegistration, InstallmentPayment
+        from packages.models import PackagePurchase
+        
+        # Get all workshop registrations with installment plans
+        workshop_registrations = WorkshopRegistration.objects.filter(
+            user=user
+        ).select_related('workshop', 'installment_plan').prefetch_related(
+            'installment_plan__payments'
+        )
+        
+        # Serialize workshop registrations
+        workshops_data = []
+        for registration in workshop_registrations:
+            workshop_data = {
+                'id': registration.id,
+                'workshop': {
+                    'id': registration.workshop.id,
+                    'title': registration.workshop.title,
+                    'slug': registration.workshop.slug,
+                },
+                'status': registration.status,
+                'payment_type': registration.payment_type,
+                'amount_paid': str(registration.amount_paid),
+                'total_amount': str(registration.total_amount),
+                'progress_percentage': registration.progress_percentage,
+                'registered_at': registration.registered_at,
+            }
+            
+            if hasattr(registration, 'installment_plan'):
+                plan = registration.installment_plan
+                payments_data = []
+                for payment in plan.payments.all().order_by('installment_number'):
+                    payments_data.append({
+                        'id': payment.id,
+                        'installment_number': payment.installment_number,
+                        'amount': str(payment.amount),
+                        'due_date': payment.due_date,
+                        'due_date_persian': payment.due_date.strftime('%Y/%m/%d') if payment.due_date else None,
+                        'status': payment.status,
+                        'paid_at': payment.paid_at,
+                        'is_overdue': payment.is_overdue,
+                    })
+                
+                workshop_data['installment_plan'] = {
+                    'total_amount': str(plan.total_amount),
+                    'number_of_installments': plan.number_of_installments,
+                    'installment_amount': str(plan.installment_amount),
+                    'total_paid': str(plan.total_paid),
+                    'remaining_amount': str(plan.remaining_amount),
+                    'is_fully_paid': plan.is_fully_paid,
+                    'payments': payments_data,
+                }
+            
+            workshops_data.append(workshop_data)
+        
+        # Get all package purchases
+        package_purchases = PackagePurchase.objects.filter(
+            user=user
+        ).select_related('package').order_by('-purchased_at')
+        
+        packages_data = []
+        for purchase in package_purchases:
+            package_data = {
+                'id': purchase.id,
+                'package': {
+                    'id': purchase.package.id,
+                    'title': purchase.package.title,
+                    'slug': purchase.package.slug,
+                },
+                'amount_paid': str(purchase.amount_paid),
+                'purchased_at': purchase.purchased_at,
+            }
+            
+            if hasattr(purchase, 'progress'):
+                progress = purchase.progress
+                package_data['progress'] = {
+                    'overall_progress_percentage': progress.overall_progress_percentage,
+                    'completed_courses': progress.completed_courses,
+                    'total_courses': purchase.package.courses.count(),
+                }
+            
+            packages_data.append(package_data)
+        
+        # Get installment payments
+        installment_payments = []
+        for registration in workshop_registrations:
+            if hasattr(registration, 'installment_plan'):
+                plan = registration.installment_plan
+                payments = plan.payments.all().order_by('installment_number')
+                for payment in payments:
+                    installment_payments.append({
+                        'id': payment.id,
+                        'installment_number': payment.installment_number,
+                        'amount': str(payment.amount),
+                        'due_date': payment.due_date,
+                        'due_date_persian': payment.due_date.strftime('%Y/%m/%d') if payment.due_date else None,
+                        'status': payment.status,
+                        'paid_at': payment.paid_at,
+                        'is_overdue': payment.is_overdue,
+                    })
+        
+    except ImportError:
+        # Workshops and packages apps not yet installed
+        workshops_data = []
+        packages_data = []
+        installment_payments = []
     
-    stats = {
-        'enrolled_courses_count': enrolled_courses_count,
-        'completed_tests_count': completed_tests_count,
-        'upcoming_sessions_count': upcoming_sessions_count,
-        'certificates_count': certificates_count,
-        'unread_notifications_count': unread_notifications_count
-    }
+    # Get course purchases
+    course_purchases = CoursePurchase.objects.filter(
+        user=user
+    ).select_related('course').order_by('-purchased_at')
     
-    serializer = DashboardStatsSerializer(stats)
-    return Response(serializer.data)
-
-
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def user_enrollments(request):
-    """Get user's course enrollments"""
-    enrollments = Enrollment.objects.filter(user=request.user).select_related('course').order_by('-enrolled_at')
-    serializer = EnrollmentSerializer(enrollments, many=True)
-    return Response(serializer.data)
-
-
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def user_test_results(request):
-    """Get user's test results"""
-    test_results = TestResult.objects.filter(session__user=request.user).select_related('session__test').order_by('-generated_at')
-    serializer = TestResultSerializer(test_results, many=True)
-    return Response(serializer.data)
-
-
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def user_sessions(request):
-    """Get user's therapy sessions"""
-    sessions = Session.objects.filter(client=request.user).select_related('therapist').order_by('-scheduled_date')
-    serializer = SessionSerializer(sessions, many=True)
-    return Response(serializer.data)
-
-
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def mark_notification_read(request, notification_id):
-    """Mark a notification as read"""
-    notification = get_object_or_404(Notification, id=notification_id, user=request.user)
-    notification.is_read = True
-    notification.save()
-    return Response({'message': 'Notification marked as read'})
-
-
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def mark_all_notifications_read(request):
-    """Mark all notifications as read"""
-    Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
-    return Response({'message': 'All notifications marked as read'})
-
-
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def recent_activities(request):
-    """Get user's recent activities"""
-    activities = []
-    
-    # Recent enrollments
-    recent_enrollments = Enrollment.objects.filter(user=request.user).order_by('-enrolled_at')[:5]
-    for enrollment in recent_enrollments:
-        activities.append({
-            'type': 'enrollment',
-            'title': f'ثبت‌نام در دوره {enrollment.course.title}',
-            'description': f'شما در دوره {enrollment.course.title} ثبت‌نام کردید',
-            'created_at': enrollment.enrolled_at,
-            'created_at_persian': enrollment.enrolled_at.strftime('%Y/%m/%d') if enrollment.enrolled_at else None
+    courses_data = []
+    for purchase in course_purchases:
+        courses_data.append({
+            'id': purchase.id,
+            'course': {
+                'id': purchase.course.id,
+                'title': purchase.course.title,
+                'slug': purchase.course.slug,
+            },
+            'amount_paid': str(purchase.amount_paid),
+            'purchased_at': purchase.purchased_at,
         })
     
-    # Recent test results
-    recent_tests = TestResult.objects.filter(session__user=request.user).select_related('session__test').order_by('-generated_at')[:5]
-    for test_result in recent_tests:
-        activities.append({
-            'type': 'test_result',
-            'title': f'تکمیل تست {test_result.session.test.title}',
-            'description': f'نتیجه تست: {test_result.percentage:.1f}%',
-            'created_at': test_result.generated_at,
-            'created_at_persian': test_result.generated_at.strftime('%Y/%m/%d') if test_result.generated_at else None
+    # Get orders
+    orders = Order.objects.filter(user=user).order_by('-created_at')
+    orders_data = []
+    for order in orders:
+        orders_data.append({
+            'id': order.id,
+            'order_number': order.order_number,
+            'status': order.status,
+            'total_amount': str(order.total_amount),
+            'created_at': order.created_at,
         })
     
-    # Recent sessions
-    recent_sessions = Session.objects.filter(client=request.user).select_related('therapist').order_by('-scheduled_date')[:5]
-    for session in recent_sessions:
-        activities.append({
-            'type': 'session',
-            'title': f'جلسه با {session.therapist.user.get_full_name()}',
-            'description': f'جلسه {session.get_mode_display()}',
-            'created_at': session.scheduled_date,
-            'created_at_persian': session.scheduled_date.strftime('%Y/%m/%d') if session.scheduled_date else None
-        })
+    # Calculate financial summary
+    total_spent = sum(order.total_amount for order in orders)
     
-    # Sort by date and return latest 10
-    activities.sort(key=lambda x: x['created_at'], reverse=True)
-    return Response(activities[:10])
+    # Count pending installments
+    pending_installments_count = sum(
+        1 for payment in installment_payments
+        if payment['status'] == 'pending'
+    )
+    
+    overdue_installments_count = sum(
+        1 for payment in installment_payments
+        if payment['status'] == 'overdue'
+    )
+    
+    return Response({
+        'orders': orders_data,
+        'workshop_registrations': workshops_data,
+        'package_purchases': packages_data,
+        'course_purchases': courses_data,
+        'installment_payments': installment_payments,
+        'total_spent': str(total_spent),
+        'pending_installments_count': pending_installments_count,
+        'overdue_installments_count': overdue_installments_count,
+        'total_orders': orders.count(),
+    })

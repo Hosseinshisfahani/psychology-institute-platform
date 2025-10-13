@@ -23,5 +23,8 @@ urlpatterns = [
     
     # Statistics
     path('stats/', views.UserStatsView.as_view(), name='user_stats'),
+    
+    # Financial Report
+    path('financial-report/', views.FinancialReportView.as_view(), name='financial_report'),
 ]
 

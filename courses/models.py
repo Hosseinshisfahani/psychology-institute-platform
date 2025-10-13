@@ -149,6 +149,7 @@ class Lesson(models.Model):
     order = models.PositiveIntegerField(verbose_name=_('Order'))
     is_preview = models.BooleanField(default=False, verbose_name=_('Is Preview'))
     is_required = models.BooleanField(default=True, verbose_name=_('Is Required'))
+    allow_download = models.BooleanField(default=False, verbose_name=_('Allow Download'))
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

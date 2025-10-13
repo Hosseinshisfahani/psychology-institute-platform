@@ -53,6 +53,8 @@ urlpatterns = [
     path('api/courses/', include('courses.api_urls')),
     path('api/therapy/', include('therapy_sessions.api_urls')),
     path('api/admin/', include('admin_panel.api_urls')),
+    path('api/workshops/', include('workshops.api_urls')),
+    path('api/packages/', include('packages.api_urls')),
     
     # Apps
     path('', include('blog.urls')),
@@ -64,6 +66,8 @@ urlpatterns = [
     path('reports/', include('reports.urls')),
     path('sales/', include('sales.urls')),
     path('admin-panel/', include('admin_panel.urls')),
+    path('workshops/', include('workshops.urls')),
+    path('packages/', include('packages.urls')),
 ]
 
 # Serve media files in development
