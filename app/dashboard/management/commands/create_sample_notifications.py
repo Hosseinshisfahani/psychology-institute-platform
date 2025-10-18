@@ -32,8 +32,8 @@ class Command(BaseCommand):
             # Course notification
             Notification.objects.get_or_create(
                 user=user,
-                title='دوره جدید',
-                message='دوره جدید "مقدمه‌ای بر روانشناسی بالینی" منتشر شد.',
+                title='بسته آموزشی جدید',
+                message='بسته آموزشی جدید "مقدمه‌ای بر روانشناسی بالینی" منتشر شد.',
                 notification_type='info',
                 is_read=False
             )
@@ -60,7 +60,7 @@ class Command(BaseCommand):
             Notification.objects.get_or_create(
                 user=user,
                 title='دستاورد جدید',
-                message='تبریک! شما اولین دوره خود را تکمیل کردید.',
+                message='تبریک! شما اولین بسته آموزشی خود را تکمیل کردید.',
                 notification_type='success',
                 is_read=True
             )

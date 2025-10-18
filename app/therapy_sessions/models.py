@@ -60,8 +60,8 @@ class SessionType(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
-        verbose_name = _('Session Type')
-        verbose_name_plural = _('Session Types')
+        verbose_name = _('نوع نوبت')
+        verbose_name_plural = _('انواع نوبت')
         ordering = ['name']
     
     def __str__(self):
@@ -151,8 +151,8 @@ class Session(models.Model):
     ended_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Ended At'))
     
     class Meta:
-        verbose_name = _('Session')
-        verbose_name_plural = _('Sessions')
+        verbose_name = _('نوبت')
+        verbose_name_plural = _('نوبت‌ها')
         ordering = ['-scheduled_date', '-scheduled_time']
     
     def __str__(self):
@@ -315,8 +315,8 @@ class SessionBooking(models.Model):
     expires_at = models.DateTimeField(verbose_name=_('Expires At'))
     
     class Meta:
-        verbose_name = _('Session Booking')
-        verbose_name_plural = _('Session Bookings')
+        verbose_name = _('درخواست نوبت')
+        verbose_name_plural = _('درخواست‌های نوبت')
         ordering = ['-created_at']
     
     def __str__(self):

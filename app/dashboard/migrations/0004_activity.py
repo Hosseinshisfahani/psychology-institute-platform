@@ -8,7 +8,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('app.dashboard', '0003_remove_username_field'),
+        ('dashboard', '0003_remove_username_field'),
     ]
 
     operations = [

@@ -1,9 +1,13 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from app.blog.models import Post, Category
+from app.blog.models import Post, Category, Tag, Comment
 from app.courses.models import Course, Enrollment
-from app.therapy_sessions.models import Session, Therapist
+from app.therapy_sessions.models import Session, Therapist, SessionBooking, SessionType
 from app.dashboard.models import Activity, Notification
+from app.workshops.models import (
+    Workshop, WorkshopCategory, WorkshopSession, WorkshopRegistration,
+    WorkshopSessionAttendance, InstallmentPlan, InstallmentPayment, WorkshopReview
+)
 import jdatetime
 
 User = get_user_model()
@@ -17,7 +21,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'first_name', 'last_name', 'full_name', 'email', 'phone',
+            'id', 'first_name', 'last_name', 'full_name', 'email', 'phone_number',
             'user_type', 'user_type_display', 'is_active', 'is_staff',
             'date_joined', 'created_at_persian', 'last_login', 'last_login_persian'
         ]
@@ -144,3 +148,419 @@ class DashboardStatsSerializer(serializers.Serializer):
     completed_sessions = serializers.IntegerField()
     average_session_rating = serializers.FloatField()
     monthly_revenue = serializers.DecimalField(max_digits=10, decimal_places=0)
+
+
+class AdminAppointmentSerializer(serializers.ModelSerializer):
+    client_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    client_email = serializers.CharField(source='user.email', read_only=True)
+    therapist_name = serializers.CharField(source='therapist.user.get_full_name', read_only=True)
+    therapist_specialization = serializers.CharField(source='therapist.specialization', read_only=True)
+    session_type_name = serializers.CharField(source='session_type.name', read_only=True)
+    created_at_persian = serializers.SerializerMethodField()
+    preferred_date_persian = serializers.SerializerMethodField()
+    confirmed_date_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = SessionBooking
+        fields = [
+            'id', 'user', 'client_name', 'client_email', 'therapist', 'therapist_name',
+            'therapist_specialization', 'session_type', 'session_type_name', 'status',
+            'mode', 'preferred_date', 'preferred_time', 'preferred_date_persian',
+            'confirmed_date', 'confirmed_time', 'confirmed_date_persian',
+            'goals', 'notes', 'location', 'price', 'created_at', 'created_at_persian',
+            'expires_at', 'is_expired', 'croom_class_url', 'croom_meeting_id',
+            'croom_password', 'confirmation_notes'
+        ]
+        read_only_fields = ['id', 'created_at', 'expires_at', 'is_expired']
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_preferred_date_persian(self, obj):
+        if obj.preferred_date:
+            return jdatetime.datetime.fromgregorian(datetime=obj.preferred_date).strftime('%Y/%m/%d')
+        return None
+    
+    def get_confirmed_date_persian(self, obj):
+        if obj.confirmed_date:
+            return jdatetime.datetime.fromgregorian(datetime=obj.confirmed_date).strftime('%Y/%m/%d')
+        return None
+
+
+class AdminTherapistSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    user_phone = serializers.CharField(source='user.phone_number', read_only=True)
+    specialization_display = serializers.CharField(source='get_specialization_display', read_only=True)
+    created_at_persian = serializers.SerializerMethodField()
+    experience_years = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Therapist
+        fields = [
+            'id', 'user', 'user_name', 'user_email', 'user_phone', 'specialization',
+            'specialization_display', 'bio', 'education', 'certifications',
+            'experience_start_date', 'experience_years', 'hourly_rate', 'is_available',
+            'profile_image', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_experience_years(self, obj):
+        if obj.experience_start_date:
+            from datetime import date
+            today = date.today()
+            return today.year - obj.experience_start_date.year
+        return None
+
+
+class AdminSessionTypeSerializer(serializers.ModelSerializer):
+    created_at_persian = serializers.SerializerMethodField()
+    duration_display = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = SessionType
+        fields = [
+            'id', 'name', 'description', 'duration_minutes', 'duration_display',
+            'price', 'is_active', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_duration_display(self, obj):
+        hours = obj.duration_minutes // 60
+        minutes = obj.duration_minutes % 60
+        if hours > 0:
+            return f"{hours} ساعت {minutes} دقیقه" if minutes > 0 else f"{hours} ساعت"
+        return f"{minutes} دقیقه"
+
+
+# Blog Admin Serializers
+
+class AdminBlogPostSerializer(serializers.ModelSerializer):
+    author_name = serializers.CharField(source='author.get_full_name', read_only=True)
+    author_email = serializers.CharField(source='author.email', read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    tags_data = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    post_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Post
+        fields = [
+            'id', 'title', 'slug', 'content', 'excerpt', 'featured_image',
+            'author', 'author_name', 'author_email', 'category', 'category_name', 
+            'category_color', 'tags', 'tags_data', 'status', 'status_display',
+            'is_featured', 'allow_comments', 'view_count', 'like_count',
+            'created_at', 'created_at_persian', 'updated_at', 'updated_at_persian',
+            'published_at', 'published_at_persian', 'post_count'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'view_count', 'like_count']
+    
+    def get_tags_data(self, obj):
+        return [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in obj.tags.all()]
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_post_count(self, obj):
+        return Post.objects.filter(category=obj.category).count()
+
+
+class AdminCategorySerializer(serializers.ModelSerializer):
+    post_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Category
+        fields = [
+            'id', 'name', 'slug', 'description', 'color', 'icon',
+            'is_active', 'post_count', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_post_count(self, obj):
+        return Post.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class AdminTagSerializer(serializers.ModelSerializer):
+    usage_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Tag
+        fields = [
+            'id', 'name', 'slug', 'usage_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_usage_count(self, obj):
+        return Post.objects.filter(tags=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class AdminCommentSerializer(serializers.ModelSerializer):
+    author_name = serializers.CharField(source='author.get_full_name', read_only=True)
+    author_email = serializers.CharField(source='author.email', read_only=True)
+    post_title = serializers.CharField(source='post.title', read_only=True)
+    post_slug = serializers.CharField(source='post.slug', read_only=True)
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    is_approved_display = serializers.CharField(source='get_is_approved_display', read_only=True)
+    replies_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Comment
+        fields = [
+            'id', 'post', 'post_title', 'post_slug', 'author', 'author_name',
+            'author_email', 'content', 'is_approved', 'is_approved_display',
+            'parent', 'replies_count', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_replies_count(self, obj):
+        return Comment.objects.filter(parent=obj).count()
+
+
+# Workshop Admin Serializers
+
+class AdminWorkshopCategorySerializer(serializers.ModelSerializer):
+    workshop_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = WorkshopCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'workshop_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_workshop_count(self, obj):
+        return Workshop.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class AdminWorkshopSessionSerializer(serializers.ModelSerializer):
+    scheduled_datetime_persian = serializers.SerializerMethodField()
+    duration_display = serializers.SerializerMethodField()
+    has_meeting_link = serializers.SerializerMethodField()
+    attendance_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = WorkshopSession
+        fields = [
+            'id', 'session_number', 'title', 'description', 'scheduled_datetime',
+            'scheduled_datetime_persian', 'duration_minutes', 'duration_display',
+            'meeting_link', 'meeting_id', 'meeting_password', 'recording_url',
+            'materials', 'homework', 'is_completed', 'has_meeting_link',
+            'attendance_count', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_scheduled_datetime_persian(self, obj):
+        if obj.scheduled_datetime:
+            return jdatetime.datetime.fromgregorian(datetime=obj.scheduled_datetime).strftime('%Y/%m/%d - %H:%M')
+        return None
+    
+    def get_duration_display(self, obj):
+        hours = obj.duration_minutes // 60
+        minutes = obj.duration_minutes % 60
+        if hours > 0:
+            return f"{hours} ساعت {minutes} دقیقه" if minutes > 0 else f"{hours} ساعت"
+        return f"{minutes} دقیقه"
+    
+    def get_has_meeting_link(self, obj):
+        return bool(obj.meeting_link)
+    
+    def get_attendance_count(self, obj):
+        return WorkshopSessionAttendance.objects.filter(session=obj, attended=True).count()
+
+
+class AdminWorkshopRegistrationSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    workshop_title = serializers.CharField(source='workshop.title', read_only=True)
+    registered_at_persian = serializers.SerializerMethodField()
+    completed_at_persian = serializers.SerializerMethodField()
+    last_accessed_persian = serializers.SerializerMethodField()
+    payment_status = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = WorkshopRegistration
+        fields = [
+            'id', 'user', 'user_name', 'user_email', 'workshop', 'workshop_title',
+            'status', 'payment_type', 'amount_paid', 'total_amount',
+            'progress_percentage', 'registered_at', 'registered_at_persian',
+            'completed_at', 'completed_at_persian', 'last_accessed',
+            'last_accessed_persian', 'payment_status'
+        ]
+        read_only_fields = ['id', 'registered_at', 'completed_at', 'last_accessed']
+    
+    def get_registered_at_persian(self, obj):
+        if obj.registered_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.registered_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_completed_at_persian(self, obj):
+        if obj.completed_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.completed_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_last_accessed_persian(self, obj):
+        if obj.last_accessed:
+            return jdatetime.datetime.fromgregorian(datetime=obj.last_accessed).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_payment_status(self, obj):
+        if obj.payment_type == 'full_payment':
+            return 'پرداخت کامل' if obj.amount_paid >= obj.total_amount else 'در انتظار پرداخت'
+        else:
+            return 'قسطی' if obj.amount_paid > 0 else 'در انتظار پرداخت'
+
+
+class AdminWorkshopSerializer(serializers.ModelSerializer):
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    instructor_email = serializers.CharField(source='instructor.email', read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    sessions = AdminWorkshopSessionSerializer(many=True, read_only=True)
+    registrations = AdminWorkshopRegistrationSerializer(many=True, read_only=True)
+    
+    # Statistics
+    registration_count = serializers.SerializerMethodField()
+    attendance_rate = serializers.SerializerMethodField()
+    revenue = serializers.SerializerMethodField()
+    
+    # Persian dates
+    start_date_persian = serializers.SerializerMethodField()
+    end_date_persian = serializers.SerializerMethodField()
+    registration_deadline_persian = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    is_full = serializers.BooleanField(read_only=True)
+    available_seats = serializers.IntegerField(read_only=True)
+    installment_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Workshop
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'instructor',
+            'instructor_name', 'instructor_email', 'status', 'difficulty',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'payment_type', 'installment_months', 'installment_amount',
+            'start_date', 'start_date_persian', 'end_date', 'end_date_persian',
+            'registration_deadline', 'registration_deadline_persian',
+            'total_hours', 'language', 'prerequisites', 'learning_objectives',
+            'current_participants', 'max_participants', 'is_full', 'available_seats',
+            'thumbnail', 'intro_video', 'rating', 'review_count',
+            'registration_count', 'attendance_rate', 'revenue',
+            'created_at', 'created_at_persian', 'published_at', 'published_at_persian',
+            'sessions', 'registrations'
+        ]
+        read_only_fields = ['id', 'created_at', 'published_at', 'rating', 'review_count']
+    
+    def get_registration_count(self, obj):
+        return WorkshopRegistration.objects.filter(workshop=obj).count()
+    
+    def get_attendance_rate(self, obj):
+        total_sessions = obj.sessions.count()
+        if total_sessions == 0:
+            return 0
+        total_attendance = WorkshopSessionAttendance.objects.filter(
+            session__workshop=obj, attended=True
+        ).count()
+        return round((total_attendance / (total_sessions * obj.current_participants)) * 100, 1) if obj.current_participants > 0 else 0
+    
+    def get_revenue(self, obj):
+        registrations = WorkshopRegistration.objects.filter(workshop=obj)
+        return sum(float(reg.amount_paid) for reg in registrations)
+    
+    def get_start_date_persian(self, obj):
+        if obj.start_date:
+            jdate = jdatetime.date.fromgregorian(date=obj.start_date)
+            return jdate.strftime('%Y/%m/%d')
+        return None
+    
+    def get_end_date_persian(self, obj):
+        if obj.end_date:
+            jdate = jdatetime.date.fromgregorian(date=obj.end_date)
+            return jdate.strftime('%Y/%m/%d')
+        return None
+    
+    def get_registration_deadline_persian(self, obj):
+        if obj.registration_deadline:
+            return jdatetime.datetime.fromgregorian(datetime=obj.registration_deadline).strftime('%Y/%m/%d - %H:%M')
+        return None
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None

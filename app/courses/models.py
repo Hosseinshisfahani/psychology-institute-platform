@@ -18,8 +18,8 @@ class CourseCategory(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
-        verbose_name = _('Course Category')
-        verbose_name_plural = _('Course Categories')
+        verbose_name = 'دسته‌بندی بسته آموزشی'
+        verbose_name_plural = 'دسته‌بندی‌های بسته آموزشی'
         ordering = ['name']
     
     def __str__(self):
@@ -83,8 +83,8 @@ class Course(models.Model):
     published_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Published At'))
     
     class Meta:
-        verbose_name = _('Course')
-        verbose_name_plural = _('Courses')
+        verbose_name = 'بسته آموزشی'
+        verbose_name_plural = 'بسته‌های آموزشی'
         ordering = ['-created_at']
     
     def __str__(self):
@@ -118,8 +118,8 @@ class CourseModule(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
-        verbose_name = _('Course Module')
-        verbose_name_plural = _('Course Modules')
+        verbose_name = 'ماژول بسته آموزشی'
+        verbose_name_plural = 'ماژول‌های بسته آموزشی'
         ordering = ['order']
         unique_together = ['course', 'order']
     
@@ -154,8 +154,8 @@ class Lesson(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        verbose_name = _('Lesson')
-        verbose_name_plural = _('Lessons')
+        verbose_name = 'درس'
+        verbose_name_plural = 'درس‌ها'
         ordering = ['order']
         unique_together = ['module', 'order']
     
@@ -182,8 +182,8 @@ class Enrollment(models.Model):
     last_accessed = models.DateTimeField(blank=True, null=True, verbose_name=_('Last Accessed'))
     
     class Meta:
-        verbose_name = _('Enrollment')
-        verbose_name_plural = _('Enrollments')
+        verbose_name = 'ثبت‌نام'
+        verbose_name_plural = 'ثبت‌نام‌ها'
         unique_together = ['user', 'course']
         ordering = ['-enrolled_at']
     
@@ -202,8 +202,8 @@ class LessonProgress(models.Model):
     last_position = models.PositiveIntegerField(default=0, help_text=_('Last position in video (seconds)'), verbose_name=_('Last Position'))
     
     class Meta:
-        verbose_name = _('Lesson Progress')
-        verbose_name_plural = _('Lesson Progress')
+        verbose_name = 'پیشرفت درس'
+        verbose_name_plural = 'پیشرفت درس‌ها'
         unique_together = ['enrollment', 'lesson']
     
     def __str__(self):
@@ -222,8 +222,8 @@ class CourseReview(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        verbose_name = _('Course Review')
-        verbose_name_plural = _('Course Reviews')
+        verbose_name = 'نظر بسته آموزشی'
+        verbose_name_plural = 'نظرات بسته‌های آموزشی'
         ordering = ['-created_at']
     
     def __str__(self):
@@ -262,8 +262,8 @@ class Coupon(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        verbose_name = _('Coupon')
-        verbose_name_plural = _('Coupons')
+        verbose_name = 'کوپن تخفیف'
+        verbose_name_plural = 'کوپن‌های تخفیف'
         ordering = ['-created_at']
     
     def __str__(self):
@@ -309,8 +309,8 @@ class CoursePurchase(models.Model):
     order = models.ForeignKey('payment.Order', on_delete=models.SET_NULL, blank=True, null=True, verbose_name=_('Order'))
     
     class Meta:
-        verbose_name = _('Course Purchase')
-        verbose_name_plural = _('Course Purchases')
+        verbose_name = 'خرید بسته آموزشی'
+        verbose_name_plural = 'خریدهای بسته‌های آموزشی'
         ordering = ['-purchased_at']
         unique_together = ['user', 'course']
     

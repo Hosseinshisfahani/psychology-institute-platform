@@ -56,8 +56,11 @@ urlpatterns = [
     path('api/workshops/', include('app.workshops.api_urls')),
     path('api/packages/', include('app.packages.api_urls')),
     
-    # Apps
-    path('', include('app.blog.urls')),
+    # Redirect root to React frontend
+    path('', RedirectView.as_view(url='http://localhost:3001', permanent=False), name='home_redirect'),
+    
+    # Apps (for API endpoints only)
+    path('blog/', include('app.blog.urls')),
     path('tests/', include('app.tests.urls')),
     path('courses/', include('app.courses.urls')),
     path('dashboard/', include('app.dashboard.urls')),

@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from .models import (
     CourseCategory, Course, CourseModule, Lesson, 
-    Enrollment, LessonProgress, CoursePurchase, CourseReview
+    Enrollment, LessonProgress, CoursePurchase, CourseReview, Coupon
 )
 
 
@@ -181,6 +181,39 @@ class CourseReviewAdmin(admin.ModelAdmin):
         }),
         (_('Timestamp'), {
             'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(Coupon)
+class CouponAdmin(admin.ModelAdmin):
+    """Admin configuration for Coupon model"""
+    
+    list_display = ('code', 'title', 'coupon_type', 'discount_value', 'is_active', 'valid_from', 'valid_until', 'used_count', 'usage_limit')
+    list_filter = ('coupon_type', 'is_active', 'valid_from', 'valid_until')
+    search_fields = ('code', 'title', 'description')
+    readonly_fields = ('used_count', 'created_at', 'updated_at')
+    filter_horizontal = ('applicable_courses',)
+    
+    fieldsets = (
+        (None, {
+            'fields': ('code', 'title', 'description')
+        }),
+        (_('Discount'), {
+            'fields': ('coupon_type', 'discount_value', 'min_order_amount', 'max_discount_amount')
+        }),
+        (_('Usage Limits'), {
+            'fields': ('usage_limit', 'used_count')
+        }),
+        (_('Validity'), {
+            'fields': ('is_active', 'valid_from', 'valid_until')
+        }),
+        (_('Applicable Courses'), {
+            'fields': ('applicable_courses',)
+        }),
+        (_('Timestamps'), {
+            'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )

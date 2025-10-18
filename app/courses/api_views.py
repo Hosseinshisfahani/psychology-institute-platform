@@ -21,7 +21,7 @@ class CourseLearnAPIView(generics.RetrieveAPIView):
         course = super().get_object()
         # Check if user is enrolled
         if not Enrollment.objects.filter(user=self.request.user, course=course).exists():
-            raise PermissionError("شما در این دوره ثبت‌نام نکرده‌اید")
+            raise PermissionError("شما در این بسته آموزشی ثبت‌نام نکرده‌اید")
         return course
 
 @api_view(['POST'])
@@ -35,7 +35,7 @@ def mark_lesson_complete(request, lesson_id):
     # Check if user is enrolled in the course
     if not Enrollment.objects.filter(user=request.user, course=lesson.course).exists():
         return Response(
-            {'error': 'شما در این دوره ثبت‌نام نکرده‌اید'}, 
+            {'error': 'شما در این بسته آموزشی ثبت‌نام نکرده‌اید'}, 
             status=status.HTTP_403_FORBIDDEN
         )
     
@@ -78,7 +78,7 @@ def update_watch_time(request, lesson_id):
     # Check if user is enrolled in the course
     if not Enrollment.objects.filter(user=request.user, course=lesson.course).exists():
         return Response(
-            {'error': 'شما در این دوره ثبت‌نام نکرده‌اید'}, 
+            {'error': 'شما در این بسته آموزشی ثبت‌نام نکرده‌اید'}, 
             status=status.HTTP_403_FORBIDDEN
         )
     
@@ -109,10 +109,10 @@ def enroll_course(request, course_slug):
     )
     
     if created:
-        message = 'با موفقیت در دوره ثبت‌نام شدید'
+        message = 'با موفقیت در بسته آموزشی ثبت‌نام شدید'
         status_code = status.HTTP_201_CREATED
     else:
-        message = 'شما قبلاً در این دوره ثبت‌نام کرده‌اید'
+        message = 'شما قبلاً در این بسته آموزشی ثبت‌نام کرده‌اید'
         status_code = status.HTTP_200_OK
     
     serializer = EnrollmentSerializer(enrollment)
@@ -143,14 +143,14 @@ def add_to_cart(request, course_slug):
     # Check if user already purchased this course
     if CoursePurchase.objects.filter(user=request.user, course=course).exists():
         return Response(
-            {'error': 'شما قبلاً این دوره را خریداری کرده‌اید'}, 
+            {'error': 'شما قبلاً این بسته آموزشی را خریداری کرده‌اید'}, 
             status=status.HTTP_400_BAD_REQUEST
         )
     
     # Check if user is already enrolled (for free courses)
     if course.is_free and Enrollment.objects.filter(user=request.user, course=course).exists():
         return Response(
-            {'error': 'شما قبلاً در این دوره ثبت‌نام کرده‌اید'}, 
+            {'error': 'شما قبلاً در این بسته آموزشی ثبت‌نام کرده‌اید'}, 
             status=status.HTTP_400_BAD_REQUEST
         )
     
@@ -159,7 +159,7 @@ def add_to_cart(request, course_slug):
     # Check if item already in cart
     if CartItem.objects.filter(cart=cart, item_type='course', item_id=course.id).exists():
         return Response(
-            {'error': 'این دوره قبلاً در سبد خرید شما موجود است'}, 
+            {'error': 'این بسته آموزشی قبلاً در سبد خرید شما موجود است'}, 
             status=status.HTTP_400_BAD_REQUEST
         )
     
@@ -173,7 +173,7 @@ def add_to_cart(request, course_slug):
     )
     
     return Response({
-        'message': 'دوره با موفقیت به سبد خرید اضافه شد',
+        'message': 'بسته آموزشی با موفقیت به سبد خرید اضافه شد',
         'cart_total': float(cart.total_amount)
     }, status=status.HTTP_201_CREATED)
 
@@ -266,7 +266,7 @@ def purchase_course(request, course_slug):
     # Check if user already purchased this course
     if CoursePurchase.objects.filter(user=request.user, course=course).exists():
         return Response(
-            {'error': 'شما قبلاً این دوره را خریداری کرده‌اید'}, 
+            {'error': 'شما قبلاً این بسته آموزشی را خریداری کرده‌اید'}, 
             status=status.HTTP_400_BAD_REQUEST
         )
     
@@ -279,12 +279,12 @@ def purchase_course(request, course_slug):
         
         if created:
             return Response({
-                'message': 'با موفقیت در دوره رایگان ثبت‌نام شدید',
+                'message': 'با موفقیت در بسته آموزشی رایگان ثبت‌نام شدید',
                 'enrollment': True
             }, status=status.HTTP_201_CREATED)
         else:
             return Response({
-                'message': 'شما قبلاً در این دوره ثبت‌نام کرده‌اید',
+                'message': 'شما قبلاً در این بسته آموزشی ثبت‌نام کرده‌اید',
                 'enrollment': True
             }, status=status.HTTP_200_OK)
     
@@ -304,6 +304,6 @@ def purchase_course(request, course_slug):
     )
     
     return Response({
-        'message': 'دوره به سبد خرید اضافه شد. لطفاً برای تکمیل خرید به سبد خرید مراجعه کنید.',
+        'message': 'بسته آموزشی به سبد خرید اضافه شد. لطفاً برای تکمیل خرید به سبد خرید مراجعه کنید.',
         'cart_url': '/payment/cart/'
     }, status=status.HTTP_201_CREATED)

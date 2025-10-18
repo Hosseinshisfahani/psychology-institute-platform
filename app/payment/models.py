@@ -23,8 +23,8 @@ class PaymentMethod(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
-        verbose_name = _('Payment Method')
-        verbose_name_plural = _('Payment Methods')
+        verbose_name = 'روش پرداخت'
+        verbose_name_plural = 'روش‌های پرداخت'
         ordering = ['name']
     
     def __str__(self):
@@ -39,8 +39,8 @@ class Cart(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        verbose_name = _('Cart')
-        verbose_name_plural = _('Carts')
+        verbose_name = 'سبد خرید'
+        verbose_name_plural = 'سبدهای خرید'
     
     def __str__(self):
         return f"Cart for {self.user.full_name}"
@@ -73,8 +73,8 @@ class CartItem(models.Model):
     added_at = models.DateTimeField(auto_now_add=True, verbose_name=_('Added At'))
     
     class Meta:
-        verbose_name = _('Cart Item')
-        verbose_name_plural = _('Cart Items')
+        verbose_name = 'آیتم سبد خرید'
+        verbose_name_plural = 'آیتم‌های سبد خرید'
         unique_together = ['cart', 'item_type', 'item_id']
     
     def __str__(self):
@@ -119,8 +119,8 @@ class Order(models.Model):
     paid_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Paid At'))
     
     class Meta:
-        verbose_name = _('Order')
-        verbose_name_plural = _('Orders')
+        verbose_name = 'سفارش'
+        verbose_name_plural = 'سفارشات'
         ordering = ['-created_at']
     
     def __str__(self):
@@ -153,8 +153,8 @@ class OrderItem(models.Model):
     total_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Total Price'))
     
     class Meta:
-        verbose_name = _('Order Item')
-        verbose_name_plural = _('Order Items')
+        verbose_name = 'آیتم سفارش'
+        verbose_name_plural = 'آیتم‌های سفارش'
     
     def __str__(self):
         return f"{self.item_title} in Order {self.order.order_number}"
@@ -191,8 +191,8 @@ class Payment(models.Model):
     completed_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Completed At'))
     
     class Meta:
-        verbose_name = _('Payment')
-        verbose_name_plural = _('Payments')
+        verbose_name = 'پرداخت'
+        verbose_name_plural = 'پرداخت‌ها'
         ordering = ['-created_at']
     
     def __str__(self):
@@ -211,8 +211,8 @@ class InstallmentSchedule(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        verbose_name = _('Installment Schedule')
-        verbose_name_plural = _('Installment Schedules')
+        verbose_name = 'برنامه اقساط'
+        verbose_name_plural = 'برنامه‌های اقساط'
     
     def __str__(self):
         return f"Installment Schedule for {self.order.order_number}"

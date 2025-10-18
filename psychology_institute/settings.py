@@ -125,16 +125,16 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'dashboard.validators.PersianUserAttributeSimilarityValidator',
+        'NAME': 'app.dashboard.validators.PersianUserAttributeSimilarityValidator',
     },
     {
-        'NAME': 'dashboard.validators.PersianMinimumLengthValidator',
+        'NAME': 'app.dashboard.validators.PersianMinimumLengthValidator',
     },
     {
-        'NAME': 'dashboard.validators.PersianCommonPasswordValidator',
+        'NAME': 'app.dashboard.validators.PersianCommonPasswordValidator',
     },
     {
-        'NAME': 'dashboard.validators.PersianNumericPasswordValidator',
+        'NAME': 'app.dashboard.validators.PersianNumericPasswordValidator',
     },
 ]
 

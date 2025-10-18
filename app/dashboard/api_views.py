@@ -1,8 +1,13 @@
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
+from django.contrib.auth import authenticate, login, logout
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.utils.decorators import method_decorator
 from .models import User, Notification
+from .serializers import UserSerializer, UserProfileSerializer
 from app.courses.models import CoursePurchase
 from app.payment.models import Order
 
@@ -179,3 +184,119 @@ def financial_report_api(request):
         'overdue_installments_count': overdue_installments_count,
         'total_orders': orders.count(),
     })
+
+
+class LoginAPIView(APIView):
+    """API endpoint for user login"""
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        email = request.data.get('email')
+        password = request.data.get('password')
+        
+        if not email or not password:
+            return Response({
+                'success': False,
+                'message': 'Email and password are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        user = authenticate(request, username=email, password=password)
+        
+        if user is not None:
+            login(request, user)
+            return Response({
+                'success': True,
+                'message': 'Login successful',
+                'user': UserSerializer(user).data
+            })
+        else:
+            return Response({
+                'success': False,
+                'message': 'Invalid email or password'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+
+class SignupAPIView(APIView):
+    """API endpoint for user signup"""
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        email = request.data.get('email')
+        password1 = request.data.get('password1')
+        password2 = request.data.get('password2')
+        first_name = request.data.get('first_name')
+        last_name = request.data.get('last_name')
+        
+        # Validate required fields
+        if not all([email, password1, password2, first_name, last_name]):
+            return Response({
+                'success': False,
+                'message': 'All fields are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if passwords match
+        if password1 != password2:
+            return Response({
+                'success': False,
+                'message': 'Passwords do not match'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if user already exists
+        if User.objects.filter(email=email).exists():
+            return Response({
+                'success': False,
+                'message': 'User with this email already exists'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create user
+        try:
+            user = User.objects.create_user(
+                email=email,
+                password=password1,
+                first_name=first_name,
+                last_name=last_name
+            )
+            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+            
+            return Response({
+                'success': True,
+                'message': 'Signup successful',
+                'user': UserSerializer(user).data
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class LogoutAPIView(APIView):
+    """API endpoint for user logout"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        logout(request)
+        return Response({
+            'success': True,
+            'message': 'Logout successful'
+        })
+
+
+class ProfileAPIView(APIView):
+    """API endpoint for user profile"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        user = request.user
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
+    
+    def patch(self, request):
+        user = request.user
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

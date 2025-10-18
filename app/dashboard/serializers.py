@@ -26,9 +26,9 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'email', 'first_name', 'last_name', 'full_name',
             'user_type', 'phone_number', 'national_id', 'birth_date', 'gender',
             'address', 'city', 'postal_code', 'profile_image', 'bio',
-            'is_active', 'is_verified', 'date_joined', 'last_login', 'profile'
+            'is_active', 'is_verified', 'is_staff', 'date_joined', 'last_login', 'profile'
         ]
-        read_only_fields = ['id', 'date_joined', 'last_login', 'is_verified']
+        read_only_fields = ['id', 'date_joined', 'last_login', 'is_verified', 'is_staff']
 
 
 class NotificationSerializer(serializers.ModelSerializer):

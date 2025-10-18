@@ -52,27 +52,27 @@ class Command(BaseCommand):
         # Create course categories
         course_cat1 = CourseCategory.objects.get_or_create(
             name='روانشناسی بالینی',
-            description='دوره‌های روانشناسی بالینی',
+            description='بسته‌های روانشناسی بالینی',
             color='#6f42c1'
         )[0]
         
         course_cat2 = CourseCategory.objects.get_or_create(
             name='مشاوره',
-            description='دوره‌های مشاوره',
+            description='بسته‌های مشاوره',
             color='#fd7e14'
         )[0]
         
         # Create session types
         session_type1 = SessionType.objects.get_or_create(
             name='مشاوره فردی',
-            description='جلسات مشاوره فردی',
+            description='نوبت‌های مشاوره فردی',
             duration_minutes=60,
             price=150000
         )[0]
         
         session_type2 = SessionType.objects.get_or_create(
             name='مشاوره خانوادگی',
-            description='جلسات مشاوره خانوادگی',
+            description='نوبت‌های مشاوره خانوادگی',
             duration_minutes=90,
             price=200000
         )[0]
@@ -88,7 +88,7 @@ class Command(BaseCommand):
             max_tests=50,
             max_courses=20,
             max_sessions=100,
-            features=['تست‌های پایه', 'دوره‌های مقدماتی', 'گزارش‌گیری ساده']
+            features=['تست‌های پایه', 'بسته‌های مقدماتی', 'گزارش‌گیری ساده']
         )[0]
         
         # Create sample blog posts
@@ -216,7 +216,7 @@ class Command(BaseCommand):
         course_cat1 = CourseCategory.objects.get_or_create(
             name='روانشناسی بالینی',
             slug='clinical-psychology',
-            description='دوره‌های تخصصی روانشناسی بالینی',
+            description='بسته‌های تخصصی روانشناسی بالینی',
             color='#e74c3c',
             icon='fas fa-stethoscope',
             is_active=True
@@ -225,7 +225,7 @@ class Command(BaseCommand):
         course_cat2 = CourseCategory.objects.get_or_create(
             name='مشاوره خانواده',
             slug='family-counseling',
-            description='دوره‌های مشاوره و درمان خانواده',
+            description='بسته‌های مشاوره و درمان خانواده',
             color='#3498db',
             icon='fas fa-users',
             is_active=True
@@ -234,7 +234,7 @@ class Command(BaseCommand):
         course1 = Course.objects.get_or_create(
             title='مقدمه‌ای بر روانشناسی بالینی',
             slug='intro-clinical-psychology',
-            description='دوره مقدماتی روانشناسی بالینی که شما را با اصول و مبانی این رشته آشنا می‌کند. این دوره شامل مفاهیم پایه، روش‌های تشخیص و درمان است.',
+            description='بسته آموزشی مقدماتی روانشناسی بالینی که شما را با اصول و مبانی این رشته آشنا می‌کند. این بسته شامل مفاهیم پایه، روش‌های تشخیص و درمان است.',
             short_description='آشنایی با اصول روانشناسی بالینی',
             category=course_cat1,
             instructor=admin_user,
@@ -250,14 +250,14 @@ class Command(BaseCommand):
         course2 = Course.objects.get_or_create(
             title='مشاوره خانواده و زوجین',
             slug='family-couples-counseling',
-            description='دوره تخصصی مشاوره خانواده و زوجین که شامل تکنیک‌های درمانی و روش‌های حل تعارض است.',
+            description='بسته آموزشی تخصصی مشاوره خانواده و زوجین که شامل تکنیک‌های درمانی و روش‌های حل تعارض است.',
             short_description='آموزش تکنیک‌های مشاوره خانواده',
             category=course_cat2,
             instructor=admin_user,
             level='متوسط',
             duration_hours=30,
             learning_objectives='یادگیری تکنیک‌های مشاوره خانواده، حل تعارضات زناشویی',
-            prerequisites='دوره مقدماتی روانشناسی بالینی',
+            prerequisites='بسته آموزشی مقدماتی روانشناسی بالینی',
             is_free=False,
             price=150000,
             status='published'

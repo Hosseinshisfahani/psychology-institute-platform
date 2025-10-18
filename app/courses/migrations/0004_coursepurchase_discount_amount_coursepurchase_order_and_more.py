@@ -7,8 +7,8 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('app.payment', '0001_initial'),
-        ('app.courses', '0003_coursecategory_slug'),
+        ('payment', '0001_initial'),
+        ('courses', '0003_coursecategory_slug'),
     ]
 
     operations = [

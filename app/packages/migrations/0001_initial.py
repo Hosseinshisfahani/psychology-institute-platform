@@ -11,9 +11,9 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('app.courses', '0005_lesson_allow_download'),
+        ('courses', '0005_lesson_allow_download'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('app.payment', '0002_alter_cartitem_item_type_alter_orderitem_item_type_and_more'),
+        ('payment', '0002_alter_cartitem_item_type_alter_orderitem_item_type_and_more'),
     ]
 
     operations = [
