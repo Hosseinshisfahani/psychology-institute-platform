@@ -44,30 +44,30 @@ urlpatterns = [
     path('csrf/', lambda request: JsonResponse({'csrfToken': get_token(request)}), name='csrf_token'),
     
     # Authentication (Custom views)
-    path('accounts/', include('dashboard.auth_urls')),
+    path('accounts/', include('app.dashboard.auth_urls')),
     
     # API
     path('api/', include('rest_framework.urls')),
-    path('api/blog/', include('blog.api_urls')),
-    path('api/dashboard/', include('dashboard.api_urls')),
-    path('api/courses/', include('courses.api_urls')),
-    path('api/therapy/', include('therapy_sessions.api_urls')),
-    path('api/admin/', include('admin_panel.api_urls')),
-    path('api/workshops/', include('workshops.api_urls')),
-    path('api/packages/', include('packages.api_urls')),
+    path('api/blog/', include('app.blog.api_urls')),
+    path('api/dashboard/', include('app.dashboard.api_urls')),
+    path('api/courses/', include('app.courses.api_urls')),
+    path('api/therapy/', include('app.therapy_sessions.api_urls')),
+    path('api/admin/', include('app.admin_panel.api_urls')),
+    path('api/workshops/', include('app.workshops.api_urls')),
+    path('api/packages/', include('app.packages.api_urls')),
     
     # Apps
-    path('', include('blog.urls')),
-    path('tests/', include('tests.urls')),
-    path('courses/', include('courses.urls')),
-    path('dashboard/', include('dashboard.urls')),
-    path('sessions/', include('therapy_sessions.urls')),
-    path('payment/', include('payment.urls')),
-    path('reports/', include('reports.urls')),
-    path('sales/', include('sales.urls')),
-    path('admin-panel/', include('admin_panel.urls')),
-    path('workshops/', include('workshops.urls')),
-    path('packages/', include('packages.urls')),
+    path('', include('app.blog.urls')),
+    path('tests/', include('app.tests.urls')),
+    path('courses/', include('app.courses.urls')),
+    path('dashboard/', include('app.dashboard.urls')),
+    path('sessions/', include('app.therapy_sessions.urls')),
+    path('payment/', include('app.payment.urls')),
+    path('reports/', include('app.reports.urls')),
+    path('sales/', include('app.sales.urls')),
+    path('admin-panel/', include('app.admin_panel.urls')),
+    path('workshops/', include('app.workshops.urls')),
+    path('packages/', include('app.packages.urls')),
 ]
 
 # Serve media files in development

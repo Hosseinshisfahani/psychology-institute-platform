@@ -55,17 +55,18 @@ INSTALLED_APPS = [
     'django_celery_beat',
     
     # Local apps
-    'blog',
-    'tests',
-    'courses',
-    'dashboard',
-    'therapy_sessions',
-    'payment',
-    'reports',
-    'sales',
-    'admin_panel',
-    'workshops',
-    'packages',
+    'app.blog',
+    'app.tests',
+    'app.courses',
+    'app.dashboard',
+    'app.therapy_sessions',
+    'app.payment',
+    'app.reports',
+    'app.sales',
+    'app.admin_panel',
+    'app.workshops',
+    'app.packages',
+    'app.cohorts',
 ]
 
 MIDDLEWARE = [
