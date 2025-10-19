@@ -12,8 +12,7 @@ class SessionType(models.Model):
     name = models.CharField(max_length=100, verbose_name=_('Name'))
     description = models.TextField(blank=True, null=True, verbose_name=_('Description'))
     duration_minutes = models.PositiveIntegerField(verbose_name=_('Duration (Minutes)'))
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Price'))
-    is_active = models.BooleanField(default=True, verbose_name=_('Is Active'))
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Is Active')
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
@@ -39,10 +38,7 @@ class TherapistAvailability(models.Model):
     ]
     
     therapist = models.ForeignKey(User, on_delete=models.CASCADE, related_name='availability', verbose_name=_('Therapist'))
-    day_of_week = models.CharField(max_length=10, choices=DAYS_OF_WEEK, verbose_name=_('Day of Week'))
-    start_time = models.TimeField(verbose_name=_('Start Time'))
-    end_time = models.TimeField(verbose_name=_('End Time'))
-    is_available = models.BooleanField(default=True, verbose_name=_('Is Available'))
+    day_of_week = models.CharField(max_length=10, choices=DAYS_OF_WEEK, verbose_name=_('Is Available')
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
@@ -96,8 +92,7 @@ class Session(models.Model):
     homework = models.TextField(blank=True, null=True, verbose_name=_('Homework'))
     
     # Pricing
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Price'))
-    is_paid = models.BooleanField(default=False, verbose_name=_('Is Paid'))
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Is Paid')
     payment_method = models.CharField(max_length=50, blank=True, null=True, verbose_name=_('Payment Method'))
     transaction_id = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Transaction ID'))
     
@@ -128,9 +123,7 @@ class SessionNote(models.Model):
     ]
     
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='notes', verbose_name=_('Session'))
-    note_type = models.CharField(max_length=20, choices=NOTE_TYPES, verbose_name=_('Note Type'))
-    content = models.TextField(verbose_name=_('Content'))
-    is_private = models.BooleanField(default=True, verbose_name=_('Is Private'))
+    note_type = models.CharField(max_length=20, choices=NOTE_TYPES, verbose_name=_('Is Private')
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='session_notes', verbose_name=_('Created By'))
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -152,8 +145,7 @@ class SessionRating(models.Model):
     therapist_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name=_('Therapist Rating'))
     environment_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name=_('Environment Rating'))
     helpfulness_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name=_('Helpfulness Rating'))
-    comments = models.TextField(blank=True, null=True, verbose_name=_('Comments'))
-    would_recommend = models.BooleanField(default=True, verbose_name=_('Would Recommend'))
+    comments = models.TextField(blank=True, null=True, verbose_name=_('Would Recommend')
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
@@ -179,10 +171,8 @@ class SessionCancellation(models.Model):
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='cancellations', verbose_name=_('Session'))
     cancelled_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='session_cancellations', verbose_name=_('Cancelled By'))
     reason = models.CharField(max_length=20, choices=CANCELLATION_REASONS, verbose_name=_('Reason'))
-    explanation = models.TextField(blank=True, null=True, verbose_name=_('Explanation'))
-    cancelled_at = models.DateTimeField(auto_now_add=True, verbose_name=_('Cancelled At'))
-    refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_('Refund Amount'))
-    is_refunded = models.BooleanField(default=False, verbose_name=_('Is Refunded'))
+    explanation = models.TextField(blank=True, null=True, verbose_name=_('Cancelled At')
+    refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_('Is Refunded')
     
     class Meta:
         verbose_name = _('Session Cancellation')
@@ -203,9 +193,7 @@ class SessionReminder(models.Model):
     ]
     
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='reminders', verbose_name=_('Session'))
-    reminder_type = models.CharField(max_length=20, choices=REMINDER_TYPES, verbose_name=_('Reminder Type'))
-    scheduled_time = models.DateTimeField(verbose_name=_('Scheduled Time'))
-    is_sent = models.BooleanField(default=False, verbose_name=_('Is Sent'))
+    reminder_type = models.CharField(max_length=20, choices=REMINDER_TYPES, verbose_name=_('Is Sent')
     sent_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Sent At'))
     created_at = models.DateTimeField(auto_now_add=True)
     

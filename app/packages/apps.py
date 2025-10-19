@@ -1,6 +1,9 @@
 from django.apps import AppConfig
+from django.utils.translation import gettext_lazy as _
 
 
 class PackagesConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'app.packages'
+    verbose_name = _('پکیج‌ها')
+    verbose_name_plural = _('پکیج‌ها')

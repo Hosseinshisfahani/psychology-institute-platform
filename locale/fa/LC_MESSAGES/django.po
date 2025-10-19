@@ -213,3 +213,1218 @@ msgstr "فیلد الزامی"
 
 msgid "Optional field"
 msgstr "فیلد اختیاری"
+
+# Django Admin Interface
+msgid "Django administration"
+msgstr "مدیریت جنگو"
+
+msgid "Django site admin"
+msgstr "مدیریت سایت جنگو"
+
+msgid "Site administration"
+msgstr "مدیریت سایت"
+
+msgid "Recent actions"
+msgstr "اقدامات اخیر"
+
+msgid "My actions"
+msgstr "اقدامات من"
+
+msgid "None available"
+msgstr "موردی وجود ندارد"
+
+msgid "Add"
+msgstr "افزودن"
+
+msgid "Change"
+msgstr "تغییر"
+
+msgid "View"
+msgstr "مشاهده"
+
+msgid "Log in"
+msgstr "ورود"
+
+msgid "Log out"
+msgstr "خروج"
+
+msgid "Welcome,"
+msgstr "خوش آمدید،"
+
+msgid "View site"
+msgstr "مشاهده سایت"
+
+msgid "Documentation"
+msgstr "مستندات"
+
+msgid "Change password"
+msgstr "تغییر رمز عبور"
+
+msgid "Home"
+msgstr "خانه"
+
+msgid "Server error (500)"
+msgstr "خطای سرور (500)"
+
+msgid "Page not found (404)"
+msgstr "صفحه یافت نشد (404)"
+
+msgid "Go"
+msgstr "برو"
+
+msgid "Today"
+msgstr "امروز"
+
+msgid "Now"
+msgstr "اکنون"
+
+# Admin actions
+msgid "Are you sure?"
+msgstr "آیا مطمئن هستید؟"
+
+msgid "Delete selected %(verbose_name_plural)s"
+msgstr "حذف %(verbose_name_plural)s انتخاب شده"
+
+msgid "Delete?"
+msgstr "حذف؟"
+
+msgid "Summary"
+msgstr "خلاصه"
+
+msgid "All"
+msgstr "همه"
+
+msgid "Any date"
+msgstr "هر تاریخی"
+
+msgid "Date:"
+msgstr "تاریخ:"
+
+msgid "Time:"
+msgstr "زمان:"
+
+msgid "Lookup"
+msgstr "جستجو"
+
+msgid "Currently:"
+msgstr "در حال حاضر:"
+
+msgid "Change:"
+msgstr "تغییر:"
+
+msgid "Clear selection"
+msgstr "پاک کردن انتخاب"
+
+msgid "Click to select all %s at once."
+msgstr "برای انتخاب تمام %s کلیک کنید."
+
+msgid "Select %s"
+msgstr "انتخاب %s"
+
+msgid "Select %s to change"
+msgstr "%s را برای تغییر انتخاب کنید"
+
+msgid "Select %s to view"
+msgstr "%s را برای مشاهده انتخاب کنید"
+
+msgid "remove"
+msgstr "حذف"
+
+msgid "Remove"
+msgstr "حذف"
+
+msgid "Show"
+msgstr "نمایش"
+
+msgid "Hide"
+msgstr "مخفی کردن"
+
+msgid "Clear all filters"
+msgstr "پاک کردن همه فیلترها"
+
+msgid "Unknown"
+msgstr "نامشخص"
+
+msgid "Unknown content"
+msgstr "محتوای نامشخص"
+
+msgid "Hold down \"Control\", or \"Command\" on a Mac, to select more than one."
+msgstr "برای انتخاب بیش از یک مورد، کلید \"Control\" یا \"Command\" در مک را نگه دارید."
+
+# Django Auth app
+msgid "Authentication and Authorization"
+msgstr "احراز هویت و مجوزها"
+
+msgid "AUTHENTICATION AND AUTHORIZATION"
+msgstr "احراز هویت و مجوزها"
+
+msgid "Groups"
+msgstr "گروه‌ها"
+
+msgid "Group"
+msgstr "گروه"
+
+msgid "Permissions"
+msgstr "مجوزها"
+
+msgid "Permission"
+msgstr "مجوز"
+
+msgid "User"
+msgstr "کاربر"
+
+msgid "Users"
+msgstr "کاربران"
+
+msgid "Personal info"
+msgstr "اطلاعات شخصی"
+
+msgid "Important dates"
+msgstr "تاریخ‌های مهم"
+
+msgid "Permissions and Groups"
+msgstr "مجوزها و گروه‌ها"
+
+msgid "Staff status"
+msgstr "وضعیت کارمند"
+
+msgid "Active"
+msgstr "فعال"
+
+msgid "Superuser status"
+msgstr "وضعیت کاربر ارشد"
+
+msgid "Username"
+msgstr "نام کاربری"
+
+msgid "Password"
+msgstr "رمز عبور"
+
+msgid "Password confirmation"
+msgstr "تأیید رمز عبور"
+
+msgid "Enter the same password as before, for verification."
+msgstr "برای تأیید، همان رمز عبور قبلی را وارد کنید."
+
+msgid "Raw passwords are not stored, so there is no way to see this user's password, but you can change the password using <a href=\"{}\">this form</a>."
+msgstr "رمزهای عبور به صورت خام ذخیره نمی‌شوند، بنابراین راهی برای مشاهده رمز عبور این کاربر وجود ندارد، اما می‌توانید با استفاده از <a href=\"{}\">این فرم</a> رمز عبور را تغییر دهید."
+
+msgid "Date joined"
+msgstr "تاریخ عضویت"
+
+msgid "Last login"
+msgstr "آخرین ورود"
+
+msgid "Designates whether the user can log into this admin site."
+msgstr "مشخص می‌کند که آیا کاربر می‌تواند به این سایت مدیریت وارد شود."
+
+msgid "Designates whether this user should be treated as active. Unselect this instead of deleting accounts."
+msgstr "مشخص می‌کند که آیا این کاربر باید به عنوان فعال در نظر گرفته شود. به جای حذف حساب‌ها، این گزینه را غیرفعال کنید."
+
+msgid "Designates that this user has all permissions without explicitly assigning them."
+msgstr "مشخص می‌کند که این کاربر تمام مجوزها را بدون تخصیص صریح دارد."
+
+# Accounts app
+msgid "ACCOUNTS"
+msgstr "حساب‌های کاربری"
+
+msgid "Accounts"
+msgstr "حساب‌های کاربری"
+
+msgid "Email addresses"
+msgstr "آدرس‌های ایمیل"
+
+msgid "Email"
+msgstr "ایمیل"
+
+msgid "Verified"
+msgstr "تأیید شده"
+
+msgid "Primary"
+msgstr "اصلی"
+
+# Blog app
+msgid "BLOG"
+msgstr "وبلاگ"
+
+msgid "Blog"
+msgstr "وبلاگ"
+
+msgid "Posts"
+msgstr "نوشته‌ها"
+
+msgid "Post"
+msgstr "نوشته"
+
+msgid "Categories"
+msgstr "دسته‌بندی‌ها"
+
+msgid "Category"
+msgstr "دسته‌بندی"
+
+msgid "Tags"
+msgstr "برچسب‌ها"
+
+msgid "Tag"
+msgstr "برچسب"
+
+msgid "Comments"
+msgstr "نظرات"
+
+msgid "Comment"
+msgstr "نظر"
+
+msgid "Newsletter Subscriptions"
+msgstr "اشتراک‌های خبرنامه"
+
+msgid "Newsletter Subscription"
+msgstr "اشتراک خبرنامه"
+
+msgid "Post Likes"
+msgstr "پسندیدن نوشته‌ها"
+
+msgid "Post Like"
+msgstr "پسندیدن نوشته"
+
+msgid "Title"
+msgstr "عنوان"
+
+msgid "Slug"
+msgstr "نامک"
+
+msgid "Content"
+msgstr "محتوا"
+
+msgid "Excerpt"
+msgstr "خلاصه"
+
+msgid "Author"
+msgstr "نویسنده"
+
+msgid "Published"
+msgstr "منتشر شده"
+
+msgid "Created"
+msgstr "ایجاد شده"
+
+msgid "Modified"
+msgstr "ویرایش شده"
+
+msgid "Created at"
+msgstr "زمان ایجاد"
+
+msgid "Updated at"
+msgstr "زمان به‌روزرسانی"
+
+msgid "Featured image"
+msgstr "تصویر شاخص"
+
+msgid "Status"
+msgstr "وضعیت"
+
+msgid "Draft"
+msgstr "پیش‌نویس"
+
+msgid "Published at"
+msgstr "زمان انتشار"
+
+msgid "Views"
+msgstr "بازدیدها"
+
+msgid "Likes"
+msgstr "پسندها"
+
+msgid "Name"
+msgstr "نام"
+
+msgid "Description"
+msgstr "توضیحات"
+
+msgid "Approved"
+msgstr "تأیید شده"
+
+msgid "Text"
+msgstr "متن"
+
+msgid "Parent"
+msgstr "والد"
+
+# Cohorts app
+msgid "COHORTS (CLASSES)"
+msgstr "دوره‌ها (کلاس‌ها)"
+
+msgid "Cohorts"
+msgstr "دوره‌ها"
+
+msgid "Cohort"
+msgstr "دوره"
+
+msgid "Cohort Sessions"
+msgstr "جلسات دوره"
+
+msgid "Cohort Session"
+msgstr "جلسه دوره"
+
+msgid "Cohort Enrollments"
+msgstr "ثبت‌نام‌های دوره"
+
+msgid "Cohort Enrollment"
+msgstr "ثبت‌نام دوره"
+
+msgid "Cohort Attendance"
+msgstr "حضور و غیاب دوره"
+
+msgid "Cohort Installments"
+msgstr "اقساط دوره"
+
+msgid "Cohort Installment"
+msgstr "قسط دوره"
+
+msgid "Start date"
+msgstr "تاریخ شروع"
+
+msgid "End date"
+msgstr "تاریخ پایان"
+
+msgid "Capacity"
+msgstr "ظرفیت"
+
+msgid "Enrolled"
+msgstr "ثبت‌نام شده"
+
+msgid "Instructor"
+msgstr "مدرس"
+
+msgid "Location"
+msgstr "مکان"
+
+msgid "Session date"
+msgstr "تاریخ جلسه"
+
+msgid "Session time"
+msgstr "زمان جلسه"
+
+msgid "Duration"
+msgstr "مدت زمان"
+
+msgid "Student"
+msgstr "دانشجو"
+
+msgid "Enrollment date"
+msgstr "تاریخ ثبت‌نام"
+
+msgid "Present"
+msgstr "حاضر"
+
+msgid "Absent"
+msgstr "غایب"
+
+msgid "Amount"
+msgstr "مبلغ"
+
+msgid "Due date"
+msgstr "تاریخ سررسید"
+
+msgid "Paid"
+msgstr "پرداخت شده"
+
+msgid "Payment date"
+msgstr "تاریخ پرداخت"
+
+# Dashboard app
+msgid "DASHBOARD"
+msgstr "داشبورد"
+
+msgid "Dashboard"
+msgstr "داشبورد"
+
+msgid "Notifications"
+msgstr "اطلاعیه‌ها"
+
+msgid "Notification"
+msgstr "اطلاعیه"
+
+msgid "Profile"
+msgstr "پروفایل"
+
+msgid "Profiles"
+msgstr "پروفایل‌ها"
+
+msgid "Message"
+msgstr "پیام"
+
+msgid "Read"
+msgstr "خوانده شده"
+
+msgid "Recipient"
+msgstr "گیرنده"
+
+msgid "Sender"
+msgstr "فرستنده"
+
+msgid "Sent at"
+msgstr "زمان ارسال"
+
+msgid "Type"
+msgstr "نوع"
+
+msgid "Link"
+msgstr "لینک"
+
+# Courses app
+msgid "Courses"
+msgstr "دوره‌ها"
+
+msgid "Course"
+msgstr "دوره"
+
+msgid "Lessons"
+msgstr "درس‌ها"
+
+msgid "Lesson"
+msgstr "درس"
+
+msgid "Modules"
+msgstr "ماژول‌ها"
+
+msgid "Module"
+msgstr "ماژول"
+
+msgid "Assignments"
+msgstr "تکالیف"
+
+msgid "Assignment"
+msgstr "تکلیف"
+
+msgid "Enrollments"
+msgstr "ثبت‌نام‌ها"
+
+msgid "Enrollment"
+msgstr "ثبت‌نام"
+
+msgid "Progress"
+msgstr "پیشرفت"
+
+msgid "Completed"
+msgstr "تکمیل شده"
+
+msgid "Price"
+msgstr "قیمت"
+
+msgid "Free"
+msgstr "رایگان"
+
+msgid "Level"
+msgstr "سطح"
+
+msgid "Beginner"
+msgstr "مبتدی"
+
+msgid "Intermediate"
+msgstr "متوسط"
+
+msgid "Advanced"
+msgstr "پیشرفته"
+
+msgid "Language"
+msgstr "زبان"
+
+msgid "Persian"
+msgstr "فارسی"
+
+msgid "English"
+msgstr "انگلیسی"
+
+msgid "Video"
+msgstr "ویدیو"
+
+msgid "Video URL"
+msgstr "آدرس ویدیو"
+
+msgid "Order"
+msgstr "ترتیب"
+
+msgid "Prerequisite"
+msgstr "پیش‌نیاز"
+
+# Packages app
+msgid "Packages"
+msgstr "پکیج‌ها"
+
+msgid "Package"
+msgstr "پکیج"
+
+msgid "Features"
+msgstr "ویژگی‌ها"
+
+msgid "Feature"
+msgstr "ویژگی"
+
+msgid "Discount"
+msgstr "تخفیف"
+
+msgid "Discount code"
+msgstr "کد تخفیف"
+
+msgid "Discount amount"
+msgstr "مبلغ تخفیف"
+
+msgid "Valid from"
+msgstr "معتبر از"
+
+msgid "Valid until"
+msgstr "معتبر تا"
+
+msgid "Max uses"
+msgstr "حداکثر استفاده"
+
+msgid "Times used"
+msgstr "دفعات استفاده"
+
+# Payment app
+msgid "Payments"
+msgstr "پرداخت‌ها"
+
+msgid "Payment"
+msgstr "پرداخت"
+
+msgid "Transactions"
+msgstr "تراکنش‌ها"
+
+msgid "Transaction"
+msgstr "تراکنش"
+
+msgid "Invoices"
+msgstr "فاکتورها"
+
+msgid "Invoice"
+msgstr "فاکتور"
+
+msgid "Transaction ID"
+msgstr "شناسه تراکنش"
+
+msgid "Reference ID"
+msgstr "شناسه پیگیری"
+
+msgid "Failed"
+msgstr "ناموفق"
+
+msgid "Pending"
+msgstr "در انتظار"
+
+msgid "Refunded"
+msgstr "بازگشت داده شده"
+
+msgid "Total amount"
+msgstr "مبلغ کل"
+
+msgid "Paid amount"
+msgstr "مبلغ پرداخت شده"
+
+msgid "Remaining amount"
+msgstr "مبلغ باقیمانده"
+
+# Reports app
+msgid "Reports"
+msgstr "گزارش‌ها"
+
+msgid "Report"
+msgstr "گزارش"
+
+msgid "Statistics"
+msgstr "آمار"
+
+msgid "Analytics"
+msgstr "تحلیل‌ها"
+
+msgid "Revenue"
+msgstr "درآمد"
+
+msgid "Expenses"
+msgstr "هزینه‌ها"
+
+msgid "Profit"
+msgstr "سود"
+
+msgid "Period"
+msgstr "دوره"
+
+msgid "Daily"
+msgstr "روزانه"
+
+msgid "Weekly"
+msgstr "هفتگی"
+
+msgid "Monthly"
+msgstr "ماهانه"
+
+msgid "Yearly"
+msgstr "سالانه"
+
+# Sales app
+msgid "Sales"
+msgstr "فروش"
+
+msgid "Sale"
+msgstr "فروش"
+
+msgid "Orders"
+msgstr "سفارشات"
+
+msgid "Products"
+msgstr "محصولات"
+
+msgid "Product"
+msgstr "محصول"
+
+msgid "Cart"
+msgstr "سبد خرید"
+
+msgid "Checkout"
+msgstr "تسویه حساب"
+
+msgid "Quantity"
+msgstr "تعداد"
+
+msgid "Subtotal"
+msgstr "جمع جزء"
+
+msgid "Tax"
+msgstr "مالیات"
+
+msgid "Total"
+msgstr "جمع کل"
+
+msgid "Shipping"
+msgstr "ارسال"
+
+msgid "Billing"
+msgstr "صورتحساب"
+
+# Tests app
+msgid "Tests"
+msgstr "آزمون‌ها"
+
+msgid "Test"
+msgstr "آزمون"
+
+msgid "Questions"
+msgstr "سؤالات"
+
+msgid "Question"
+msgstr "سؤال"
+
+msgid "Answers"
+msgstr "پاسخ‌ها"
+
+msgid "Answer"
+msgstr "پاسخ"
+
+msgid "Results"
+msgstr "نتایج"
+
+msgid "Result"
+msgstr "نتیجه"
+
+msgid "Score"
+msgstr "امتیاز"
+
+msgid "Correct"
+msgstr "صحیح"
+
+msgid "Incorrect"
+msgstr "نادرست"
+
+msgid "Attempts"
+msgstr "تلاش‌ها"
+
+msgid "Attempt"
+msgstr "تلاش"
+
+msgid "Pass mark"
+msgstr "نمره قبولی"
+
+msgid "Time limit"
+msgstr "محدودیت زمانی"
+
+msgid "Minutes"
+msgstr "دقیقه"
+
+msgid "Seconds"
+msgstr "ثانیه"
+
+# Therapy Sessions app
+msgid "Therapy Sessions"
+msgstr "جلسات درمان"
+
+msgid "Therapy Session"
+msgstr "جلسه درمان"
+
+msgid "Therapists"
+msgstr "درمانگران"
+
+msgid "Clients"
+msgstr "مراجعان"
+
+msgid "Appointments"
+msgstr "قرارها"
+
+msgid "Appointment"
+msgstr "قرار"
+
+msgid "Session notes"
+msgstr "یادداشت‌های جلسه"
+
+msgid "Session note"
+msgstr "یادداشت جلسه"
+
+msgid "Scheduled"
+msgstr "برنامه‌ریزی شده"
+
+msgid "Confirmed"
+msgstr "تأیید شده"
+
+msgid "Cancelled"
+msgstr "لغو شده"
+
+msgid "No-show"
+msgstr "حضور نیافته"
+
+msgid "Notes"
+msgstr "یادداشت‌ها"
+
+msgid "Private notes"
+msgstr "یادداشت‌های خصوصی"
+
+msgid "Diagnosis"
+msgstr "تشخیص"
+
+msgid "Treatment plan"
+msgstr "برنامه درمانی"
+
+msgid "Next session"
+msgstr "جلسه بعدی"
+
+msgid "Session type"
+msgstr "نوع جلسه"
+
+msgid "Individual"
+msgstr "انفرادی"
+
+msgid "Couple"
+msgstr "زوج درمانی"
+
+msgid "Family"
+msgstr "خانواده درمانی"
+
+# Workshops app
+msgid "Workshops"
+msgstr "کارگاه‌ها"
+
+msgid "Workshop"
+msgstr "کارگاه"
+
+msgid "Workshop Sessions"
+msgstr "جلسات کارگاه"
+
+msgid "Workshop Session"
+msgstr "جلسه کارگاه"
+
+msgid "Workshop Enrollments"
+msgstr "ثبت‌نام‌های کارگاه"
+
+msgid "Workshop Enrollment"
+msgstr "ثبت‌نام کارگاه"
+
+msgid "Participants"
+msgstr "شرکت‌کنندگان"
+
+msgid "Participant"
+msgstr "شرکت‌کننده"
+
+msgid "Materials"
+msgstr "مواد آموزشی"
+
+msgid "Material"
+msgstr "ماده آموزشی"
+
+msgid "Certificate"
+msgstr "گواهینامه"
+
+msgid "Certificates"
+msgstr "گواهینامه‌ها"
+
+msgid "Attendance"
+msgstr "حضور و غیاب"
+
+msgid "Feedback"
+msgstr "بازخورد"
+
+msgid "Rating"
+msgstr "امتیاز"
+
+msgid "Organizer"
+msgstr "برگزارکننده"
+
+msgid "Registration deadline"
+msgstr "مهلت ثبت‌نام"
+
+msgid "Prerequisites"
+msgstr "پیش‌نیازها"
+
+msgid "Target audience"
+msgstr "مخاطبان هدف"
+
+# Admin Panel app
+msgid "Admin Panel"
+msgstr "پنل مدیریت"
+
+msgid "Settings"
+msgstr "تنظیمات"
+
+msgid "Site settings"
+msgstr "تنظیمات سایت"
+
+msgid "Email settings"
+msgstr "تنظیمات ایمیل"
+
+msgid "Payment settings"
+msgstr "تنظیمات پرداخت"
+
+msgid "System logs"
+msgstr "گزارش‌های سیستم"
+
+msgid "Backup"
+msgstr "پشتیبان"
+
+msgid "Restore"
+msgstr "بازیابی"
+
+# Common field names
+msgid "ID"
+msgstr "شناسه"
+
+msgid "Is active"
+msgstr "فعال است"
+
+msgid "Is staff"
+msgstr "کارمند است"
+
+msgid "Is superuser"
+msgstr "کاربر ارشد است"
+
+msgid "Date created"
+msgstr "تاریخ ایجاد"
+
+msgid "Date modified"
+msgstr "تاریخ ویرایش"
+
+msgid "Visible"
+msgstr "قابل مشاهده"
+
+msgid "Hidden"
+msgstr "مخفی"
+
+msgid "Image"
+msgstr "تصویر"
+
+msgid "File"
+msgstr "فایل"
+
+msgid "URL"
+msgstr "آدرس"
+
+msgid "Code"
+msgstr "کد"
+
+msgid "Number"
+msgstr "شماره"
+
+msgid "Count"
+msgstr "تعداد"
+
+msgid "Enabled"
+msgstr "فعال"
+
+msgid "Disabled"
+msgstr "غیرفعال"
+
+msgid "Public"
+msgstr "عمومی"
+
+msgid "Private"
+msgstr "خصوصی"
+
+msgid "Priority"
+msgstr "اولویت"
+
+msgid "High"
+msgstr "بالا"
+
+msgid "Medium"
+msgstr "متوسط"
+
+msgid "Low"
+msgstr "پایین"
+
+msgid "Urgent"
+msgstr "فوری"
+
+msgid "Normal"
+msgstr "عادی"
+
+# Pagination
+msgid "Page"
+msgstr "صفحه"
+
+msgid "Previous"
+msgstr "قبلی"
+
+msgid "Next"
+msgstr "بعدی"
+
+msgid "First"
+msgstr "اولین"
+
+msgid "Last"
+msgstr "آخرین"
+
+msgid "of"
+msgstr "از"
+
+msgid "items"
+msgstr "مورد"
+
+msgid "%(count)s item"
+msgid_plural "%(count)s items"
+msgstr[0] "%(count)s مورد"
+msgstr[1] "%(count)s مورد"
+
+# Date and time
+msgid "Date"
+msgstr "تاریخ"
+
+msgid "Time"
+msgstr "زمان"
+
+msgid "Datetime"
+msgstr "تاریخ و زمان"
+
+msgid "Year"
+msgstr "سال"
+
+msgid "Month"
+msgstr "ماه"
+
+msgid "Day"
+msgstr "روز"
+
+msgid "Hour"
+msgstr "ساعت"
+
+msgid "Minute"
+msgstr "دقیقه"
+
+msgid "Second"
+msgstr "ثانیه"
+
+# Days of week
+msgid "Monday"
+msgstr "دوشنبه"
+
+msgid "Tuesday"
+msgstr "سه‌شنبه"
+
+msgid "Wednesday"
+msgstr "چهارشنبه"
+
+msgid "Thursday"
+msgstr "پنج‌شنبه"
+
+msgid "Friday"
+msgstr "جمعه"
+
+msgid "Saturday"
+msgstr "شنبه"
+
+msgid "Sunday"
+msgstr "یک‌شنبه"
+
+# Months
+msgid "January"
+msgstr "ژانویه"
+
+msgid "February"
+msgstr "فوریه"
+
+msgid "March"
+msgstr "مارس"
+
+msgid "April"
+msgstr "آوریل"
+
+msgid "May"
+msgstr "می"
+
+msgid "June"
+msgstr "ژوئن"
+
+msgid "July"
+msgstr "ژوئیه"
+
+msgid "August"
+msgstr "اوت"
+
+msgid "September"
+msgstr "سپتامبر"
+
+msgid "October"
+msgstr "اکتبر"
+
+msgid "November"
+msgstr "نوامبر"
+
+msgid "December"
+msgstr "دسامبر"
+
+# Verbose messages
+msgid "Successfully deleted %(count)d %(items)s."
+msgstr "%(count)d %(items)s با موفقیت حذف شد."
+
+msgid "Cannot delete %(name)s"
+msgstr "نمی‌توان %(name)s را حذف کرد"
+
+msgid "Are you sure you want to delete the %(object_name)s \"%(escaped_object)s\"? All of the following related items will be deleted:"
+msgstr "آیا مطمئن هستید که می‌خواهید %(object_name)s \"%(escaped_object)s\" را حذف کنید؟ تمام موارد مرتبط زیر نیز حذف خواهند شد:"
+
+msgid "Yes, I'm sure"
+msgstr "بله، مطمئن هستم"
+
+msgid "No, take me back"
+msgstr "خیر، مرا برگردان"
+
+msgid "The %(name)s \"%(obj)s\" was added successfully."
+msgstr "%(name)s \"%(obj)s\" با موفقیت اضافه شد."
+
+msgid "The %(name)s \"%(obj)s\" was changed successfully."
+msgstr "%(name)s \"%(obj)s\" با موفقیت تغییر یافت."
+
+msgid "The %(name)s \"%(obj)s\" was deleted successfully."
+msgstr "%(name)s \"%(obj)s\" با موفقیت حذف شد."
+
+msgid "You may edit it again below."
+msgstr "می‌توانید آن را دوباره در زیر ویرایش کنید."
+
+msgid "Add another"
+msgstr "افزودن مورد دیگر"
+
+msgid "Add another %(verbose_name)s"
+msgstr "افزودن %(verbose_name)s دیگر"
+
+msgid "Thanks for spending some quality time with the Web site today."
+msgstr "از اینکه امروز زمانی را با وب‌سایت سپری کردید متشکریم."
+
+msgid "Thanks for using our site!"
+msgstr "از استفاده از سایت ما متشکریم!"
+
+msgid "Please correct the error below."
+msgid_plural "Please correct the errors below."
+msgstr[0] "لطفاً خطای زیر را اصلاح کنید."
+msgstr[1] "لطفاً خطاهای زیر را اصلاح کنید."
+
+msgid "This field cannot be blank."
+msgstr "این فیلد نمی‌تواند خالی باشد."
+
+msgid "This field cannot be null."
+msgstr "این فیلد نمی‌تواند خالی باشد."
+
+msgid "Filtering"
+msgstr "فیلترسازی"
+
+msgid "Action:"
+msgstr "عملیات:"
+
+msgid "%(counter)s result"
+msgid_plural "%(counter)s results"
+msgstr[0] "%(counter)s نتیجه"
+msgstr[1] "%(counter)s نتیجه"
+
+msgid "%(full_result_count)s total"
+msgstr "%(full_result_count)s کل"
+
+msgid "0 of %(cnt)s selected"
+msgstr "0 از %(cnt)s انتخاب شده"
+
+msgid "%(name)s object with primary key %(key)r does not exist."
+msgstr "شیء %(name)s با کلید اصلی %(key)r وجود ندارد."
+
+msgid "run the selected action"
+msgstr "اجرای عملیات انتخاب شده"
+
+msgid "Database error"
+msgstr "خطای پایگاه داده"
+
+# Custom admin site titles
+msgid "Psychology Institute Administration"
+msgstr "مدیریت موسسه روانشناسی"
+
+msgid "Psychology Institute Admin"
+msgstr "پنل مدیریت موسسه روانشناسی"
+
+msgid "Welcome to Psychology Institute Administration"
+msgstr "به پنل مدیریت موسسه روانشناسی خوش آمدید"
+# Add these translations to your django.po file:
+
+# ACCOUNTS section
+msgid "ACCOUNTS"
+msgstr "حساب‌های کاربری"
+
+# AUTHENTICATION AND AUTHORIZATION section  
+msgid "AUTHENTICATION AND AUTHORIZATION"
+msgstr "احراز هویت و مجوزها"
+
+# PERIODIC TASKS section
+msgid "PERIODIC TASKS"
+msgstr "وظایف دوره‌ای"
+
+# SITES section
+msgid "SITES"
+msgstr "سایت‌ها"
+
+# SOCIAL ACCOUNTS section
+msgid "SOCIAL ACCOUNTS"
+msgstr "حساب‌های اجتماعی"
+
+# Individual items within sections
+msgid "Email addresses"
+msgstr "آدرس‌های ایمیل"
+
+msgid "Groups"
+msgstr "گروه‌ها"
+
+msgid "Clocked"
+msgstr "زمان‌بندی شده"
+
+msgid "Crontabs"
+msgstr "کرون‌جاب‌ها"
+
+msgid "Intervals"
+msgstr "فواصل زمانی"
+
+msgid "Periodic tasks"
+msgstr "وظایف دوره‌ای"
+
+msgid "Solar events"
+msgstr "رویدادهای خورشیدی"
+
+msgid "Sites"
+msgstr "سایت‌ها"
+
+msgid "Social accounts"
+msgstr "حساب‌های اجتماعی"
+
+msgid "Social application tokens"
+msgstr "توکن‌های برنامه اجتماعی"
+
+msgid "Social applications"
+msgstr "برنامه‌های اجتماعی"

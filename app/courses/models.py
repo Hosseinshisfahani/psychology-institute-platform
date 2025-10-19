@@ -9,17 +9,17 @@ User = get_user_model()
 class CourseCategory(models.Model):
     """Categories for courses"""
     
-    name = models.CharField(max_length=100, verbose_name=_('Name'))
-    slug = models.SlugField(max_length=100, unique=True, blank=True, null=True, verbose_name=_('Slug'))
-    description = models.TextField(blank=True, null=True, verbose_name=_('Description'))
-    icon = models.CharField(max_length=50, blank=True, null=True, help_text=_('Font Awesome icon class'))
-    color = models.CharField(max_length=7, default='#007bff', help_text=_('Hex color code'))
-    is_active = models.BooleanField(default=True, verbose_name=_('Is Active'))
-    created_at = models.DateTimeField(auto_now_add=True)
+    name = models.CharField(max_length=100, verbose_name='نام')
+    slug = models.SlugField(max_length=100, unique=True, blank=True, null=True, verbose_name='نامک')
+    description = models.TextField(blank=True, null=True, verbose_name='توضیحات')
+    icon = models.CharField(max_length=50, blank=True, null=True, help_text=_('Font Awesome icon class', verbose_name='کلاس آیکون Font Awesome'))
+    color = models.CharField(max_length=7, default='#007bff', help_text=_('Hex color code', verbose_name='کد رنگ هگز'))
+    is_active = models.BooleanField(default=True, verbose_name='فعال')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
     
     class Meta:
-        verbose_name = 'دسته‌بندی بسته آموزشی'
-        verbose_name_plural = 'دسته‌بندی‌های بسته آموزشی'
+        verbose_name = _('دسته‌بندی بسته آموزشی')
+        verbose_name_plural = _('دسته‌بندی‌های بسته آموزشی')
         ordering = ['name']
     
     def __str__(self):
@@ -47,44 +47,44 @@ class Course(models.Model):
         ('archived', _('Archived')),
     ]
     
-    title = models.CharField(max_length=200, verbose_name=_('Title'))
-    slug = models.SlugField(max_length=200, unique=True, verbose_name=_('Slug'))
-    description = models.TextField(verbose_name=_('Description'))
-    short_description = models.CharField(max_length=300, verbose_name=_('Short Description'))
-    category = models.ForeignKey(CourseCategory, on_delete=models.CASCADE, related_name='courses', verbose_name=_('Category'))
-    instructor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='taught_courses', verbose_name=_('Instructor'))
-    difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, verbose_name=_('Difficulty'))
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name=_('Status'))
+    title = models.CharField(max_length=200, verbose_name='عنوان')
+    slug = models.SlugField(max_length=200, unique=True, verbose_name='نامک')
+    description = models.TextField(verbose_name='توضیحات')
+    short_description = models.CharField(max_length=300, verbose_name='توضیحات کوتاه')
+    category = models.ForeignKey(CourseCategory, on_delete=models.CASCADE, related_name='courses', verbose_name='دسته‌بندی')
+    instructor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='taught_courses', verbose_name='مربی')
+    difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, verbose_name='سطح دشواری')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name='وضعیت')
     
     # Pricing
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Price'))
-    discount_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name=_('Discount Price'))
-    is_free = models.BooleanField(default=False, verbose_name=_('Is Free'))
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='قیمت')
+    discount_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name='قیمت تخفیف')
+    is_free = models.BooleanField(default=False, verbose_name='رایگان')
     
     # Course details
-    duration_hours = models.PositiveIntegerField(verbose_name=_('Duration (Hours)'))
-    language = models.CharField(max_length=10, default='fa', verbose_name=_('Language'))
-    level = models.CharField(max_length=50, verbose_name=_('Level'))
-    prerequisites = models.TextField(blank=True, null=True, verbose_name=_('Prerequisites'))
-    learning_objectives = models.TextField(verbose_name=_('Learning Objectives'))
+    duration_hours = models.PositiveIntegerField(verbose_name='مدت ساعت')
+    language = models.CharField(max_length=10, default='fa', verbose_name='زبان')
+    level = models.CharField(max_length=50, verbose_name='سطح')
+    prerequisites = models.TextField(blank=True, null=True, verbose_name='پیش‌نیازها')
+    learning_objectives = models.TextField(verbose_name='اهداف یادگیری')
     
     # Media
-    thumbnail = models.ImageField(upload_to='courses/thumbnails/', blank=True, null=True, verbose_name=_('Thumbnail'))
-    video_intro = models.FileField(upload_to='courses/videos/', blank=True, null=True, verbose_name=_('Intro Video'))
+    thumbnail = models.ImageField(upload_to='courses/thumbnails/', blank=True, null=True, verbose_name='تصویر کوچک')
+    video_intro = models.FileField(upload_to='courses/videos/', blank=True, null=True, verbose_name='ویدیو معرفی')
     
     # Statistics
-    enrollment_count = models.PositiveIntegerField(default=0, verbose_name=_('Enrollment Count'))
-    rating = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(5)], verbose_name=_('Rating'))
-    review_count = models.PositiveIntegerField(default=0, verbose_name=_('Review Count'))
+    enrollment_count = models.PositiveIntegerField(default=0, verbose_name='تعداد ثبت‌نام')
+    rating = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(5)], verbose_name='امتیاز')
+    review_count = models.PositiveIntegerField(default=0, verbose_name='تعداد نظر')
     
     # Timestamps
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    published_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Published At'))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
+    published_at = models.DateTimeField(blank=True, null=True, verbose_name='تاریخ انتشار')
     
     class Meta:
-        verbose_name = 'بسته آموزشی'
-        verbose_name_plural = 'بسته‌های آموزشی'
+        verbose_name = _('بسته آموزشی')
+        verbose_name_plural = _('بسته‌های آموزشی')
         ordering = ['-created_at']
     
     def __str__(self):
@@ -110,16 +110,16 @@ class Course(models.Model):
 class CourseModule(models.Model):
     """Modules within a course"""
     
-    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='modules', verbose_name=_('Course'))
-    title = models.CharField(max_length=200, verbose_name=_('Title'))
-    description = models.TextField(blank=True, null=True, verbose_name=_('Description'))
-    order = models.PositiveIntegerField(verbose_name=_('Order'))
-    is_required = models.BooleanField(default=True, verbose_name=_('Is Required'))
-    created_at = models.DateTimeField(auto_now_add=True)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='modules', verbose_name='دوره')
+    title = models.CharField(max_length=200, verbose_name='عنوان')
+    description = models.TextField(blank=True, null=True, verbose_name='توضیحات')
+    order = models.PositiveIntegerField(verbose_name='ترتیب')
+    is_required = models.BooleanField(default=True, verbose_name='اجباری')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
     
     class Meta:
-        verbose_name = 'ماژول بسته آموزشی'
-        verbose_name_plural = 'ماژول‌های بسته آموزشی'
+        verbose_name = _('ماژول بسته آموزشی')
+        verbose_name_plural = _('ماژول‌های بسته آموزشی')
         ordering = ['order']
         unique_together = ['course', 'order']
     
@@ -138,24 +138,24 @@ class Lesson(models.Model):
         ('live', _('Live Session')),
     ]
     
-    module = models.ForeignKey(CourseModule, on_delete=models.CASCADE, related_name='lessons', verbose_name=_('Module'))
-    title = models.CharField(max_length=200, verbose_name=_('Title'))
-    description = models.TextField(blank=True, null=True, verbose_name=_('Description'))
-    lesson_type = models.CharField(max_length=20, choices=LESSON_TYPES, verbose_name=_('Lesson Type'))
-    content = models.TextField(blank=True, null=True, verbose_name=_('Content'))
-    video_file = models.FileField(upload_to='courses/lessons/videos/', blank=True, null=True, verbose_name=_('Video File'))
-    video_url = models.URLField(blank=True, null=True, verbose_name=_('Video URL'))
-    duration_minutes = models.PositiveIntegerField(blank=True, null=True, verbose_name=_('Duration (Minutes)'))
-    order = models.PositiveIntegerField(verbose_name=_('Order'))
-    is_preview = models.BooleanField(default=False, verbose_name=_('Is Preview'))
-    is_required = models.BooleanField(default=True, verbose_name=_('Is Required'))
-    allow_download = models.BooleanField(default=False, verbose_name=_('Allow Download'))
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    module = models.ForeignKey(CourseModule, on_delete=models.CASCADE, related_name='lessons', verbose_name='ماژول')
+    title = models.CharField(max_length=200, verbose_name='عنوان')
+    description = models.TextField(blank=True, null=True, verbose_name='توضیحات')
+    lesson_type = models.CharField(max_length=20, choices=LESSON_TYPES, verbose_name='نوع درس')
+    content = models.TextField(blank=True, null=True, verbose_name='محتوای')
+    video_file = models.FileField(upload_to='courses/lessons/videos/', blank=True, null=True, verbose_name='فایل ویدیو')
+    video_url = models.URLField(blank=True, null=True, verbose_name='لینک ویدیو')
+    duration_minutes = models.PositiveIntegerField(blank=True, null=True, verbose_name='مدت دقیقه')
+    order = models.PositiveIntegerField(verbose_name='ترتیب')
+    is_preview = models.BooleanField(default=False, verbose_name='پیش‌نمایش')
+    is_required = models.BooleanField(default=True, verbose_name='اجباری')
+    allow_download = models.BooleanField(default=False, verbose_name='اجازه دانلود')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
     
     class Meta:
-        verbose_name = 'درس'
-        verbose_name_plural = 'درس‌ها'
+        verbose_name = _('درس')
+        verbose_name_plural = _('درس‌ها')
         ordering = ['order']
         unique_together = ['module', 'order']
     
@@ -173,17 +173,17 @@ class Enrollment(models.Model):
         ('suspended', _('Suspended')),
     ]
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='enrollments', verbose_name=_('User'))
-    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='enrollments', verbose_name=_('Course'))
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', verbose_name=_('Status'))
-    enrolled_at = models.DateTimeField(auto_now_add=True, verbose_name=_('Enrolled At'))
-    completed_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Completed At'))
-    progress_percentage = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)], verbose_name=_('Progress Percentage'))
-    last_accessed = models.DateTimeField(blank=True, null=True, verbose_name=_('Last Accessed'))
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='enrollments', verbose_name='کاربر')
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='enrollments', verbose_name='دوره')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', verbose_name='وضعیت')
+    enrolled_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ثبت‌نام')
+    completed_at = models.DateTimeField(blank=True, null=True, verbose_name='تاریخ تکمیل')
+    progress_percentage = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)], verbose_name='درصد پیشرفت')
+    last_accessed = models.DateTimeField(blank=True, null=True, verbose_name='آخرین دسترسی')
     
     class Meta:
-        verbose_name = 'ثبت‌نام'
-        verbose_name_plural = 'ثبت‌نام‌ها'
+        verbose_name = _('ثبت‌نام')
+        verbose_name_plural = _('ثبت‌نام‌ها')
         unique_together = ['user', 'course']
         ordering = ['-enrolled_at']
     
@@ -194,16 +194,16 @@ class Enrollment(models.Model):
 class LessonProgress(models.Model):
     """User progress on individual lessons"""
     
-    enrollment = models.ForeignKey(Enrollment, on_delete=models.CASCADE, related_name='lesson_progress', verbose_name=_('Enrollment'))
-    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='progress', verbose_name=_('Lesson'))
-    is_completed = models.BooleanField(default=False, verbose_name=_('Is Completed'))
-    completed_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Completed At'))
-    time_spent = models.PositiveIntegerField(default=0, help_text=_('Time spent in seconds'), verbose_name=_('Time Spent'))
-    last_position = models.PositiveIntegerField(default=0, help_text=_('Last position in video (seconds)'), verbose_name=_('Last Position'))
+    enrollment = models.ForeignKey(Enrollment, on_delete=models.CASCADE, related_name='lesson_progress', verbose_name='ثبت‌نام')
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='progress', verbose_name='درس')
+    is_completed = models.BooleanField(default=False, verbose_name='تکمیل شده')
+    completed_at = models.DateTimeField(blank=True, null=True, verbose_name='تاریخ تکمیل')
+    time_spent = models.PositiveIntegerField(default=0, help_text=_('Time spent in seconds'), verbose_name='زمان صرف شده')
+    last_position = models.PositiveIntegerField(default=0, help_text=_('Last position in video (seconds)'), verbose_name='آخرین موقعیت')
     
     class Meta:
-        verbose_name = 'پیشرفت درس'
-        verbose_name_plural = 'پیشرفت درس‌ها'
+        verbose_name = _('پیشرفت درس')
+        verbose_name_plural = _('پیشرفت درس‌ها')
         unique_together = ['enrollment', 'lesson']
     
     def __str__(self):
@@ -213,17 +213,17 @@ class LessonProgress(models.Model):
 class CourseReview(models.Model):
     """Course reviews and ratings"""
     
-    enrollment = models.OneToOneField(Enrollment, on_delete=models.CASCADE, related_name='review', verbose_name=_('Enrollment'))
-    rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name=_('Rating'))
-    title = models.CharField(max_length=200, verbose_name=_('Review Title'))
-    content = models.TextField(verbose_name=_('Review Content'))
-    is_approved = models.BooleanField(default=False, verbose_name=_('Is Approved'))
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    enrollment = models.OneToOneField(Enrollment, on_delete=models.CASCADE, related_name='review', verbose_name='ثبت‌نام')
+    rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name='امتیاز')
+    title = models.CharField(max_length=200, verbose_name='عنوان نظر')
+    content = models.TextField(verbose_name='محتوای نظر')
+    is_approved = models.BooleanField(default=False, verbose_name='تأیید شده')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
     
     class Meta:
-        verbose_name = 'نظر بسته آموزشی'
-        verbose_name_plural = 'نظرات بسته‌های آموزشی'
+        verbose_name = _('نظر بسته آموزشی')
+        verbose_name_plural = _('نظرات بسته‌های آموزشی')
         ordering = ['-created_at']
     
     def __str__(self):
@@ -238,32 +238,32 @@ class Coupon(models.Model):
         ('fixed', _('Fixed Amount')),
     ]
     
-    code = models.CharField(max_length=50, unique=True, verbose_name=_('Coupon Code'))
-    title = models.CharField(max_length=200, verbose_name=_('Title'))
-    description = models.TextField(blank=True, null=True, verbose_name=_('Description'))
-    coupon_type = models.CharField(max_length=20, choices=COUPON_TYPES, verbose_name=_('Coupon Type'))
-    discount_value = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Discount Value'))
-    min_order_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_('Minimum Order Amount'))
-    max_discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name=_('Maximum Discount Amount'))
+    code = models.CharField(max_length=50, unique=True, verbose_name='کد کوپن')
+    title = models.CharField(max_length=200, verbose_name='عنوان')
+    description = models.TextField(blank=True, null=True, verbose_name='توضیحات')
+    coupon_type = models.CharField(max_length=20, choices=COUPON_TYPES, verbose_name='نوع کوپن')
+    discount_value = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='مقدار تخفیف')
+    min_order_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='حداقل مبلغ سفارش')
+    max_discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name='حداکثر مبلغ تخفیف')
     
     # Usage limits
-    usage_limit = models.PositiveIntegerField(blank=True, null=True, verbose_name=_('Usage Limit'))
-    used_count = models.PositiveIntegerField(default=0, verbose_name=_('Used Count'))
+    usage_limit = models.PositiveIntegerField(blank=True, null=True, verbose_name='حد استفاده')
+    used_count = models.PositiveIntegerField(default=0, verbose_name='تعداد استفاده')
     
     # Validity
-    is_active = models.BooleanField(default=True, verbose_name=_('Is Active'))
-    valid_from = models.DateTimeField(verbose_name=_('Valid From'))
-    valid_until = models.DateTimeField(verbose_name=_('Valid Until'))
+    is_active = models.BooleanField(default=True, verbose_name='فعال')
+    valid_from = models.DateTimeField(verbose_name='معتبر از')
+    valid_until = models.DateTimeField(verbose_name='معتبر تا')
     
     # Applicable courses
-    applicable_courses = models.ManyToManyField(Course, blank=True, related_name='coupons', verbose_name=_('Applicable Courses'))
+    applicable_courses = models.ManyToManyField(Course, blank=True, related_name='coupons', verbose_name='دوره‌های قابل اعمال')
     
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
     
     class Meta:
-        verbose_name = 'کوپن تخفیف'
-        verbose_name_plural = 'کوپن‌های تخفیف'
+        verbose_name = _('کوپن تخفیف')
+        verbose_name_plural = _('کوپن‌های تخفیف')
         ordering = ['-created_at']
     
     def __str__(self):
@@ -297,20 +297,20 @@ class Coupon(models.Model):
 class CoursePurchase(models.Model):
     """Course purchases"""
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='course_purchases', verbose_name=_('User'))
-    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='purchases', verbose_name=_('Course'))
-    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Amount Paid'))
-    original_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_('Original Price'))
-    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_('Discount Amount'))
-    coupon = models.ForeignKey(Coupon, on_delete=models.SET_NULL, blank=True, null=True, verbose_name=_('Coupon Used'))
-    purchased_at = models.DateTimeField(auto_now_add=True, verbose_name=_('Purchased At'))
-    payment_method = models.CharField(max_length=50, verbose_name=_('Payment Method'))
-    transaction_id = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Transaction ID'))
-    order = models.ForeignKey('payment.Order', on_delete=models.SET_NULL, blank=True, null=True, verbose_name=_('Order'))
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='course_purchases', verbose_name='کاربر')
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='purchases', verbose_name='دوره')
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='مبلغ پرداخت شده')
+    original_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='قیمت اصلی')
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='مبلغ تخفیف')
+    coupon = models.ForeignKey(Coupon, on_delete=models.SET_NULL, blank=True, null=True, verbose_name='کوپن استفاده شده')
+    purchased_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ خرید')
+    payment_method = models.CharField(max_length=50, verbose_name='روش پرداخت')
+    transaction_id = models.CharField(max_length=100, blank=True, null=True, verbose_name='شناسه تراکنش')
+    order = models.ForeignKey('payment.Order', on_delete=models.SET_NULL, blank=True, null=True, verbose_name='سفارش')
     
     class Meta:
-        verbose_name = 'خرید بسته آموزشی'
-        verbose_name_plural = 'خریدهای بسته‌های آموزشی'
+        verbose_name = _('خرید بسته آموزشی')
+        verbose_name_plural = _('خریدهای بسته‌های آموزشی')
         ordering = ['-purchased_at']
         unique_together = ['user', 'course']
     

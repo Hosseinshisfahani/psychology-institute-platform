@@ -3,10 +3,10 @@ from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from .models import (
+# from psychology_institute.admin import persian_admin_site
     Therapist, SessionType, TherapistAvailability, Session, SessionNote,
     SessionRating, SessionCancellation, SessionReminder, SessionBooking
 )
-
 
 @admin.register(Therapist)
 class TherapistAdmin(admin.ModelAdmin):

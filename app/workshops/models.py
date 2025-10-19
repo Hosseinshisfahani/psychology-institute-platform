@@ -10,17 +10,17 @@ User = get_user_model()
 class WorkshopCategory(models.Model):
     """Categories for workshops"""
     
-    name = models.CharField(max_length=100, verbose_name=_('Name'))
-    slug = models.SlugField(max_length=100, unique=True, blank=True, null=True, verbose_name=_('Slug'))
-    description = models.TextField(blank=True, null=True, verbose_name=_('Description'))
-    icon = models.CharField(max_length=50, blank=True, null=True, help_text=_('Font Awesome icon class'))
-    color = models.CharField(max_length=7, default='#007bff', help_text=_('Hex color code'))
-    is_active = models.BooleanField(default=True, verbose_name=_('Is Active'))
-    created_at = models.DateTimeField(auto_now_add=True)
+    name = models.CharField(max_length=100, verbose_name='نام')
+    slug = models.SlugField(max_length=100, unique=True, blank=True, null=True, verbose_name='نامک')
+    description = models.TextField(blank=True, null=True, verbose_name='توضیحات')
+    icon = models.CharField(max_length=50, blank=True, null=True, help_text=_('Font Awesome icon class', verbose_name='کلاس آیکون Font Awesome'))
+    color = models.CharField(max_length=7, default='#007bff', help_text=_('Hex color code', verbose_name='کد رنگ هگز'))
+    is_active = models.BooleanField(default=True, verbose_name='فعال')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
     
     class Meta:
-        verbose_name = _('Workshop Category')
-        verbose_name_plural = _('Workshop Categories')
+        verbose_name = _('دسته‌بندی کارگاه')
+        verbose_name_plural = _('دسته‌بندی‌های کارگاه')
         ordering = ['name']
     
     def __str__(self):
@@ -57,56 +57,56 @@ class Workshop(models.Model):
         ('advanced', _('Advanced')),
     ]
     
-    title = models.CharField(max_length=200, verbose_name=_('Title'))
-    slug = models.SlugField(max_length=200, unique=True, verbose_name=_('Slug'))
-    description = models.TextField(verbose_name=_('Description'))
-    short_description = models.CharField(max_length=300, verbose_name=_('Short Description'))
-    category = models.ForeignKey(WorkshopCategory, on_delete=models.CASCADE, related_name='workshops', verbose_name=_('Category'))
-    instructor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='taught_workshops', verbose_name=_('Instructor'))
+    title = models.CharField(max_length=200, verbose_name='عنوان')
+    slug = models.SlugField(max_length=200, unique=True, verbose_name='نامک')
+    description = models.TextField(verbose_name='توضیحات')
+    short_description = models.CharField(max_length=300, verbose_name='توضیحات کوتاه')
+    category = models.ForeignKey(WorkshopCategory, on_delete=models.CASCADE, related_name='workshops', verbose_name='دسته‌بندی')
+    instructor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='taught_workshops', verbose_name='مدرس')
     
     # Status and difficulty
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name=_('Status'))
-    difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, verbose_name=_('Difficulty'))
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name='وضعیت')
+    difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, verbose_name='سطح دشواری')
     
     # Scheduling
-    start_date = models.DateField(verbose_name=_('Start Date'))
-    end_date = models.DateField(verbose_name=_('End Date'))
-    registration_deadline = models.DateTimeField(verbose_name=_('Registration Deadline'))
+    start_date = models.DateField(verbose_name='تاریخ شروع')
+    end_date = models.DateField(verbose_name='تاریخ پایان')
+    registration_deadline = models.DateTimeField(verbose_name='مهلت ثبت‌نام')
     
     # Capacity
-    max_participants = models.PositiveIntegerField(default=50, verbose_name=_('Maximum Participants'))
-    current_participants = models.PositiveIntegerField(default=0, verbose_name=_('Current Participants'))
+    max_participants = models.PositiveIntegerField(default=50, verbose_name='حداکثر شرکت‌کنندگان')
+    current_participants = models.PositiveIntegerField(default=0, verbose_name='شرکت‌کنندگان فعلی')
     
     # Pricing
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Price'))
-    discount_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name=_('Discount Price'))
-    payment_type = models.CharField(max_length=20, choices=PAYMENT_TYPE_CHOICES, default='both', verbose_name=_('Payment Type'))
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='قیمت')
+    discount_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name='قیمت تخفیف')
+    payment_type = models.CharField(max_length=20, choices=PAYMENT_TYPE_CHOICES, default='both', verbose_name='نوع پرداخت')
     
     # Installment options
-    installment_months = models.PositiveIntegerField(default=3, verbose_name=_('Number of Installment Months'))
+    installment_months = models.PositiveIntegerField(default=3, verbose_name='تعداد ماه‌های اقساط')
     
     # Workshop details
-    total_hours = models.PositiveIntegerField(verbose_name=_('Total Hours'))
-    language = models.CharField(max_length=10, default='fa', verbose_name=_('Language'))
-    prerequisites = models.TextField(blank=True, null=True, verbose_name=_('Prerequisites'))
-    learning_objectives = models.TextField(verbose_name=_('Learning Objectives'))
+    total_hours = models.PositiveIntegerField(verbose_name='مجموع ساعات')
+    language = models.CharField(max_length=10, default='fa', verbose_name='زبان')
+    prerequisites = models.TextField(blank=True, null=True, verbose_name='پیش‌نیازها')
+    learning_objectives = models.TextField(verbose_name='اهداف یادگیری')
     
     # Media
-    thumbnail = models.ImageField(upload_to='workshops/thumbnails/', blank=True, null=True, verbose_name=_('Thumbnail'))
-    intro_video = models.FileField(upload_to='workshops/videos/', blank=True, null=True, verbose_name=_('Intro Video'))
+    thumbnail = models.ImageField(upload_to='workshops/thumbnails/', blank=True, null=True, verbose_name='تصویر کوچک')
+    intro_video = models.FileField(upload_to='workshops/videos/', blank=True, null=True, verbose_name='ویدیو معرفی')
     
     # Statistics
-    rating = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(5)], verbose_name=_('Rating'))
-    review_count = models.PositiveIntegerField(default=0, verbose_name=_('Review Count'))
+    rating = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(5)], verbose_name='امتیاز')
+    review_count = models.PositiveIntegerField(default=0, verbose_name='تعداد نظرات')
     
     # Timestamps
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    published_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Published At'))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
+    published_at = models.DateTimeField(blank=True, null=True, verbose_name='تاریخ انتشار')
     
     class Meta:
-        verbose_name = _('Workshop')
-        verbose_name_plural = _('Workshops')
+        verbose_name = _('کارگاه')
+        verbose_name_plural = _('کارگاه‌ها')
         ordering = ['-created_at']
     
     def __str__(self):
@@ -147,35 +147,35 @@ class Workshop(models.Model):
 class WorkshopSession(models.Model):
     """Individual sessions within a workshop"""
     
-    workshop = models.ForeignKey(Workshop, on_delete=models.CASCADE, related_name='sessions', verbose_name=_('Workshop'))
-    session_number = models.PositiveIntegerField(verbose_name=_('Session Number'))
-    title = models.CharField(max_length=200, verbose_name=_('Title'))
-    description = models.TextField(blank=True, null=True, verbose_name=_('Description'))
+    workshop = models.ForeignKey(Workshop, on_delete=models.CASCADE, related_name='sessions', verbose_name='کارگاه')
+    session_number = models.PositiveIntegerField(verbose_name='شماره جلسه')
+    title = models.CharField(max_length=200, verbose_name='عنوان')
+    description = models.TextField(blank=True, null=True, verbose_name='توضیحات')
     
     # Scheduling
-    scheduled_datetime = models.DateTimeField(verbose_name=_('Scheduled Date & Time'))
-    duration_minutes = models.PositiveIntegerField(verbose_name=_('Duration (Minutes)'))
+    scheduled_datetime = models.DateTimeField(verbose_name='تاریخ و زمان برنامه‌ریزی شده')
+    duration_minutes = models.PositiveIntegerField(verbose_name='مدت دقیقه')
     
     # Croom integration
-    meeting_link = models.URLField(blank=True, null=True, verbose_name=_('Meeting Link'))
-    meeting_id = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Meeting ID'))
-    meeting_password = models.CharField(max_length=50, blank=True, null=True, verbose_name=_('Meeting Password'))
-    recording_url = models.URLField(blank=True, null=True, verbose_name=_('Recording URL'))
+    meeting_link = models.URLField(blank=True, null=True, verbose_name='لینک جلسه')
+    meeting_id = models.CharField(max_length=100, blank=True, null=True, verbose_name='شناسه جلسه')
+    meeting_password = models.CharField(max_length=50, blank=True, null=True, verbose_name='رمز عبور جلسه')
+    recording_url = models.URLField(blank=True, null=True, verbose_name='لینک ضبط')
     
     # Session materials
-    materials = models.TextField(blank=True, null=True, verbose_name=_('Session Materials'))
-    homework = models.TextField(blank=True, null=True, verbose_name=_('Homework'))
+    materials = models.TextField(blank=True, null=True, verbose_name='مواد جلسه')
+    homework = models.TextField(blank=True, null=True, verbose_name='تکلیف')
     
     # Status
-    is_completed = models.BooleanField(default=False, verbose_name=_('Is Completed'))
-    completed_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Completed At'))
+    is_completed = models.BooleanField(default=False, verbose_name='تکمیل شده')
+    completed_at = models.DateTimeField(blank=True, null=True, verbose_name='تکمیل شده در')
     
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
     
     class Meta:
-        verbose_name = _('Workshop Session')
-        verbose_name_plural = _('Workshop Sessions')
+        verbose_name = _('جلسه کارگاه')
+        verbose_name_plural = _('جلسات کارگاه')
         ordering = ['workshop', 'session_number']
         unique_together = ['workshop', 'session_number']
     
@@ -199,26 +199,26 @@ class WorkshopRegistration(models.Model):
         ('installment', _('Installment Payment')),
     ]
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='workshop_registrations', verbose_name=_('User'))
-    workshop = models.ForeignKey(Workshop, on_delete=models.CASCADE, related_name='registrations', verbose_name=_('Workshop'))
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending_payment', verbose_name=_('Status'))
-    payment_type = models.CharField(max_length=20, choices=PAYMENT_TYPE_CHOICES, verbose_name=_('Payment Type'))
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='workshop_registrations', verbose_name='کاربر')
+    workshop = models.ForeignKey(Workshop, on_delete=models.CASCADE, related_name='registrations', verbose_name='کارگاه')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending_payment', verbose_name='وضعیت')
+    payment_type = models.CharField(max_length=20, choices=PAYMENT_TYPE_CHOICES, verbose_name='نوع پرداخت')
     
     # Pricing
-    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_('Amount Paid'))
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Total Amount'))
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='مبلغ پرداخت شده')
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='مبلغ کل')
     
     # Timestamps
-    registered_at = models.DateTimeField(auto_now_add=True, verbose_name=_('Registered At'))
-    completed_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Completed At'))
-    last_accessed = models.DateTimeField(blank=True, null=True, verbose_name=_('Last Accessed'))
+    registered_at = models.DateTimeField(auto_now_add=True, verbose_name='ثبت‌نام شده در')
+    completed_at = models.DateTimeField(blank=True, null=True, verbose_name='تکمیل شده در')
+    last_accessed = models.DateTimeField(blank=True, null=True, verbose_name='آخرین دسترسی')
     
     # Progress
-    progress_percentage = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)], verbose_name=_('Progress Percentage'))
+    progress_percentage = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)], verbose_name='درصد پیشرفت')
     
     class Meta:
-        verbose_name = _('Workshop Registration')
-        verbose_name_plural = _('Workshop Registrations')
+        verbose_name = _('ثبت‌نام کارگاه')
+        verbose_name_plural = _('ثبت‌نام‌های کارگاه')
         unique_together = ['user', 'workshop']
         ordering = ['-registered_at']
     
@@ -237,25 +237,25 @@ class WorkshopRegistration(models.Model):
 class WorkshopSessionAttendance(models.Model):
     """Track user attendance for workshop sessions"""
     
-    registration = models.ForeignKey(WorkshopRegistration, on_delete=models.CASCADE, related_name='session_attendance', verbose_name=_('Registration'))
-    session = models.ForeignKey(WorkshopSession, on_delete=models.CASCADE, related_name='attendance', verbose_name=_('Session'))
-    attended = models.BooleanField(default=False, verbose_name=_('Attended'))
-    attendance_marked_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Attendance Marked At'))
+    registration = models.ForeignKey(WorkshopRegistration, on_delete=models.CASCADE, related_name='session_attendance', verbose_name='ثبت‌نام')
+    session = models.ForeignKey(WorkshopSession, on_delete=models.CASCADE, related_name='attendance', verbose_name='جلسه')
+    attended = models.BooleanField(default=False, verbose_name='حاضر')
+    attendance_marked_at = models.DateTimeField(blank=True, null=True, verbose_name='حضور ثبت شده در')
     
     # Time tracking
-    join_time = models.DateTimeField(blank=True, null=True, verbose_name=_('Join Time'))
-    leave_time = models.DateTimeField(blank=True, null=True, verbose_name=_('Leave Time'))
-    duration_minutes = models.PositiveIntegerField(default=0, verbose_name=_('Duration (Minutes)'))
+    join_time = models.DateTimeField(blank=True, null=True, verbose_name='زمان ورود')
+    leave_time = models.DateTimeField(blank=True, null=True, verbose_name='زمان خروج')
+    duration_minutes = models.PositiveIntegerField(default=0, verbose_name='مدت دقیقه')
     
     # Notes
-    notes = models.TextField(blank=True, null=True, verbose_name=_('Notes'))
+    notes = models.TextField(blank=True, null=True, verbose_name='یادداشت‌ها')
     
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
     
     class Meta:
-        verbose_name = _('Workshop Session Attendance')
-        verbose_name_plural = _('Workshop Session Attendances')
+        verbose_name = _('حضور جلسه کارگاه')
+        verbose_name_plural = _('حضورهای جلسه کارگاه')
         unique_together = ['registration', 'session']
         ordering = ['session__scheduled_datetime']
     
@@ -266,17 +266,17 @@ class WorkshopSessionAttendance(models.Model):
 class InstallmentPlan(models.Model):
     """Installment plan for a workshop registration"""
     
-    registration = models.OneToOneField(WorkshopRegistration, on_delete=models.CASCADE, related_name='installment_plan', verbose_name=_('Registration'))
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Total Amount'))
-    number_of_installments = models.PositiveIntegerField(verbose_name=_('Number of Installments'))
-    installment_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Installment Amount'))
+    registration = models.OneToOneField(WorkshopRegistration, on_delete=models.CASCADE, related_name='installment_plan', verbose_name='ثبت‌نام')
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='مبلغ کل')
+    number_of_installments = models.PositiveIntegerField(verbose_name='تعداد اقساط')
+    installment_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='مبلغ قسط')
     
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
     
     class Meta:
-        verbose_name = _('Installment Plan')
-        verbose_name_plural = _('Installment Plans')
+        verbose_name = _('برنامه اقساط')
+        verbose_name_plural = _('برنامه‌های اقساط')
     
     def __str__(self):
         return f"Installment Plan for {self.registration}"
@@ -307,28 +307,28 @@ class InstallmentPayment(models.Model):
         ('cancelled', _('Cancelled')),
     ]
     
-    plan = models.ForeignKey(InstallmentPlan, on_delete=models.CASCADE, related_name='payments', verbose_name=_('Plan'))
-    installment_number = models.PositiveIntegerField(verbose_name=_('Installment Number'))
-    amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Amount'))
-    due_date = models.DateField(verbose_name=_('Due Date'))
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name=_('Status'))
+    plan = models.ForeignKey(InstallmentPlan, on_delete=models.CASCADE, related_name='payments', verbose_name='برنامه')
+    installment_number = models.PositiveIntegerField(verbose_name='شماره قسط')
+    amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='مبلغ')
+    due_date = models.DateField(verbose_name='تاریخ سررسید')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name='وضعیت')
     
     # Payment details
-    paid_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Paid At'))
-    payment_method = models.CharField(max_length=50, blank=True, null=True, verbose_name=_('Payment Method'))
-    transaction_id = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Transaction ID'))
-    order = models.ForeignKey('payment.Order', on_delete=models.SET_NULL, blank=True, null=True, verbose_name=_('Order'))
+    paid_at = models.DateTimeField(blank=True, null=True, verbose_name='پرداخت شده در')
+    payment_method = models.CharField(max_length=50, blank=True, null=True, verbose_name='روش پرداخت')
+    transaction_id = models.CharField(max_length=100, blank=True, null=True, verbose_name='شناسه تراکنش')
+    order = models.ForeignKey('payment.Order', on_delete=models.SET_NULL, blank=True, null=True, verbose_name='سفارش')
     
     # Reminders
-    reminder_sent = models.BooleanField(default=False, verbose_name=_('Reminder Sent'))
-    reminder_sent_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Reminder Sent At'))
+    reminder_sent = models.BooleanField(default=False, verbose_name='یادآوری ارسال شده')
+    reminder_sent_at = models.DateTimeField(blank=True, null=True, verbose_name='یادآوری ارسال شده در')
     
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
     
     class Meta:
-        verbose_name = _('Installment Payment')
-        verbose_name_plural = _('Installment Payments')
+        verbose_name = _('پرداخت اقساط')
+        verbose_name_plural = _('پرداخت‌های اقساط')
         ordering = ['plan', 'installment_number']
         unique_together = ['plan', 'installment_number']
     
@@ -345,23 +345,23 @@ class InstallmentPayment(models.Model):
 class WorkshopReview(models.Model):
     """Workshop reviews and ratings"""
     
-    registration = models.OneToOneField(WorkshopRegistration, on_delete=models.CASCADE, related_name='review', verbose_name=_('Registration'))
-    rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name=_('Rating'))
-    title = models.CharField(max_length=200, verbose_name=_('Review Title'))
-    content = models.TextField(verbose_name=_('Review Content'))
+    registration = models.OneToOneField(WorkshopRegistration, on_delete=models.CASCADE, related_name='review', verbose_name='ثبت‌نام')
+    rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name='امتیاز')
+    title = models.CharField(max_length=200, verbose_name='عنوان نظر')
+    content = models.TextField(verbose_name='محتوای نظر')
     
     # Detailed ratings
-    instructor_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name=_('Instructor Rating'))
-    content_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name=_('Content Rating'))
-    interaction_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name=_('Interaction Rating'))
+    instructor_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name='امتیاز مدرس')
+    content_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name='امتیاز محتوا')
+    interaction_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name='امتیاز تعامل')
     
-    is_approved = models.BooleanField(default=False, verbose_name=_('Is Approved'))
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    is_approved = models.BooleanField(default=False, verbose_name='تأیید شده')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
     
     class Meta:
-        verbose_name = _('Workshop Review')
-        verbose_name_plural = _('Workshop Reviews')
+        verbose_name = _('نظر کارگاه')
+        verbose_name_plural = _('نظرات کارگاه')
         ordering = ['-created_at']
     
     def __str__(self):

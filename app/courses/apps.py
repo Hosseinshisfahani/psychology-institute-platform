@@ -1,10 +1,12 @@
 from django.apps import AppConfig
+from django.utils.translation import gettext_lazy as _
 
 
 class CoursesConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'app.courses'
-    verbose_name = 'بسته‌های آموزشی'
+    verbose_name = _('دوره‌های آموزشی')
+    verbose_name_plural = _('دوره‌های آموزشی')
     
     def ready(self):
         import app.courses.signals

@@ -10,17 +10,17 @@ User = get_user_model()
 class PackageCategory(models.Model):
     """Categories for packages"""
     
-    name = models.CharField(max_length=100, verbose_name=_('Name'))
-    slug = models.SlugField(max_length=100, unique=True, blank=True, null=True, verbose_name=_('Slug'))
-    description = models.TextField(blank=True, null=True, verbose_name=_('Description'))
-    icon = models.CharField(max_length=50, blank=True, null=True, help_text=_('Font Awesome icon class'))
-    color = models.CharField(max_length=7, default='#007bff', help_text=_('Hex color code'))
-    is_active = models.BooleanField(default=True, verbose_name=_('Is Active'))
-    created_at = models.DateTimeField(auto_now_add=True)
+    name = models.CharField(max_length=100, verbose_name='نام')
+    slug = models.SlugField(max_length=100, unique=True, blank=True, null=True, verbose_name='نامک')
+    description = models.TextField(blank=True, null=True, verbose_name='توضیحات')
+    icon = models.CharField(max_length=50, blank=True, null=True, help_text=_('Font Awesome icon class', verbose_name='کلاس آیکون Font Awesome'))
+    color = models.CharField(max_length=7, default='#007bff', help_text=_('Hex color code', verbose_name='کد رنگ هگز'))
+    is_active = models.BooleanField(default=True, verbose_name='فعال')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
     
     class Meta:
-        verbose_name = _('Package Category')
-        verbose_name_plural = _('Package Categories')
+        verbose_name = _('دسته‌بندی پکیج')
+        verbose_name_plural = _('دسته‌بندی‌های پکیج')
         ordering = ['name']
     
     def __str__(self):
@@ -42,50 +42,50 @@ class Package(models.Model):
         ('archived', _('Archived')),
     ]
     
-    title = models.CharField(max_length=200, verbose_name=_('Title'))
-    slug = models.SlugField(max_length=200, unique=True, verbose_name=_('Slug'))
-    description = models.TextField(verbose_name=_('Description'))
-    short_description = models.CharField(max_length=300, verbose_name=_('Short Description'))
-    category = models.ForeignKey(PackageCategory, on_delete=models.CASCADE, related_name='packages', verbose_name=_('Category'))
+    title = models.CharField(max_length=200, verbose_name='عنوان')
+    slug = models.SlugField(max_length=200, unique=True, verbose_name='نامک')
+    description = models.TextField(verbose_name='توضیحات')
+    short_description = models.CharField(max_length=300, verbose_name='توضیحات کوتاه')
+    category = models.ForeignKey(PackageCategory, on_delete=models.CASCADE, related_name='packages', verbose_name='دسته‌بندی')
     
     # Courses
-    courses = models.ManyToManyField(Course, related_name='packages', verbose_name=_('Courses'))
+    courses = models.ManyToManyField(Course, related_name='packages', verbose_name='دوره‌ها')
     
     # Status
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name=_('Status'))
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name='وضعیت')
     
     # Pricing
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Price'))
-    discount_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name=_('Discount Price'))
-    is_featured = models.BooleanField(default=False, verbose_name=_('Is Featured'))
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='قیمت')
+    discount_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name='قیمت تخفیف')
+    is_featured = models.BooleanField(default=False, verbose_name='ویژه')
     
     # Package details
-    duration_months = models.PositiveIntegerField(verbose_name=_('Duration (Months)'), help_text=_('Estimated time to complete'))
-    language = models.CharField(max_length=10, default='fa', verbose_name=_('Language'))
-    prerequisites = models.TextField(blank=True, null=True, verbose_name=_('Prerequisites'))
-    learning_objectives = models.TextField(verbose_name=_('Learning Objectives'))
+    duration_months = models.PositiveIntegerField(verbose_name='مدت ماه', help_text='زمان تخمینی تکمیل')
+    language = models.CharField(max_length=10, default='fa', verbose_name='زبان')
+    prerequisites = models.TextField(blank=True, null=True, verbose_name='پیش‌نیازها')
+    learning_objectives = models.TextField(verbose_name='اهداف یادگیری')
     
     # Media
-    thumbnail = models.ImageField(upload_to='packages/thumbnails/', blank=True, null=True, verbose_name=_('Thumbnail'))
-    intro_video = models.FileField(upload_to='packages/videos/', blank=True, null=True, verbose_name=_('Intro Video'))
+    thumbnail = models.ImageField(upload_to='packages/thumbnails/', blank=True, null=True, verbose_name='تصویر کوچک')
+    intro_video = models.FileField(upload_to='packages/videos/', blank=True, null=True, verbose_name='ویدیو معرفی')
     
     # Statistics
-    purchase_count = models.PositiveIntegerField(default=0, verbose_name=_('Purchase Count'))
-    rating = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(5)], verbose_name=_('Rating'))
-    review_count = models.PositiveIntegerField(default=0, verbose_name=_('Review Count'))
+    purchase_count = models.PositiveIntegerField(default=0, verbose_name='تعداد خرید')
+    rating = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(5)], verbose_name='امتیاز')
+    review_count = models.PositiveIntegerField(default=0, verbose_name='تعداد نظر')
     
     # SEO
-    meta_title = models.CharField(max_length=200, blank=True, null=True, verbose_name=_('Meta Title'))
-    meta_description = models.TextField(blank=True, null=True, verbose_name=_('Meta Description'))
+    meta_title = models.CharField(max_length=200, blank=True, null=True, verbose_name='عنوان متا')
+    meta_description = models.TextField(blank=True, null=True, verbose_name='توضیحات متا')
     
     # Timestamps
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    published_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Published At'))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
+    published_at = models.DateTimeField(blank=True, null=True, verbose_name='تاریخ انتشار')
     
     class Meta:
-        verbose_name = _('Package')
-        verbose_name_plural = _('Packages')
+        verbose_name = _('پکیج')
+        verbose_name_plural = _('پکیج‌ها')
         ordering = ['-created_at']
     
     def __str__(self):
@@ -139,26 +139,26 @@ class Package(models.Model):
 class PackagePurchase(models.Model):
     """Package purchases by users"""
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='package_purchases', verbose_name=_('User'))
-    package = models.ForeignKey(Package, on_delete=models.CASCADE, related_name='purchases', verbose_name=_('Package'))
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='package_purchases', verbose_name='کاربر')
+    package = models.ForeignKey(Package, on_delete=models.CASCADE, related_name='purchases', verbose_name='پکیج')
     
     # Pricing
-    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Amount Paid'))
-    original_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_('Original Price'))
-    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_('Discount Amount'))
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='مبلغ پرداخت شده')
+    original_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='قیمت اصلی')
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='مبلغ تخفیف')
     
     # Payment details
-    payment_method = models.CharField(max_length=50, verbose_name=_('Payment Method'))
-    transaction_id = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Transaction ID'))
-    order = models.ForeignKey('payment.Order', on_delete=models.SET_NULL, blank=True, null=True, verbose_name=_('Order'))
+    payment_method = models.CharField(max_length=50, verbose_name='روش پرداخت')
+    transaction_id = models.CharField(max_length=100, blank=True, null=True, verbose_name='شناسه تراکنش')
+    order = models.ForeignKey('payment.Order', on_delete=models.SET_NULL, blank=True, null=True, verbose_name='سفارش')
     
     # Timestamps
-    purchased_at = models.DateTimeField(auto_now_add=True, verbose_name=_('Purchased At'))
-    expires_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Expires At'))
+    purchased_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ خرید')
+    expires_at = models.DateTimeField(blank=True, null=True, verbose_name='تاریخ انقضا')
     
     class Meta:
-        verbose_name = _('Package Purchase')
-        verbose_name_plural = _('Package Purchases')
+        verbose_name = _('خرید پکیج')
+        verbose_name_plural = _('خریدهای پکیج')
         ordering = ['-purchased_at']
         unique_together = ['user', 'package']
     
@@ -198,19 +198,19 @@ class PackagePurchase(models.Model):
 class PackageEnrollment(models.Model):
     """Track user progress in package courses"""
     
-    purchase = models.ForeignKey(PackagePurchase, on_delete=models.CASCADE, related_name='course_enrollments', verbose_name=_('Purchase'))
-    enrollment = models.ForeignKey(Enrollment, on_delete=models.CASCADE, related_name='package_enrollments', verbose_name=_('Enrollment'))
+    purchase = models.ForeignKey(PackagePurchase, on_delete=models.CASCADE, related_name='course_enrollments', verbose_name='خرید')
+    enrollment = models.ForeignKey(Enrollment, on_delete=models.CASCADE, related_name='package_enrollments', verbose_name='ثبت‌نام')
     
     # Progress tracking
-    started_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Started At'))
-    last_accessed = models.DateTimeField(blank=True, null=True, verbose_name=_('Last Accessed'))
+    started_at = models.DateTimeField(blank=True, null=True, verbose_name='شروع شده در')
+    last_accessed = models.DateTimeField(blank=True, null=True, verbose_name='آخرین دسترسی')
     
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
     
     class Meta:
-        verbose_name = _('Package Enrollment')
-        verbose_name_plural = _('Package Enrollments')
+        verbose_name = _('ثبت‌نام پکیج')
+        verbose_name_plural = _('ثبت‌نام‌های پکیج')
         unique_together = ['purchase', 'enrollment']
         ordering = ['-created_at']
     
@@ -226,16 +226,16 @@ class PackageEnrollment(models.Model):
 class PackageProgress(models.Model):
     """Overall package progress for a user"""
     
-    purchase = models.OneToOneField(PackagePurchase, on_delete=models.CASCADE, related_name='progress', verbose_name=_('Purchase'))
-    overall_progress_percentage = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)], verbose_name=_('Overall Progress'))
-    completed_courses = models.PositiveIntegerField(default=0, verbose_name=_('Completed Courses'))
-    total_time_spent = models.PositiveIntegerField(default=0, help_text=_('Time spent in minutes'), verbose_name=_('Total Time Spent'))
+    purchase = models.OneToOneField(PackagePurchase, on_delete=models.CASCADE, related_name='progress', verbose_name='خرید')
+    overall_progress_percentage = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)], verbose_name='پیشرفت کلی')
+    completed_courses = models.PositiveIntegerField(default=0, verbose_name='دوره‌های تکمیل شده')
+    total_time_spent = models.PositiveIntegerField(default=0, help_text=_('Time spent in minutes'), verbose_name='کل زمان صرف شده')
     
-    updated_at = models.DateTimeField(auto_now=True)
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
     
     class Meta:
-        verbose_name = _('Package Progress')
-        verbose_name_plural = _('Package Progress')
+        verbose_name = _('پیشرفت پکیج')
+        verbose_name_plural = _('پیشرفت‌های پکیج')
     
     def __str__(self):
         return f"Progress for {self.purchase}"
@@ -253,23 +253,23 @@ class PackageProgress(models.Model):
 class PackageReview(models.Model):
     """Package reviews and ratings"""
     
-    purchase = models.OneToOneField(PackagePurchase, on_delete=models.CASCADE, related_name='review', verbose_name=_('Purchase'))
-    rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name=_('Rating'))
-    title = models.CharField(max_length=200, verbose_name=_('Review Title'))
-    content = models.TextField(verbose_name=_('Review Content'))
+    purchase = models.OneToOneField(PackagePurchase, on_delete=models.CASCADE, related_name='review', verbose_name='خرید')
+    rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name='امتیاز')
+    title = models.CharField(max_length=200, verbose_name='عنوان نظر')
+    content = models.TextField(verbose_name='محتوای نظر')
     
     # Detailed ratings
-    value_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name=_('Value for Money'))
-    content_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name=_('Content Quality'))
-    support_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name=_('Support Rating'))
+    value_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name='ارزش پول')
+    content_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name='کیفیت محتوا')
+    support_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name='امتیاز پشتیبانی')
     
-    is_approved = models.BooleanField(default=False, verbose_name=_('Is Approved'))
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    is_approved = models.BooleanField(default=False, verbose_name='تأیید شده')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
     
     class Meta:
-        verbose_name = _('Package Review')
-        verbose_name_plural = _('Package Reviews')
+        verbose_name = _('نظر پکیج')
+        verbose_name_plural = _('نظرات پکیج')
         ordering = ['-created_at']
     
     def __str__(self):
@@ -284,32 +284,32 @@ class PackageCoupon(models.Model):
         ('fixed', _('Fixed Amount')),
     ]
     
-    code = models.CharField(max_length=50, unique=True, verbose_name=_('Coupon Code'))
-    title = models.CharField(max_length=200, verbose_name=_('Title'))
-    description = models.TextField(blank=True, null=True, verbose_name=_('Description'))
-    coupon_type = models.CharField(max_length=20, choices=COUPON_TYPES, verbose_name=_('Coupon Type'))
-    discount_value = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Discount Value'))
-    min_order_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_('Minimum Order Amount'))
-    max_discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name=_('Maximum Discount Amount'))
+    code = models.CharField(max_length=50, unique=True, verbose_name='کد کوپن')
+    title = models.CharField(max_length=200, verbose_name='عنوان')
+    description = models.TextField(blank=True, null=True, verbose_name='توضیحات')
+    coupon_type = models.CharField(max_length=20, choices=COUPON_TYPES, verbose_name='نوع کوپن')
+    discount_value = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='مقدار تخفیف')
+    min_order_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='حداقل مبلغ سفارش')
+    max_discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name='حداکثر مبلغ تخفیف')
     
     # Usage limits
-    usage_limit = models.PositiveIntegerField(blank=True, null=True, verbose_name=_('Usage Limit'))
-    used_count = models.PositiveIntegerField(default=0, verbose_name=_('Used Count'))
+    usage_limit = models.PositiveIntegerField(blank=True, null=True, verbose_name='حد استفاده')
+    used_count = models.PositiveIntegerField(default=0, verbose_name='تعداد استفاده')
     
     # Validity
-    is_active = models.BooleanField(default=True, verbose_name=_('Is Active'))
-    valid_from = models.DateTimeField(verbose_name=_('Valid From'))
-    valid_until = models.DateTimeField(verbose_name=_('Valid Until'))
+    is_active = models.BooleanField(default=True, verbose_name='فعال')
+    valid_from = models.DateTimeField(verbose_name='معتبر از')
+    valid_until = models.DateTimeField(verbose_name='معتبر تا')
     
     # Applicable packages
-    applicable_packages = models.ManyToManyField(Package, blank=True, related_name='coupons', verbose_name=_('Applicable Packages'))
+    applicable_packages = models.ManyToManyField(Package, blank=True, related_name='coupons', verbose_name='پکیج‌های قابل اعمال')
     
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
     
     class Meta:
-        verbose_name = _('Package Coupon')
-        verbose_name_plural = _('Package Coupons')
+        verbose_name = _('کوپن پکیج')
+        verbose_name_plural = _('کوپن‌های پکیج')
         ordering = ['-created_at']
     
     def __str__(self):

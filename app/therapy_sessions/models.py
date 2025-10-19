@@ -23,20 +23,20 @@ class Therapist(models.Model):
         ('other', _('Other')),
     ]
     
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='therapist_profile', verbose_name=_('User'))
-    specialization = models.CharField(max_length=50, choices=SPECIALIZATION_CHOICES, verbose_name=_('Specialization'))
-    bio = models.TextField(blank=True, null=True, verbose_name=_('Bio'))
-    education = models.TextField(blank=True, null=True, verbose_name=_('Education'))
-    certifications = models.TextField(blank=True, null=True, verbose_name=_('Certifications'))
-    experience_start_date = models.DateField(blank=True, null=True, verbose_name=_('Experience Start Date'))
-    hourly_rate = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name=_('Hourly Rate'))
-    is_available = models.BooleanField(default=True, verbose_name=_('Is Available'))
-    profile_image = models.ImageField(upload_to='therapist_profiles/', blank=True, null=True, verbose_name=_('Profile Image'))
-    created_at = models.DateTimeField(auto_now_add=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='therapist_profile', verbose_name='کاربر')
+    specialization = models.CharField(max_length=50, choices=SPECIALIZATION_CHOICES, verbose_name='تخصص')
+    bio = models.TextField(blank=True, null=True, verbose_name='بیوگرافی')
+    education = models.TextField(blank=True, null=True, verbose_name='تحصیلات')
+    certifications = models.TextField(blank=True, null=True, verbose_name='گواهینامه‌ها')
+    experience_start_date = models.DateField(blank=True, null=True, verbose_name='تاریخ شروع تجربه')
+    hourly_rate = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name='نرخ ساعتی')
+    is_available = models.BooleanField(default=True, verbose_name='در دسترس')
+    profile_image = models.ImageField(upload_to='therapist_profiles/', blank=True, null=True, verbose_name='تصویر پروفایل')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
     
     class Meta:
-        verbose_name = _('Therapist')
-        verbose_name_plural = _('Therapists')
+        verbose_name = _('درمانگر')
+        verbose_name_plural = _('درمانگران')
         ordering = ['user__first_name', 'user__last_name']
     
     def __str__(self):
@@ -52,12 +52,12 @@ class Therapist(models.Model):
 class SessionType(models.Model):
     """Types of therapy sessions"""
     
-    name = models.CharField(max_length=100, verbose_name=_('Name'))
-    description = models.TextField(blank=True, null=True, verbose_name=_('Description'))
-    duration_minutes = models.PositiveIntegerField(verbose_name=_('Duration (Minutes)'))
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Price'))
-    is_active = models.BooleanField(default=True, verbose_name=_('Is Active'))
-    created_at = models.DateTimeField(auto_now_add=True)
+    name = models.CharField(max_length=100, verbose_name='نام')
+    description = models.TextField(blank=True, null=True, verbose_name='توضیحات')
+    duration_minutes = models.PositiveIntegerField(verbose_name='مدت دقیقه')
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='قیمت')
+    is_active = models.BooleanField(default=True, verbose_name='فعال')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
     
     class Meta:
         verbose_name = _('نوع نوبت')
@@ -81,16 +81,16 @@ class TherapistAvailability(models.Model):
         ('sunday', _('Sunday')),
     ]
     
-    therapist = models.ForeignKey(Therapist, on_delete=models.CASCADE, related_name='availability', verbose_name=_('Therapist'))
-    day_of_week = models.CharField(max_length=10, choices=DAYS_OF_WEEK, verbose_name=_('Day of Week'))
-    start_time = models.TimeField(verbose_name=_('Start Time'))
-    end_time = models.TimeField(verbose_name=_('End Time'))
-    is_available = models.BooleanField(default=True, verbose_name=_('Is Available'))
-    created_at = models.DateTimeField(auto_now_add=True)
+    therapist = models.ForeignKey(Therapist, on_delete=models.CASCADE, related_name='availability', verbose_name='درمانگر')
+    day_of_week = models.CharField(max_length=10, choices=DAYS_OF_WEEK, verbose_name='روز هفته')
+    start_time = models.TimeField(verbose_name='زمان شروع')
+    end_time = models.TimeField(verbose_name='زمان پایان')
+    is_available = models.BooleanField(default=True, verbose_name='در دسترس')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
     
     class Meta:
-        verbose_name = _('Therapist Availability')
-        verbose_name_plural = _('Therapist Availability')
+        verbose_name = _('دسترسی درمانگر')
+        verbose_name_plural = _('دسترسی‌های درمانگر')
         ordering = ['day_of_week', 'start_time']
         unique_together = ['therapist', 'day_of_week', 'start_time']
     
@@ -116,39 +116,39 @@ class Session(models.Model):
         ('phone', _('Phone Call')),
     ]
     
-    client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='client_sessions', verbose_name=_('Client'))
-    therapist = models.ForeignKey(Therapist, on_delete=models.CASCADE, related_name='therapist_sessions', verbose_name=_('Therapist'))
-    session_type = models.ForeignKey(SessionType, on_delete=models.CASCADE, related_name='sessions', verbose_name=_('Session Type'))
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='scheduled', verbose_name=_('Status'))
-    mode = models.CharField(max_length=20, choices=SESSION_MODES, verbose_name=_('Mode'))
+    client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='client_sessions', verbose_name='مراجع')
+    therapist = models.ForeignKey(Therapist, on_delete=models.CASCADE, related_name='therapist_sessions', verbose_name='درمانگر')
+    session_type = models.ForeignKey(SessionType, on_delete=models.CASCADE, related_name='sessions', verbose_name='نوع نوبت')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='scheduled', verbose_name='وضعیت')
+    mode = models.CharField(max_length=20, choices=SESSION_MODES, verbose_name='حالت')
     
     # Scheduling
-    scheduled_date = models.DateField(verbose_name=_('Scheduled Date'))
-    scheduled_time = models.TimeField(verbose_name=_('Scheduled Time'))
-    duration_minutes = models.PositiveIntegerField(verbose_name=_('Duration (Minutes)'))
+    scheduled_date = models.DateField(verbose_name='تاریخ برنامه‌ریزی شده')
+    scheduled_time = models.TimeField(verbose_name='زمان برنامه‌ریزی شده')
+    duration_minutes = models.PositiveIntegerField(verbose_name='مدت دقیقه')
     
     # Location/Meeting details
-    location = models.CharField(max_length=200, blank=True, null=True, verbose_name=_('Location'))
-    meeting_link = models.URLField(blank=True, null=True, verbose_name=_('Meeting Link'))
-    meeting_id = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Meeting ID'))
-    meeting_password = models.CharField(max_length=50, blank=True, null=True, verbose_name=_('Meeting Password'))
+    location = models.CharField(max_length=200, blank=True, null=True, verbose_name='مکان')
+    meeting_link = models.URLField(blank=True, null=True, verbose_name='لینک جلسه')
+    meeting_id = models.CharField(max_length=100, blank=True, null=True, verbose_name='شناسه جلسه')
+    meeting_password = models.CharField(max_length=50, blank=True, null=True, verbose_name='رمز عبور جلسه')
     
     # Session details
-    session_notes = models.TextField(blank=True, null=True, verbose_name=_('Session Notes'))
-    goals = models.TextField(blank=True, null=True, verbose_name=_('Session Goals'))
-    homework = models.TextField(blank=True, null=True, verbose_name=_('Homework'))
+    session_notes = models.TextField(blank=True, null=True, verbose_name='یادداشت‌های جلسه')
+    goals = models.TextField(blank=True, null=True, verbose_name='اهداف جلسه')
+    homework = models.TextField(blank=True, null=True, verbose_name='تکلیف')
     
     # Pricing
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Price'))
-    is_paid = models.BooleanField(default=False, verbose_name=_('Is Paid'))
-    payment_method = models.CharField(max_length=50, blank=True, null=True, verbose_name=_('Payment Method'))
-    transaction_id = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Transaction ID'))
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='قیمت')
+    is_paid = models.BooleanField(default=False, verbose_name='پرداخت شده')
+    payment_method = models.CharField(max_length=50, blank=True, null=True, verbose_name='روش پرداخت')
+    transaction_id = models.CharField(max_length=100, blank=True, null=True, verbose_name='شناسه تراکنش')
     
     # Timestamps
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    started_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Started At'))
-    ended_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Ended At'))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
+    started_at = models.DateTimeField(blank=True, null=True, verbose_name='شروع شده در')
+    ended_at = models.DateTimeField(blank=True, null=True, verbose_name='پایان یافته در')
     
     class Meta:
         verbose_name = _('نوبت')
@@ -170,17 +170,17 @@ class SessionNote(models.Model):
         ('homework', _('Homework Assignment')),
     ]
     
-    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='notes', verbose_name=_('Session'))
-    note_type = models.CharField(max_length=20, choices=NOTE_TYPES, verbose_name=_('Note Type'))
-    content = models.TextField(verbose_name=_('Content'))
-    is_private = models.BooleanField(default=True, verbose_name=_('Is Private'))
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='session_notes', verbose_name=_('Created By'))
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='notes', verbose_name='نوبت')
+    note_type = models.CharField(max_length=20, choices=NOTE_TYPES, verbose_name='نوع یادداشت')
+    content = models.TextField(verbose_name='محتوای')
+    is_private = models.BooleanField(default=True, verbose_name='خصوصی')
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='session_notes', verbose_name='ایجاد شده توسط')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
     
     class Meta:
-        verbose_name = _('Session Note')
-        verbose_name_plural = _('Session Notes')
+        verbose_name = _('یادداشت نوبت')
+        verbose_name_plural = _('یادداشت‌های نوبت')
         ordering = ['-created_at']
     
     def __str__(self):
@@ -190,18 +190,18 @@ class SessionNote(models.Model):
 class SessionRating(models.Model):
     """Client ratings for sessions"""
     
-    session = models.OneToOneField(Session, on_delete=models.CASCADE, related_name='rating', verbose_name=_('Session'))
-    overall_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name=_('Overall Rating'))
-    therapist_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name=_('Therapist Rating'))
-    environment_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name=_('Environment Rating'))
-    helpfulness_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name=_('Helpfulness Rating'))
-    comments = models.TextField(blank=True, null=True, verbose_name=_('Comments'))
-    would_recommend = models.BooleanField(default=True, verbose_name=_('Would Recommend'))
-    created_at = models.DateTimeField(auto_now_add=True)
+    session = models.OneToOneField(Session, on_delete=models.CASCADE, related_name='rating', verbose_name='نوبت')
+    overall_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name='امتیاز کلی')
+    therapist_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name='امتیاز درمانگر')
+    environment_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name='امتیاز محیط')
+    helpfulness_rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name='امتیاز مفید بودن')
+    comments = models.TextField(blank=True, null=True, verbose_name='نظرات')
+    would_recommend = models.BooleanField(default=True, verbose_name='توصیه می‌کند')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
     
     class Meta:
-        verbose_name = _('Session Rating')
-        verbose_name_plural = _('Session Ratings')
+        verbose_name = _('امتیاز نوبت')
+        verbose_name_plural = _('امتیازهای نوبت')
     
     def __str__(self):
         return f"Rating for {self.session} - {self.overall_rating}/5"
@@ -219,17 +219,17 @@ class SessionCancellation(models.Model):
         ('other', _('Other')),
     ]
     
-    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='cancellations', verbose_name=_('Session'))
-    cancelled_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='session_cancellations', verbose_name=_('Cancelled By'))
-    reason = models.CharField(max_length=20, choices=CANCELLATION_REASONS, verbose_name=_('Reason'))
-    explanation = models.TextField(blank=True, null=True, verbose_name=_('Explanation'))
-    cancelled_at = models.DateTimeField(auto_now_add=True, verbose_name=_('Cancelled At'))
-    refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_('Refund Amount'))
-    is_refunded = models.BooleanField(default=False, verbose_name=_('Is Refunded'))
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='cancellations', verbose_name='نوبت')
+    cancelled_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='session_cancellations', verbose_name='لغو شده توسط')
+    reason = models.CharField(max_length=20, choices=CANCELLATION_REASONS, verbose_name='دلیل')
+    explanation = models.TextField(blank=True, null=True, verbose_name='توضیح')
+    cancelled_at = models.DateTimeField(auto_now_add=True, verbose_name='لغو شده در')
+    refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='مبلغ بازپرداخت')
+    is_refunded = models.BooleanField(default=False, verbose_name='بازپرداخت شده')
     
     class Meta:
-        verbose_name = _('Session Cancellation')
-        verbose_name_plural = _('Session Cancellations')
+        verbose_name = _('لغو نوبت')
+        verbose_name_plural = _('لغوهای نوبت')
         ordering = ['-cancelled_at']
     
     def __str__(self):
@@ -245,16 +245,16 @@ class SessionReminder(models.Model):
         ('push', _('Push Notification')),
     ]
     
-    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='reminders', verbose_name=_('Session'))
-    reminder_type = models.CharField(max_length=20, choices=REMINDER_TYPES, verbose_name=_('Reminder Type'))
-    scheduled_time = models.DateTimeField(verbose_name=_('Scheduled Time'))
-    is_sent = models.BooleanField(default=False, verbose_name=_('Is Sent'))
-    sent_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Sent At'))
-    created_at = models.DateTimeField(auto_now_add=True)
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='reminders', verbose_name='نوبت')
+    reminder_type = models.CharField(max_length=20, choices=REMINDER_TYPES, verbose_name='نوع یادآوری')
+    scheduled_time = models.DateTimeField(verbose_name='زمان برنامه‌ریزی شده')
+    is_sent = models.BooleanField(default=False, verbose_name='ارسال شده')
+    sent_at = models.DateTimeField(blank=True, null=True, verbose_name='ارسال شده در')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
     
     class Meta:
-        verbose_name = _('Session Reminder')
-        verbose_name_plural = _('Session Reminders')
+        verbose_name = _('یادآوری نوبت')
+        verbose_name_plural = _('یادآوری‌های نوبت')
         ordering = ['scheduled_time']
     
     def __str__(self):
@@ -277,42 +277,42 @@ class SessionBooking(models.Model):
         ('phone', _('Phone Call')),
     ]
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='session_bookings', verbose_name=_('User'))
-    therapist = models.ForeignKey(Therapist, on_delete=models.CASCADE, related_name='booking_requests', verbose_name=_('Therapist'))
-    session_type = models.ForeignKey(SessionType, on_delete=models.CASCADE, related_name='bookings', verbose_name=_('Session Type'))
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name=_('Status'))
-    mode = models.CharField(max_length=20, choices=SESSION_MODES, verbose_name=_('Mode'))
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='session_bookings', verbose_name='کاربر')
+    therapist = models.ForeignKey(Therapist, on_delete=models.CASCADE, related_name='booking_requests', verbose_name='درمانگر')
+    session_type = models.ForeignKey(SessionType, on_delete=models.CASCADE, related_name='bookings', verbose_name='نوع نوبت')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name='وضعیت')
+    mode = models.CharField(max_length=20, choices=SESSION_MODES, verbose_name='حالت')
     
     # Preferred scheduling
-    preferred_date = models.DateField(verbose_name=_('Preferred Date'))
-    preferred_time = models.TimeField(verbose_name=_('Preferred Time'))
-    alternative_dates = models.JSONField(default=list, verbose_name=_('Alternative Dates'))
+    preferred_date = models.DateField(verbose_name='تاریخ ترجیحی')
+    preferred_time = models.TimeField(verbose_name='زمان ترجیحی')
+    alternative_dates = models.JSONField(default=list, verbose_name='تاریخ‌های جایگزین')
     
     # Session details
-    goals = models.TextField(blank=True, null=True, verbose_name=_('Session Goals'))
-    notes = models.TextField(blank=True, null=True, verbose_name=_('Additional Notes'))
-    location = models.CharField(max_length=200, blank=True, null=True, verbose_name=_('Location'))
+    goals = models.TextField(blank=True, null=True, verbose_name='اهداف جلسه')
+    notes = models.TextField(blank=True, null=True, verbose_name='یادداشت‌های اضافی')
+    location = models.CharField(max_length=200, blank=True, null=True, verbose_name='مکان')
     
     # Pricing
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Price'))
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='قیمت')
     
     # Confirmation details
-    confirmed_date = models.DateField(blank=True, null=True, verbose_name=_('Confirmed Date'))
-    confirmed_time = models.TimeField(blank=True, null=True, verbose_name=_('Confirmed Time'))
-    confirmation_notes = models.TextField(blank=True, null=True, verbose_name=_('Confirmation Notes'))
-    confirmed_at = models.DateTimeField(blank=True, null=True, verbose_name=_('Confirmed At'))
-    confirmed_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='confirmed_bookings', verbose_name=_('Confirmed By'))
+    confirmed_date = models.DateField(blank=True, null=True, verbose_name='تاریخ تأیید شده')
+    confirmed_time = models.TimeField(blank=True, null=True, verbose_name='زمان تأیید شده')
+    confirmation_notes = models.TextField(blank=True, null=True, verbose_name='یادداشت‌های تأیید')
+    confirmed_at = models.DateTimeField(blank=True, null=True, verbose_name='تأیید شده در')
+    confirmed_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='confirmed_bookings', verbose_name='تأیید شده توسط')
     
     # Croom integration
-    croom_class_id = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Croom Class ID'))
-    croom_class_url = models.URLField(blank=True, null=True, verbose_name=_('Croom Class URL'))
-    croom_meeting_id = models.CharField(max_length=100, blank=True, null=True, verbose_name=_('Croom Meeting ID'))
-    croom_password = models.CharField(max_length=50, blank=True, null=True, verbose_name=_('Croom Password'))
+    croom_class_id = models.CharField(max_length=100, blank=True, null=True, verbose_name='شناسه کلاس Croom')
+    croom_class_url = models.URLField(blank=True, null=True, verbose_name='لینک کلاس Croom')
+    croom_meeting_id = models.CharField(max_length=100, blank=True, null=True, verbose_name='شناسه جلسه Croom')
+    croom_password = models.CharField(max_length=50, blank=True, null=True, verbose_name='رمز عبور Croom')
     
     # Timestamps
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    expires_at = models.DateTimeField(verbose_name=_('Expires At'))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
+    expires_at = models.DateTimeField(verbose_name='انقضا در')
     
     class Meta:
         verbose_name = _('درخواست نوبت')

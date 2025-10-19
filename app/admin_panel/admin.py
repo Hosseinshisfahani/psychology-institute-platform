@@ -1,6 +1,6 @@
 from django.contrib import admin
-from .models import AdminDashboard, AdminWidget, AdminLog, AdminNotification, AdminSetting, AdminBackup
-
+from .models import AdminDashboard, AdminWidget, AdminLog, AdminNotification, AdminSetting, AdminBackup  
+# from psychology_institute.admin import persian_admin_site
 
 @admin.register(AdminDashboard)
 class AdminDashboardAdmin(admin.ModelAdmin):

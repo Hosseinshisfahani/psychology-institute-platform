@@ -2,10 +2,10 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
 from .models import (
+# from psychology_institute.admin import persian_admin_site
     WorkshopCategory, Workshop, WorkshopSession, WorkshopRegistration,
     WorkshopSessionAttendance, InstallmentPlan, InstallmentPayment, WorkshopReview
 )
-
 
 @admin.register(WorkshopCategory)
 class WorkshopCategoryAdmin(admin.ModelAdmin):

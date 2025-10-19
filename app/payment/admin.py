@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from .models import (
+# from psychology_institute.admin import persian_admin_site
     PaymentMethod, Cart, CartItem, Order, OrderItem, 
     Payment, InstallmentSchedule
 )

@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import (
+# from psychology_institute.admin import persian_admin_site
     Cohort, CohortSession, CohortEnrollment, 
     CohortInstallment, CohortAttendance
 )
