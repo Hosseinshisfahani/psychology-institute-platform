@@ -48,7 +48,7 @@ class User(AbstractUser):
     
     # Remove username field since we're using email-based authentication
     username = None
-    email = models.EmailField(_('Email address', verbose_name='آدرس ایمیل'), unique=True)
+    email = models.EmailField(_('آدرس ایمیل'), unique=True)
     user_type = models.CharField(max_length=20, choices=USER_TYPES, default='client', verbose_name='نوع کاربر')
     phone_number = models.CharField(max_length=15, blank=True, null=True, verbose_name='شماره تلفن')
     national_id = models.CharField(max_length=10, blank=True, null=True, unique=True, verbose_name='کد ملی')

@@ -4,7 +4,6 @@ from django.utils import timezone
 from app.blog.models import Category, Tag, Post, Comment, PostLike, NewsletterSubscription
 from app.tests.models import TestCategory, PsychologicalTest, Question, Choice
 from app.courses.models import CourseCategory, Course, CourseModule, Lesson
-from app.therapy_sessions.models import SessionType, TherapistAvailability, Session
 from app.sales.models import Institution, ServicePackage
 
 User = get_user_model()

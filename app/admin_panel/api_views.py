@@ -9,20 +9,21 @@ from datetime import datetime, timedelta
 from django.contrib.auth import get_user_model
 from app.blog.models import Post, Category, Tag, Comment
 from app.courses.models import Course, Enrollment
-from app.therapy_sessions.models import Session, Therapist, SessionBooking, SessionType
+# from app.therapy_sessions.models import Session, Therapist, SessionBooking, SessionType  # Removed - therapy_sessions app deleted
 from app.dashboard.models import Activity, Notification
 from app.workshops.models import (
     Workshop, WorkshopCategory, WorkshopSession, WorkshopRegistration,
     WorkshopSessionAttendance, InstallmentPlan, InstallmentPayment, WorkshopReview
 )
+from app.packages.models import Package, PackageCategory, PackagePurchase
 from .serializers import (
     AdminUserSerializer, AdminPostSerializer, AdminCourseSerializer,
-    AdminSessionSerializer, AdminActivitySerializer, AdminNotificationSerializer,
-    DashboardStatsSerializer, AdminAppointmentSerializer, AdminTherapistSerializer,
-    AdminSessionTypeSerializer, AdminBlogPostSerializer, AdminCategorySerializer,
+    # AdminSessionSerializer, AdminAppointmentSerializer, AdminTherapistSerializer, AdminSessionTypeSerializer,  # Removed - therapy_sessions app deleted
+    AdminActivitySerializer, AdminNotificationSerializer,
+    DashboardStatsSerializer, AdminBlogPostSerializer, AdminCategorySerializer,
     AdminTagSerializer, AdminCommentSerializer, AdminWorkshopSerializer,
     AdminWorkshopCategorySerializer, AdminWorkshopSessionSerializer,
-    AdminWorkshopRegistrationSerializer
+    AdminWorkshopRegistrationSerializer, AdminPackageSerializer, AdminPackageCategorySerializer
 )
 
 User = get_user_model()
@@ -54,16 +55,17 @@ class DashboardStatsAPIView(views.APIView):
         # Course statistics
         total_courses = Course.objects.count()
         
-        # Session statistics
-        total_sessions = Session.objects.count()
-        completed_sessions = Session.objects.filter(status='completed').count()
-        pending_sessions = Session.objects.filter(status='scheduled').count()
+
+        total_sessions = 0
+        completed_sessions = 0
+        pending_sessions = 0
         
-        # Calculate average session rating
-        avg_rating = Session.objects.filter(
-            status='completed',
-            rating__isnull=False
-        ).aggregate(avg_rating=Avg('rating'))['avg_rating'] or 0
+        # Calculate average session rating - commented out due to therapy_sessions app deletion
+        # avg_rating = Session.objects.filter(
+        #     status='completed',
+        #     rating__isnull=False
+        # ).aggregate(avg_rating=Avg('rating'))['avg_rating'] or 0
+        avg_rating = 0
         
         # Revenue calculations
         total_revenue = Enrollment.objects.aggregate(
@@ -94,13 +96,29 @@ class DashboardStatsAPIView(views.APIView):
 
 class AdminUserListAPIView(generics.ListAPIView):
     """
-    List all users for admin
+    List all users for admin with pagination, filtering, and search
     """
     serializer_class = AdminUserSerializer
     permission_classes = [AdminPermission]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['user_type', 'is_active']
+    search_fields = ['first_name', 'last_name', 'email']
+    ordering_fields = ['date_joined', 'last_login', 'first_name', 'last_name']
+    ordering = ['-date_joined']
     
     def get_queryset(self):
-        return User.objects.all().order_by('-date_joined')
+        queryset = User.objects.all().order_by('-date_joined')
+        
+        # Additional filtering based on query parameters
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(email__icontains=search)
+            )
+        
+        return queryset
 
 class AdminUserDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     """
@@ -152,15 +170,16 @@ class AdminCourseDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         return Course.objects.all()
 
-class AdminSessionListAPIView(generics.ListAPIView):
-    """
-    List all sessions for admin
-    """
-    serializer_class = AdminSessionSerializer
-    permission_classes = [AdminPermission]
-    
-    def get_queryset(self):
-        return Session.objects.all().select_related('user', 'therapist__user', 'session_type').order_by('-created_at')
+# AdminSessionListAPIView commented out due to therapy_sessions app deletion
+# class AdminSessionListAPIView(generics.ListAPIView):
+#     """
+#     List all sessions for admin
+#     """
+#     serializer_class = AdminSessionSerializer
+#     permission_classes = [AdminPermission]
+#     
+#     def get_queryset(self):
+#         return Session.objects.all().select_related('user', 'therapist__user', 'session_type').order_by('-created_at')
 
 class AdminActivityListAPIView(generics.ListAPIView):
     """
@@ -258,10 +277,13 @@ def admin_analytics(request):
         enrollment_count=Count('enrollments')
     ).order_by('-enrollment_count')[:5]
     
-    # Session completion rates
-    total_sessions = Session.objects.count()
-    completed_sessions = Session.objects.filter(status='completed').count()
-    completion_rate = (completed_sessions / total_sessions * 100) if total_sessions > 0 else 0
+    # Session completion rates - commented out due to therapy_sessions app deletion
+    # total_sessions = Session.objects.count()
+    # completed_sessions = Session.objects.filter(status='completed').count()
+    # completion_rate = (completed_sessions / total_sessions * 100) if total_sessions > 0 else 0
+    total_sessions = 0
+    completed_sessions = 0
+    completion_rate = 0
     
     return Response({
         'user_trends': user_trends,
@@ -379,165 +401,173 @@ def bulk_course_action(request):
 
 # Appointment Management Endpoints
 
-class AdminAppointmentListAPIView(generics.ListAPIView):
-    """
-    List all appointment bookings for admin
-    """
-    serializer_class = AdminAppointmentSerializer
-    permission_classes = [AdminPermission]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['status', 'mode', 'therapist', 'session_type']
-    search_fields = ['user__first_name', 'user__last_name', 'user__email', 'therapist__user__first_name', 'therapist__user__last_name']
-    ordering_fields = ['created_at', 'preferred_date', 'preferred_time']
-    ordering = ['-created_at']
-    
-    def get_queryset(self):
-        return SessionBooking.objects.all().select_related(
-            'user', 'therapist__user', 'session_type'
-        )
+# AdminAppointmentListAPIView commented out due to therapy_sessions app deletion
+# class AdminAppointmentListAPIView(generics.ListAPIView):
+#     """
+#     List all appointment bookings for admin
+#     """
+#     serializer_class = AdminAppointmentSerializer
+#     permission_classes = [AdminPermission]
+#     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+#     filterset_fields = ['status', 'mode', 'therapist', 'session_type']
+#     search_fields = ['user__first_name', 'user__last_name', 'user__email', 'therapist__user__first_name', 'therapist__user__last_name']
+#     ordering_fields = ['created_at', 'preferred_date', 'preferred_time']
+#     ordering = ['-created_at']
+#     
+#     def get_queryset(self):
+#         return SessionBooking.objects.all().select_related(
+#             'user', 'therapist__user', 'session_type'
+#         )
 
-class AdminAppointmentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    Get, update, or delete an appointment booking
-    """
-    serializer_class = AdminAppointmentSerializer
-    permission_classes = [AdminPermission]
-    
-    def get_queryset(self):
-        return SessionBooking.objects.all().select_related(
-            'user', 'therapist__user', 'session_type'
-        )
+# AdminAppointmentDetailAPIView commented out due to therapy_sessions app deletion
+# class AdminAppointmentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+#     """
+#     Get, update, or delete an appointment booking
+#     """
+#     serializer_class = AdminAppointmentSerializer
+#     permission_classes = [AdminPermission]
+#     
+#     def get_queryset(self):
+#         return SessionBooking.objects.all().select_related(
+#             'user', 'therapist__user', 'session_type'
+#         )
 
-@api_view(['POST'])
-@permission_classes([AdminPermission])
-def confirm_appointment(request, appointment_id):
-    """
-    Confirm an appointment booking
-    """
-    appointment = get_object_or_404(SessionBooking, id=appointment_id)
-    
-    if appointment.status != 'pending':
-        return Response(
-            {'error': 'این نوبت قبلاً تایید یا رد شده است'}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    confirmed_date = request.data.get('confirmed_date')
-    confirmed_time = request.data.get('confirmed_time')
-    croom_class_url = request.data.get('croom_class_url', '')
-    croom_meeting_id = request.data.get('croom_meeting_id', '')
-    croom_password = request.data.get('croom_password', '')
-    confirmation_notes = request.data.get('confirmation_notes', '')
-    
-    if not all([confirmed_date, confirmed_time]):
-        return Response(
-            {'error': 'تاریخ و زمان تایید الزامی است'}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    try:
-        from datetime import datetime
-        confirmed_date_obj = datetime.strptime(confirmed_date, '%Y-%m-%d').date()
-        confirmed_time_obj = datetime.strptime(confirmed_time, '%H:%M').time()
-    except ValueError:
-        return Response(
-            {'error': 'فرمت تاریخ یا زمان نامعتبر است'}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    # Update appointment with croom details
-    appointment.croom_class_url = croom_class_url
-    appointment.croom_meeting_id = croom_meeting_id
-    appointment.croom_password = croom_password
-    
-    # Confirm appointment and create session
-    session = appointment.confirm_booking(
-        confirmed_date_obj,
-        confirmed_time_obj,
-        request.user,
-        confirmation_notes
-    )
-    
-    return Response({
-        'message': 'نوبت با موفقیت تایید شد',
-        'session_id': session.id,
-        'croom_class_url': croom_class_url,
-        'croom_meeting_id': croom_meeting_id
-    })
+# confirm_appointment function commented out due to therapy_sessions app deletion
+# @api_view(['POST'])
+# @permission_classes([AdminPermission])
+# def confirm_appointment(request, appointment_id):
+#     """
+#     Confirm an appointment booking
+#     """
+#     appointment = get_object_or_404(SessionBooking, id=appointment_id)
+#     
+#     if appointment.status != 'pending':
+#         return Response(
+#             {'error': 'این نوبت قبلاً تایید یا رد شده است'}, 
+#             status=status.HTTP_400_BAD_REQUEST
+#         )
+#     
+#     confirmed_date = request.data.get('confirmed_date')
+#     confirmed_time = request.data.get('confirmed_time')
+#     croom_class_url = request.data.get('croom_class_url', '')
+#     croom_meeting_id = request.data.get('croom_meeting_id', '')
+#     croom_password = request.data.get('croom_password', '')
+#     confirmation_notes = request.data.get('confirmation_notes', '')
+#     
+#     if not all([confirmed_date, confirmed_time]):
+#         return Response(
+#             {'error': 'تاریخ و زمان تایید الزامی است'}, 
+#             status=status.HTTP_400_BAD_REQUEST
+#         )
+#     
+#     try:
+#         from datetime import datetime
+#         confirmed_date_obj = datetime.strptime(confirmed_date, '%Y-%m-%d').date()
+#         confirmed_time_obj = datetime.strptime(confirmed_time, '%H:%M').time()
+#     except ValueError:
+#         return Response(
+#             {'error': 'فرمت تاریخ یا زمان نامعتبر است'}, 
+#             status=status.HTTP_400_BAD_REQUEST
+#         )
+#     
+#     # Update appointment with croom details
+#     appointment.croom_class_url = croom_class_url
+#     appointment.croom_meeting_id = croom_meeting_id
+#     appointment.croom_password = croom_password
+#     
+#     # Confirm appointment and create session
+#     session = appointment.confirm_booking(
+#         confirmed_date_obj,
+#         confirmed_time_obj,
+#         request.user,
+#         confirmation_notes
+#     )
+#     
+#     return Response({
+#         'message': 'نوبت با موفقیت تایید شد',
+#         'session_id': session.id,
+#         'croom_class_url': croom_class_url,
+#         'croom_meeting_id': croom_meeting_id
+#     })
 
-@api_view(['POST'])
-@permission_classes([AdminPermission])
-def reject_appointment(request, appointment_id):
-    """
-    Reject an appointment booking
-    """
-    appointment = get_object_or_404(SessionBooking, id=appointment_id)
-    
-    if appointment.status != 'pending':
-        return Response(
-            {'error': 'این نوبت قبلاً تایید یا رد شده است'}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    rejection_reason = request.data.get('rejection_reason', '')
-    
-    appointment.status = 'rejected'
-    appointment.confirmation_notes = rejection_reason
-    appointment.save()
-    
-    return Response({
-        'message': 'نوبت رد شد'
-    })
+# reject_appointment function commented out due to therapy_sessions app deletion
+# @api_view(['POST'])
+# @permission_classes([AdminPermission])
+# def reject_appointment(request, appointment_id):
+#     """
+#     Reject an appointment booking
+#     """
+#     appointment = get_object_or_404(SessionBooking, id=appointment_id)
+#     
+#     if appointment.status != 'pending':
+#         return Response(
+#             {'error': 'این نوبت قبلاً تایید یا رد شده است'}, 
+#             status=status.HTTP_400_BAD_REQUEST
+#         )
+#     
+#     rejection_reason = request.data.get('rejection_reason', '')
+#     
+#     appointment.status = 'rejected'
+#     appointment.confirmation_notes = rejection_reason
+#     appointment.save()
+#     
+#     return Response({
+#         'message': 'نوبت رد شد'
+#     })
 
-class AdminTherapistListAPIView(generics.ListCreateAPIView):
-    """
-    List and create therapists for admin
-    """
-    serializer_class = AdminTherapistSerializer
-    permission_classes = [AdminPermission]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['specialization', 'is_available']
-    search_fields = ['user__first_name', 'user__last_name', 'user__email', 'bio']
-    ordering_fields = ['hourly_rate', 'created_at']
-    ordering = ['-created_at']
-    
-    def get_queryset(self):
-        return Therapist.objects.all().select_related('user')
+# AdminTherapistListAPIView commented out due to therapy_sessions app deletion
+# class AdminTherapistListAPIView(generics.ListCreateAPIView):
+#     """
+#     List and create therapists for admin
+#     """
+#     serializer_class = AdminTherapistSerializer
+#     permission_classes = [AdminPermission]
+#     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+#     filterset_fields = ['specialization', 'is_available']
+#     search_fields = ['user__first_name', 'user__last_name', 'user__email', 'bio']
+#     ordering_fields = ['hourly_rate', 'created_at']
+#     ordering = ['-created_at']
+#     
+#     def get_queryset(self):
+#         return Therapist.objects.all().select_related('user')
 
-class AdminTherapistDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    Get, update, or delete a therapist
-    """
-    serializer_class = AdminTherapistSerializer
-    permission_classes = [AdminPermission]
-    
-    def get_queryset(self):
-        return Therapist.objects.all().select_related('user')
+# AdminTherapistDetailAPIView commented out due to therapy_sessions app deletion
+# class AdminTherapistDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+#     """
+#     Get, update, or delete a therapist
+#     """
+#     serializer_class = AdminTherapistSerializer
+#     permission_classes = [AdminPermission]
+#     
+#     def get_queryset(self):
+#         return Therapist.objects.all().select_related('user')
 
-class AdminSessionTypeListAPIView(generics.ListCreateAPIView):
-    """
-    List and create session types for admin
-    """
-    serializer_class = AdminSessionTypeSerializer
-    permission_classes = [AdminPermission]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['is_active']
-    search_fields = ['name', 'description']
-    ordering_fields = ['price', 'duration_minutes', 'created_at']
-    ordering = ['-created_at']
-    
-    def get_queryset(self):
-        return SessionType.objects.all()
+# AdminSessionTypeListAPIView commented out due to therapy_sessions app deletion
+# class AdminSessionTypeListAPIView(generics.ListCreateAPIView):
+#     """
+#     List and create session types for admin
+#     """
+#     serializer_class = AdminSessionTypeSerializer
+#     permission_classes = [AdminPermission]
+#     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+#     filterset_fields = ['is_active']
+#     search_fields = ['name', 'description']
+#     ordering_fields = ['price', 'duration_minutes', 'created_at']
+#     ordering = ['-created_at']
+#     
+#     def get_queryset(self):
+#         return SessionType.objects.all()
 
-class AdminSessionTypeDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    Get, update, or delete a session type
-    """
-    serializer_class = AdminSessionTypeSerializer
-    permission_classes = [AdminPermission]
-    
-    def get_queryset(self):
-        return SessionType.objects.all()
+# AdminSessionTypeDetailAPIView commented out due to therapy_sessions app deletion
+# class AdminSessionTypeDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+#     """
+#     Get, update, or delete a session type
+#     """
+#     serializer_class = AdminSessionTypeSerializer
+#     permission_classes = [AdminPermission]
+#     
+#     def get_queryset(self):
+#         return SessionType.objects.all()
 
 
 # Blog Admin Views
@@ -951,3 +981,105 @@ def reject_workshop_registration(request, registration_id):
         'message': 'ثبت‌نام رد شد',
         'status': registration.status
     })
+
+
+# Package Admin Views
+
+class AdminPackageListAPIView(generics.ListCreateAPIView):
+    """
+    List and create packages for admin
+    """
+    serializer_class = AdminPackageSerializer
+    permission_classes = [AdminPermission]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['status', 'category', 'is_featured']
+    search_fields = ['title', 'description', 'short_description']
+    ordering_fields = ['created_at', 'updated_at', 'price', 'purchase_count', 'rating']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        queryset = Package.objects.all().select_related('category').prefetch_related('courses')
+        
+        # Date range filter
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+        
+        if date_from:
+            try:
+                date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+                queryset = queryset.filter(created_at__date__gte=date_from_obj)
+            except ValueError:
+                pass
+        
+        if date_to:
+            try:
+                date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+                queryset = queryset.filter(created_at__date__lte=date_to_obj)
+            except ValueError:
+                pass
+        
+        return queryset
+
+class AdminPackageDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Get, update, or delete a package
+    """
+    serializer_class = AdminPackageSerializer
+    permission_classes = [AdminPermission]
+    
+    def get_queryset(self):
+        return Package.objects.all().select_related('category').prefetch_related('courses')
+
+class AdminPackageCategoryListAPIView(generics.ListCreateAPIView):
+    """
+    List and create package categories for admin
+    """
+    serializer_class = AdminPackageCategorySerializer
+    permission_classes = [AdminPermission]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['is_active']
+    search_fields = ['name', 'description']
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']
+    
+    def get_queryset(self):
+        return PackageCategory.objects.all()
+
+class AdminPackageCategoryDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Get, update, or delete a package category
+    """
+    serializer_class = AdminPackageCategorySerializer
+    permission_classes = [AdminPermission]
+    
+    def get_queryset(self):
+        return PackageCategory.objects.all()
+
+@api_view(['POST'])
+@permission_classes([AdminPermission])
+def bulk_package_action(request):
+    """
+    Perform bulk actions on packages
+    """
+    action = request.data.get('action')
+    package_ids = request.data.get('package_ids', [])
+    
+    if not package_ids:
+        return Response({'error': 'هیچ پکیجی انتخاب نشده است'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    packages = Package.objects.filter(id__in=package_ids)
+    
+    if action == 'publish':
+        packages.update(status='published', published_at=timezone.now())
+        message = f'{packages.count()} پکیج منتشر شدند'
+    elif action == 'archive':
+        packages.update(status='archived')
+        message = f'{packages.count()} پکیج بایگانی شدند'
+    elif action == 'delete':
+        count = packages.count()
+        packages.delete()
+        message = f'{count} پکیج حذف شدند'
+    else:
+        return Response({'error': 'عملیات نامعتبر است'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    return Response({'message': message})

@@ -12,14 +12,14 @@ class CourseCategory(models.Model):
     name = models.CharField(max_length=100, verbose_name='نام')
     slug = models.SlugField(max_length=100, unique=True, blank=True, null=True, verbose_name='نامک')
     description = models.TextField(blank=True, null=True, verbose_name='توضیحات')
-    icon = models.CharField(max_length=50, blank=True, null=True, help_text=_('Font Awesome icon class', verbose_name='کلاس آیکون Font Awesome'))
-    color = models.CharField(max_length=7, default='#007bff', help_text=_('Hex color code', verbose_name='کد رنگ هگز'))
+    icon = models.CharField(max_length=50, blank=True, null=True, help_text=_('Font Awesome icon class'), verbose_name='کلاس آیکون Font Awesome')
+    color = models.CharField(max_length=7, default='#007bff', help_text=_('Hex color code'), verbose_name='کد رنگ هگز')
     is_active = models.BooleanField(default=True, verbose_name='فعال')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
     
     class Meta:
-        verbose_name = _('دسته‌بندی بسته آموزشی')
-        verbose_name_plural = _('دسته‌بندی‌های بسته آموزشی')
+        verbose_name = _('دسته‌بندی دوره')
+        verbose_name_plural = _('دسته‌بندی‌های دوره')
         ordering = ['name']
     
     def __str__(self):
@@ -83,8 +83,8 @@ class Course(models.Model):
     published_at = models.DateTimeField(blank=True, null=True, verbose_name='تاریخ انتشار')
     
     class Meta:
-        verbose_name = _('بسته آموزشی')
-        verbose_name_plural = _('بسته‌های آموزشی')
+        verbose_name = _('دوره')
+        verbose_name_plural = _('دوره‌ها')
         ordering = ['-created_at']
     
     def __str__(self):
@@ -118,8 +118,8 @@ class CourseModule(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
     
     class Meta:
-        verbose_name = _('ماژول بسته آموزشی')
-        verbose_name_plural = _('ماژول‌های بسته آموزشی')
+        verbose_name = _('ماژول دوره')
+        verbose_name_plural = _('ماژول‌های دوره')
         ordering = ['order']
         unique_together = ['course', 'order']
     
@@ -222,8 +222,8 @@ class CourseReview(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
     
     class Meta:
-        verbose_name = _('نظر بسته آموزشی')
-        verbose_name_plural = _('نظرات بسته‌های آموزشی')
+        verbose_name = _('نظر دوره')
+        verbose_name_plural = _('نظرات دوره‌ها')
         ordering = ['-created_at']
     
     def __str__(self):
@@ -309,8 +309,8 @@ class CoursePurchase(models.Model):
     order = models.ForeignKey('payment.Order', on_delete=models.SET_NULL, blank=True, null=True, verbose_name='سفارش')
     
     class Meta:
-        verbose_name = _('خرید بسته آموزشی')
-        verbose_name_plural = _('خریدهای بسته‌های آموزشی')
+        verbose_name = _('خرید دوره')
+        verbose_name_plural = _('خریدهای دوره‌ها')
         ordering = ['-purchased_at']
         unique_together = ['user', 'course']
     

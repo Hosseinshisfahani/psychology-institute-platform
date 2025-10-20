@@ -283,7 +283,7 @@ psychology_institute/
 ├── tests/                   # تست‌های روانشناسی
 ├── courses/                 # بسته‌های آموزشی
 ├── dashboard/               # داشبورد کاربری
-├── therapy_sessions/        # سیستم نوبت دهی
+# ├── therapy_sessions/        # سیستم نوبت دهی (removed)
 ├── payment/                 # سیستم پرداخت
 ├── reports/                 # گزارش‌گیری
 ├── sales/                   # فروش به موسسات

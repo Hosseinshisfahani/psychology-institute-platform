@@ -1,11 +1,12 @@
-from rest_framework import generics, status, permissions
+from rest_framework import generics, status, permissions, filters
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.utils import timezone
-from .models import Course, Lesson, Enrollment, LessonProgress, Coupon, CoursePurchase
-from .serializers import CourseDetailSerializer, LessonProgressSerializer, EnrollmentSerializer
+from django_filters.rest_framework import DjangoFilterBackend
+from .models import Course, Lesson, Enrollment, LessonProgress, Coupon, CoursePurchase, CourseCategory
+from .serializers import CourseDetailSerializer, LessonProgressSerializer, EnrollmentSerializer, CourseListSerializer, CourseCategorySerializer
 from app.payment.models import Cart, CartItem
 
 class CourseLearnAPIView(generics.RetrieveAPIView):
@@ -307,3 +308,45 @@ def purchase_course(request, course_slug):
         'message': 'بسته آموزشی به سبد خرید اضافه شد. لطفاً برای تکمیل خرید به سبد خرید مراجعه کنید.',
         'cart_url': '/payment/cart/'
     }, status=status.HTTP_201_CREATED)
+
+
+class CourseListAPIView(generics.ListAPIView):
+    """
+    API view for listing courses with filtering and search
+    """
+    serializer_class = CourseListSerializer
+    permission_classes = [permissions.AllowAny]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['category', 'difficulty', 'is_free', 'language']
+    search_fields = ['title', 'short_description', 'instructor__full_name']
+    ordering_fields = ['created_at', 'price', 'rating', 'enrollment_count']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        queryset = Course.objects.filter(status='published').select_related('category', 'instructor')
+        
+        # Filter by category slug if provided
+        category_slug = self.request.query_params.get('category_slug')
+        if category_slug:
+            queryset = queryset.filter(category__slug=category_slug)
+        
+        # Filter by price range
+        min_price = self.request.query_params.get('min_price')
+        max_price = self.request.query_params.get('max_price')
+        if min_price:
+            queryset = queryset.filter(price__gte=min_price)
+        if max_price:
+            queryset = queryset.filter(price__lte=max_price)
+        
+        return queryset
+
+
+class CourseCategoryListAPIView(generics.ListAPIView):
+    """
+    API view for listing course categories
+    """
+    serializer_class = CourseCategorySerializer
+    permission_classes = [permissions.AllowAny]
+    
+    def get_queryset(self):
+        return CourseCategory.objects.filter(is_active=True).order_by('name')

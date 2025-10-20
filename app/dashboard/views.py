@@ -12,7 +12,6 @@ from .models import User, UserProfile, Notification
 from .forms import CustomSignupForm, CustomLoginForm, ProfileEditForm
 from app.courses.models import Enrollment, CoursePurchase
 from app.tests.models import TestResult
-from app.therapy_sessions.models import Session
 from app.payment.models import Order
 
 
@@ -34,13 +33,7 @@ class DashboardView(LoginRequiredMixin, ListView):
         # Get user statistics
         context['enrolled_courses_count'] = Enrollment.objects.filter(user=user).count()
         context['completed_tests_count'] = TestResult.objects.filter(session__user=user).count()
-        context['upcoming_sessions_count'] = Session.objects.filter(
-            client=user, 
-            status='scheduled',
-            scheduled_date__gte=timezone.now().date()
-        ).count()
         context['certificates_count'] = 0  # Placeholder for certificates
-        context['sessions_count'] = Session.objects.filter(client=user).count()
         
         # Get recent activities (placeholder)
         context['recent_activities'] = []
@@ -73,7 +66,6 @@ class ProfileView(LoginRequiredMixin, DetailView):
         # Get user statistics
         context['enrolled_courses_count'] = Enrollment.objects.filter(user=user).count()
         context['completed_tests_count'] = TestResult.objects.filter(session__user=user).count()
-        context['sessions_count'] = Session.objects.filter(client=user).count()
         context['certificates_count'] = 0  # Placeholder for certificates
         
         return context
@@ -174,7 +166,6 @@ class UserStatsView(LoginRequiredMixin, CreateView):
         # Get user statistics
         enrolled_courses_count = Enrollment.objects.filter(user=user).count()
         completed_tests_count = TestResult.objects.filter(session__user=user).count()
-        sessions_count = Session.objects.filter(client=user).count()
         
         # Get course progress
         course_progress = []
@@ -201,7 +192,6 @@ class UserStatsView(LoginRequiredMixin, CreateView):
             'days_since_joined': days_since_joined,
             'enrolled_courses_count': enrolled_courses_count,
             'completed_tests_count': completed_tests_count,
-            'sessions_count': sessions_count,
             'course_progress': course_progress,
             'recent_test_results': recent_test_results,
             'study_time_this_month': study_time_this_month,

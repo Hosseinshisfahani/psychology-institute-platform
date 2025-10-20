@@ -42,10 +42,10 @@ urlpatterns = [
     path('api/blog/', include('app.blog.api_urls')),
     path('api/dashboard/', include('app.dashboard.api_urls')),
     path('api/courses/', include('app.courses.api_urls')),
-    path('api/therapy/', include('app.therapy_sessions.api_urls')),
     path('api/admin/', include('app.admin_panel.api_urls')),
     path('api/workshops/', include('app.workshops.api_urls')),
     path('api/packages/', include('app.packages.api_urls')),
+    path('api/appointments/', include('app.appointments.api_urls')),
     
     # Redirect root to React frontend
     path('', RedirectView.as_view(url='http://localhost:3000', permanent=False), name='home_redirect'),
@@ -55,13 +55,13 @@ urlpatterns = [
     path('tests/', include('app.tests.urls')),
     path('courses/', include('app.courses.urls')),
     path('dashboard/', include('app.dashboard.urls')),
-    path('sessions/', include('app.therapy_sessions.urls')),
     path('payment/', include('app.payment.urls')),
     path('reports/', include('app.reports.urls')),
     path('sales/', include('app.sales.urls')),
     path('admin-panel/', include('app.admin_panel.urls')),
     path('workshops/', include('app.workshops.urls')),
     path('packages/', include('app.packages.urls')),
+    path('appointments/', include('app.appointments.urls')),
 ]
 
 # Serve media files in development

@@ -13,8 +13,8 @@ class WorkshopCategory(models.Model):
     name = models.CharField(max_length=100, verbose_name='نام')
     slug = models.SlugField(max_length=100, unique=True, blank=True, null=True, verbose_name='نامک')
     description = models.TextField(blank=True, null=True, verbose_name='توضیحات')
-    icon = models.CharField(max_length=50, blank=True, null=True, help_text=_('Font Awesome icon class', verbose_name='کلاس آیکون Font Awesome'))
-    color = models.CharField(max_length=7, default='#007bff', help_text=_('Hex color code', verbose_name='کد رنگ هگز'))
+    icon = models.CharField(max_length=50, blank=True, null=True, help_text=_('Font Awesome icon class'), verbose_name='کلاس آیکون Font Awesome')
+    color = models.CharField(max_length=7, default='#007bff', help_text=_('Hex color code'), verbose_name='کد رنگ هگز')
     is_active = models.BooleanField(default=True, verbose_name='فعال')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
     

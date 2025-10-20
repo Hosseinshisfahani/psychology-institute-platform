@@ -14,6 +14,79 @@ from app.payment.models import Order
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
+def stats_api(request):
+    """
+    API endpoint for dashboard statistics
+    """
+    user = request.user
+    
+    # Get basic user stats
+    stats = {
+        'user': {
+            'id': user.id,
+            'email': user.email,
+            'full_name': user.full_name,
+            'user_type': user.user_type,
+            'is_verified': user.is_verified,
+            'date_joined': user.date_joined,
+        },
+        'notifications': {
+            'unread_count': Notification.objects.filter(user=user, is_read=False).count(),
+            'total_count': Notification.objects.filter(user=user).count(),
+        }
+    }
+    
+    # Try to get additional stats from other apps
+    try:
+        from app.courses.models import CoursePurchase
+        from app.payment.models import Order
+        
+        # Course stats
+        course_purchases = CoursePurchase.objects.filter(user=user)
+        stats['courses'] = {
+            'total_purchased': course_purchases.count(),
+            'total_spent': sum(purchase.amount_paid for purchase in course_purchases),
+        }
+        
+        # Order stats
+        orders = Order.objects.filter(user=user)
+        stats['orders'] = {
+            'total_orders': orders.count(),
+            'total_spent': sum(order.total_amount for order in orders),
+        }
+        
+    except ImportError:
+        # Apps not available
+        stats['courses'] = {'total_purchased': 0, 'total_spent': 0}
+        stats['orders'] = {'total_orders': 0, 'total_spent': 0}
+    
+    # Try to get workshop stats
+    try:
+        from app.workshops.models import WorkshopRegistration
+        workshop_registrations = WorkshopRegistration.objects.filter(user=user)
+        stats['workshops'] = {
+            'total_registered': workshop_registrations.count(),
+            'total_spent': sum(registration.amount_paid for registration in workshop_registrations),
+        }
+    except ImportError:
+        stats['workshops'] = {'total_registered': 0, 'total_spent': 0}
+    
+    # Try to get package stats
+    try:
+        from app.packages.models import PackagePurchase
+        package_purchases = PackagePurchase.objects.filter(user=user)
+        stats['packages'] = {
+            'total_purchased': package_purchases.count(),
+            'total_spent': sum(purchase.amount_paid for purchase in package_purchases),
+        }
+    except ImportError:
+        stats['packages'] = {'total_purchased': 0, 'total_spent': 0}
+    
+    return Response(stats)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
 def financial_report_api(request):
     """
     API endpoint for financial report data
@@ -207,7 +280,7 @@ class LoginAPIView(APIView):
             return Response({
                 'success': True,
                 'message': 'Login successful',
-                'user': UserSerializer(user).data
+                'user': UserSerializer(user, context={'request': request}).data
             })
         else:
             return Response({
@@ -261,7 +334,7 @@ class SignupAPIView(APIView):
             return Response({
                 'success': True,
                 'message': 'Signup successful',
-                'user': UserSerializer(user).data
+                'user': UserSerializer(user, context={'request': request}).data
             }, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({
@@ -288,12 +361,12 @@ class ProfileAPIView(APIView):
     
     def get(self, request):
         user = request.user
-        serializer = UserSerializer(user)
+        serializer = UserSerializer(user, context={'request': request})
         return Response(serializer.data)
     
     def patch(self, request):
         user = request.user
-        serializer = UserSerializer(user, data=request.data, partial=True)
+        serializer = UserSerializer(user, data=request.data, partial=True, context={'request': request})
         
         if serializer.is_valid():
             serializer.save()

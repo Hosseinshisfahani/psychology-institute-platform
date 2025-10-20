@@ -8,10 +8,17 @@ from .api_views import (
     add_to_cart,
     validate_coupon,
     user_purchases,
-    purchase_course
+    purchase_course,
+    CourseListAPIView,
+    CourseCategoryListAPIView
 )
 
 urlpatterns = [
+    # Course listing and categories
+    path('', CourseListAPIView.as_view(), name='api_course_list'),
+    path('categories/', CourseCategoryListAPIView.as_view(), name='api_course_categories'),
+    
+    # Course learning
     path('learn/<slug:slug>/', CourseLearnAPIView.as_view(), name='api_course_learn'),
     path('lesson/<int:lesson_id>/complete/', mark_lesson_complete, name='api_mark_lesson_complete'),
     path('lesson/<int:lesson_id>/watch-time/', update_watch_time, name='api_update_watch_time'),

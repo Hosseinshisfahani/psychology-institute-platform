@@ -75,14 +75,14 @@ def check_app_verbose_names():
         'app.tests',
         'app.courses',
         'app.dashboard',
-        'app.therapy_sessions',
+        # 'app.therapy_sessions',  # Removed - therapy_sessions app deleted
         'app.payment',
         'app.reports',
         'app.sales',
         'app.admin_panel',
         'app.workshops',
         'app.packages',
-        'app.cohorts',
+        # 'app.cohorts',  # Removed - cohorts app deleted
     ]
     
     for app_name in local_apps:

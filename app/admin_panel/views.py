@@ -10,7 +10,7 @@ from .models import AdminNotification
 from app.blog.models import Post, Comment
 from app.tests.models import PsychologicalTest, TestSession
 from app.courses.models import Course, Enrollment
-from app.therapy_sessions.models import Session
+# from app.therapy_sessions.models import Session  # Removed - therapy_sessions app deleted
 from app.payment.models import Order
 from app.dashboard.models import User
 

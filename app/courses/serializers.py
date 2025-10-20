@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Course, Lesson, Enrollment, LessonProgress
+from .models import Course, Lesson, Enrollment, LessonProgress, CourseCategory
 from django.contrib.auth import get_user_model
 import jdatetime
 
@@ -140,3 +140,37 @@ class EnrollmentSerializer(serializers.ModelSerializer):
         model = Enrollment
         fields = ['id', 'course', 'course_title', 'course_slug', 'enrollment_date', 'is_completed']
         read_only_fields = ['enrollment_date']
+
+
+class CourseCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CourseCategory
+        fields = ['id', 'name', 'slug', 'description', 'icon', 'color']
+
+
+class CourseListSerializer(serializers.ModelSerializer):
+    instructor_name = serializers.CharField(source='instructor.full_name', read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_slug = serializers.CharField(source='category.slug', read_only=True)
+    current_price = serializers.ReadOnlyField()
+    discount_percentage = serializers.ReadOnlyField()
+    created_at_persian = serializers.SerializerMethodField()
+    enrollment_count = serializers.ReadOnlyField()
+    rating = serializers.ReadOnlyField()
+    review_count = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'thumbnail',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_free', 'difficulty', 'duration_hours', 'language', 'level',
+            'instructor_name', 'category_name', 'category_slug',
+            'enrollment_count', 'rating', 'review_count',
+            'created_at', 'created_at_persian'
+        ]
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d')
+        return None

@@ -59,14 +59,13 @@ INSTALLED_APPS = [
     'app.tests',
     'app.courses',
     'app.dashboard',
-    'app.therapy_sessions',
     'app.payment',
     'app.reports',
     'app.sales',
     'app.admin_panel',
     'app.workshops',
     'app.packages',
-    'app.cohorts',
+    'app.appointments',
 ]
 
 MIDDLEWARE = [
@@ -245,6 +244,7 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_NAME = 'csrftoken'
 SESSION_COOKIE_SAMESITE = 'Lax'
 
 # Celery Configuration

@@ -217,9 +217,10 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'courses:course_list' %}">بسته‌های آموزشی</a>
                     </li>
-                    <li class="nav-item">
+                    <!-- Therapy sessions link removed - therapy_sessions app deleted -->
+                    <!-- <li class="nav-item">
                         <a class="nav-link" href="{% url 'therapy_sessions:session_list' %}">جلسات آنلاین</a>
-                    </li>
+                    </li> -->
                 </ul>
                 
                 <ul class="navbar-nav">
@@ -298,7 +299,7 @@
                     <ul class="list-unstyled">
                         <li><a href="{% url 'tests:test_list' %}" class="text-muted text-decoration-none">تست‌های روانشناسی</a></li>
                         <li><a href="{% url 'courses:course_list' %}" class="text-muted text-decoration-none">بسته‌های آموزشی</a></li>
-                        <li><a href="{% url 'therapy_sessions:session_list' %}" class="text-muted text-decoration-none">مشاوره آنلاین</a></li>
+                        <!-- <li><a href="{% url 'therapy_sessions:session_list' %}" class="text-muted text-decoration-none">مشاوره آنلاین</a></li> --> <!-- Removed - therapy_sessions app deleted -->
                     </ul>
                 </div>
                 <div class="col-lg-2 mb-4">

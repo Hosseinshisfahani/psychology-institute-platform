@@ -2,19 +2,20 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from app.blog.models import Post, Category, Tag, Comment
 from app.courses.models import Course, Enrollment
-from app.therapy_sessions.models import Session, Therapist, SessionBooking, SessionType
+# from app.therapy_sessions.models import Session, Therapist, SessionBooking, SessionType  # Commented out - therapy_sessions app doesn't exist
 from app.dashboard.models import Activity, Notification
 from app.workshops.models import (
     Workshop, WorkshopCategory, WorkshopSession, WorkshopRegistration,
     WorkshopSessionAttendance, InstallmentPlan, InstallmentPayment, WorkshopReview
 )
+from app.packages.models import Package, PackageCategory, PackagePurchase
 import jdatetime
 
 User = get_user_model()
 
 class AdminUserSerializer(serializers.ModelSerializer):
-    full_name = serializers.CharField(source='get_full_name', read_only=True)
-    user_type_display = serializers.CharField(source='get_user_type_display', read_only=True)
+    full_name = serializers.CharField(read_only=True)
+    user_type_display = serializers.SerializerMethodField()
     created_at_persian = serializers.SerializerMethodField()
     last_login_persian = serializers.SerializerMethodField()
     
@@ -36,6 +37,262 @@ class AdminUserSerializer(serializers.ModelSerializer):
         if obj.last_login:
             return jdatetime.datetime.fromgregorian(datetime=obj.last_login).strftime('%Y/%m/%d %H:%M')
         return None
+    
+    def get_user_type_display(self, obj):
+        return obj.get_user_type_display()
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+    
+    def get_last_login_persian(self, obj):
+        if obj.last_login:
+            return jdatetime.datetime.fromgregorian(datetime=obj.last_login).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
 
 class AdminPostSerializer(serializers.ModelSerializer):
     author_name = serializers.CharField(source='author.get_full_name', read_only=True)
@@ -55,6 +312,130 @@ class AdminPostSerializer(serializers.ModelSerializer):
         if obj.created_at:
             return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
     
     def get_view_count(self, obj):
         # This would need to be implemented based on your view tracking system
@@ -87,23 +468,272 @@ class AdminCourseSerializer(serializers.ModelSerializer):
             return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
 
-class AdminSessionSerializer(serializers.ModelSerializer):
-    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
-    therapist_name = serializers.CharField(source='therapist.get_full_name', read_only=True)
-    start_time_persian = serializers.SerializerMethodField()
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
     
     class Meta:
-        model = Session
+        model = PackageCategory
         fields = [
-            'id', 'user', 'user_name', 'therapist', 'therapist_name',
-            'session_type', 'start_time', 'end_time', 'start_time_persian',
-            'status', 'rating', 'feedback', 'created_at'
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
         ]
+        read_only_fields = ['id', 'created_at']
     
-    def get_start_time_persian(self, obj):
-        if obj.start_time:
-            return jdatetime.datetime.fromgregorian(datetime=obj.start_time).strftime('%Y/%m/%d %H:%M')
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+
+# AdminSessionSerializer commented out - therapy_sessions app doesn't exist
+# class AdminSessionSerializer(serializers.ModelSerializer):
+#     user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+#     therapist_name = serializers.CharField(source='therapist.get_full_name', read_only=True)
+#     start_time_persian = serializers.SerializerMethodField()
+#     
+#     class Meta:
+#         model = Session
+#         fields = [
+#             'id', 'user', 'user_name', 'therapist', 'therapist_name',
+#             'session_type', 'start_time', 'end_time', 'start_time_persian',
+#             'status', 'rating', 'feedback', 'created_at'
+#         ]
+#     
+#     def get_start_time_persian(self, obj):
+#         if obj.start_time:
+#             return jdatetime.datetime.fromgregorian(datetime=obj.start_time).strftime('%Y/%m/%d %H:%M')
+#         return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
 
 class AdminActivitySerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.get_full_name', read_only=True)
@@ -121,6 +751,130 @@ class AdminActivitySerializer(serializers.ModelSerializer):
             return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
 
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+
 class AdminNotificationSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.get_full_name', read_only=True)
     created_at_persian = serializers.SerializerMethodField()
@@ -137,6 +891,130 @@ class AdminNotificationSerializer(serializers.ModelSerializer):
             return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
 
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+
 class DashboardStatsSerializer(serializers.Serializer):
     total_users = serializers.IntegerField()
     total_courses = serializers.IntegerField()
@@ -150,38 +1028,287 @@ class DashboardStatsSerializer(serializers.Serializer):
     monthly_revenue = serializers.DecimalField(max_digits=10, decimal_places=0)
 
 
-class AdminAppointmentSerializer(serializers.ModelSerializer):
-    client_name = serializers.CharField(source='user.get_full_name', read_only=True)
-    client_email = serializers.CharField(source='user.email', read_only=True)
-    therapist_name = serializers.CharField(source='therapist.user.get_full_name', read_only=True)
-    therapist_specialization = serializers.CharField(source='therapist.specialization', read_only=True)
-    session_type_name = serializers.CharField(source='session_type.name', read_only=True)
+# AdminAppointmentSerializer commented out due to therapy_sessions app deletion
+# class AdminAppointmentSerializer(serializers.ModelSerializer):
+#     client_name = serializers.CharField(source='user.get_full_name', read_only=True)
+#     client_email = serializers.CharField(source='user.email', read_only=True)
+#     therapist_name = serializers.CharField(source='therapist.user.get_full_name', read_only=True)
+#     therapist_specialization = serializers.CharField(source='therapist.specialization', read_only=True)
+#     session_type_name = serializers.CharField(source='session_type.name', read_only=True)
+#     created_at_persian = serializers.SerializerMethodField()
+#     preferred_date_persian = serializers.SerializerMethodField()
+#     confirmed_date_persian = serializers.SerializerMethodField()
+#     
+#     class Meta:
+#         model = SessionBooking
+#         fields = [
+#             'id', 'user', 'client_name', 'client_email', 'therapist', 'therapist_name',
+#             'therapist_specialization', 'session_type', 'session_type_name', 'status',
+#             'mode', 'preferred_date', 'preferred_time', 'preferred_date_persian',
+#             'confirmed_date', 'confirmed_time', 'confirmed_date_persian',
+#             'goals', 'notes', 'location', 'price', 'created_at', 'created_at_persian',
+#             'expires_at', 'is_expired', 'croom_class_url', 'croom_meeting_id',
+#             'croom_password', 'confirmation_notes'
+#         ]
+#         read_only_fields = ['id', 'created_at', 'expires_at', 'is_expired']
+#     
+#     def get_created_at_persian(self, obj):
+#         if obj.created_at:
+#             return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+#         return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
     created_at_persian = serializers.SerializerMethodField()
-    preferred_date_persian = serializers.SerializerMethodField()
-    confirmed_date_persian = serializers.SerializerMethodField()
     
     class Meta:
-        model = SessionBooking
+        model = PackageCategory
         fields = [
-            'id', 'user', 'client_name', 'client_email', 'therapist', 'therapist_name',
-            'therapist_specialization', 'session_type', 'session_type_name', 'status',
-            'mode', 'preferred_date', 'preferred_time', 'preferred_date_persian',
-            'confirmed_date', 'confirmed_time', 'confirmed_date_persian',
-            'goals', 'notes', 'location', 'price', 'created_at', 'created_at_persian',
-            'expires_at', 'is_expired', 'croom_class_url', 'croom_meeting_id',
-            'croom_password', 'confirmation_notes'
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
         ]
-        read_only_fields = ['id', 'created_at', 'expires_at', 'is_expired']
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
     
     def get_created_at_persian(self, obj):
         if obj.created_at:
             return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
     
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+    
     def get_preferred_date_persian(self, obj):
         if obj.preferred_date:
             return jdatetime.datetime.fromgregorian(datetime=obj.preferred_date).strftime('%Y/%m/%d')
         return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
     
     def get_confirmed_date_persian(self, obj):
         if obj.confirmed_date:
@@ -189,28 +1316,277 @@ class AdminAppointmentSerializer(serializers.ModelSerializer):
         return None
 
 
-class AdminTherapistSerializer(serializers.ModelSerializer):
-    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
-    user_email = serializers.CharField(source='user.email', read_only=True)
-    user_phone = serializers.CharField(source='user.phone_number', read_only=True)
-    specialization_display = serializers.CharField(source='get_specialization_display', read_only=True)
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
     created_at_persian = serializers.SerializerMethodField()
-    experience_years = serializers.SerializerMethodField()
     
     class Meta:
-        model = Therapist
+        model = PackageCategory
         fields = [
-            'id', 'user', 'user_name', 'user_email', 'user_phone', 'specialization',
-            'specialization_display', 'bio', 'education', 'certifications',
-            'experience_start_date', 'experience_years', 'hourly_rate', 'is_available',
-            'profile_image', 'created_at', 'created_at_persian'
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
         ]
         read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
     
     def get_created_at_persian(self, obj):
         if obj.created_at:
             return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+
+
+# AdminTherapistSerializer commented out - therapy_sessions app doesn't exist
+# class AdminTherapistSerializer(serializers.ModelSerializer):
+#     user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+#     user_email = serializers.CharField(source='user.email', read_only=True)
+#     user_phone = serializers.CharField(source='user.phone_number', read_only=True)
+#     specialization_display = serializers.CharField(source='get_specialization_display', read_only=True)
+#     created_at_persian = serializers.SerializerMethodField()
+#     experience_years = serializers.SerializerMethodField()
+#     
+#     class Meta:
+#         model = Therapist
+#         fields = [
+#             'id', 'user', 'user_name', 'user_email', 'user_phone', 'specialization',
+#             'specialization_display', 'bio', 'education', 'certifications',
+#             'experience_start_date', 'experience_years', 'hourly_rate', 'is_available',
+#             'profile_image', 'created_at', 'created_at_persian'
+#         ]
+#         read_only_fields = ['id', 'created_at']
+#     
+#     def get_created_at_persian(self, obj):
+#         if obj.created_at:
+#             return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+#         return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
     
     def get_experience_years(self, obj):
         if obj.experience_start_date:
@@ -220,22 +1596,255 @@ class AdminTherapistSerializer(serializers.ModelSerializer):
         return None
 
 
-class AdminSessionTypeSerializer(serializers.ModelSerializer):
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
     created_at_persian = serializers.SerializerMethodField()
-    duration_display = serializers.SerializerMethodField()
     
     class Meta:
-        model = SessionType
+        model = PackageCategory
         fields = [
-            'id', 'name', 'description', 'duration_minutes', 'duration_display',
-            'price', 'is_active', 'created_at', 'created_at_persian'
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
         ]
         read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
     
     def get_created_at_persian(self, obj):
         if obj.created_at:
             return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+
+
+
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
     
     def get_duration_display(self, obj):
         hours = obj.duration_minutes // 60
@@ -290,6 +1899,392 @@ class AdminBlogPostSerializer(serializers.ModelSerializer):
         return None
     
     def get_post_count(self, obj):
+        # This method doesn't make sense for a Post object, but keeping it for compatibility
+        return 1
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+    
+    def get_post_count(self, obj):
         return Post.objects.filter(category=obj.category).count()
 
 
@@ -321,6 +2316,259 @@ class AdminCategorySerializer(serializers.ModelSerializer):
         return None
 
 
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+
+
 class AdminTagSerializer(serializers.ModelSerializer):
     usage_count = serializers.SerializerMethodField()
     created_at_persian = serializers.SerializerMethodField()
@@ -339,6 +2587,130 @@ class AdminTagSerializer(serializers.ModelSerializer):
         if obj.created_at:
             return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
 
 
 class AdminCommentSerializer(serializers.ModelSerializer):
@@ -365,11 +2737,259 @@ class AdminCommentSerializer(serializers.ModelSerializer):
         if obj.created_at:
             return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
     
     def get_updated_at_persian(self, obj):
         if obj.updated_at:
             return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
         return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
     
     def get_replies_count(self, obj):
         return Comment.objects.filter(parent=obj).count()
@@ -398,6 +3018,130 @@ class AdminWorkshopCategorySerializer(serializers.ModelSerializer):
         return None
 
 
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+
+
 class AdminWorkshopSessionSerializer(serializers.ModelSerializer):
     scheduled_datetime_persian = serializers.SerializerMethodField()
     duration_display = serializers.SerializerMethodField()
@@ -419,6 +3163,130 @@ class AdminWorkshopSessionSerializer(serializers.ModelSerializer):
         if obj.scheduled_datetime:
             return jdatetime.datetime.fromgregorian(datetime=obj.scheduled_datetime).strftime('%Y/%m/%d - %H:%M')
         return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
     
     def get_duration_display(self, obj):
         hours = obj.duration_minutes // 60
@@ -458,16 +3326,388 @@ class AdminWorkshopRegistrationSerializer(serializers.ModelSerializer):
         if obj.registered_at:
             return jdatetime.datetime.fromgregorian(datetime=obj.registered_at).strftime('%Y/%m/%d %H:%M')
         return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
     
     def get_completed_at_persian(self, obj):
         if obj.completed_at:
             return jdatetime.datetime.fromgregorian(datetime=obj.completed_at).strftime('%Y/%m/%d %H:%M')
         return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
     
     def get_last_accessed_persian(self, obj):
         if obj.last_accessed:
             return jdatetime.datetime.fromgregorian(datetime=obj.last_accessed).strftime('%Y/%m/%d %H:%M')
         return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
     
     def get_payment_status(self, obj):
         if obj.payment_type == 'full_payment':
@@ -543,24 +3783,644 @@ class AdminWorkshopSerializer(serializers.ModelSerializer):
             jdate = jdatetime.date.fromgregorian(date=obj.start_date)
             return jdate.strftime('%Y/%m/%d')
         return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
     
-    def get_end_date_persian(self, obj):
-        if obj.end_date:
-            jdate = jdatetime.date.fromgregorian(date=obj.end_date)
-            return jdate.strftime('%Y/%m/%d')
-        return None
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
     
-    def get_registration_deadline_persian(self, obj):
-        if obj.registration_deadline:
-            return jdatetime.datetime.fromgregorian(datetime=obj.registration_deadline).strftime('%Y/%m/%d - %H:%M')
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
     
     def get_created_at_persian(self, obj):
         if obj.created_at:
             return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
     
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
     def get_published_at_persian(self, obj):
         if obj.published_at:
             return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
         return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+    
+    def get_end_date_persian(self, obj):
+        if obj.end_date:
+            jdate = jdatetime.date.fromgregorian(date=obj.end_date)
+            return jdate.strftime('%Y/%m/%d')
+        return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+    
+    def get_registration_deadline_persian(self, obj):
+        if obj.registration_deadline:
+            return jdatetime.datetime.fromgregorian(datetime=obj.registration_deadline).strftime('%Y/%m/%d - %H:%M')
+        return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+# Package Admin Serializers
+
+class AdminPackageCategorySerializer(serializers.ModelSerializer):
+    package_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageCategory
+        fields = [
+            'id', 'name', 'slug', 'description', 'icon', 'color',
+            'is_active', 'package_count', 'created_at', 'created_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_package_count(self, obj):
+        return Package.objects.filter(category=obj).count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+
+class SimpleCourseSerializer(serializers.ModelSerializer):
+    """Simplified course serializer for package admin"""
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'slug', 'short_description', 'instructor_name',
+            'difficulty', 'price', 'discount_price', 'current_price',
+            'duration_hours', 'thumbnail', 'status'
+        ]
+
+
+class AdminPackageSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    courses = SimpleCourseSerializer(many=True, read_only=True)
+    course_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    
+    # Computed fields
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    discount_percentage = serializers.IntegerField(read_only=True)
+    total_courses = serializers.IntegerField(read_only=True)
+    total_hours = serializers.IntegerField(read_only=True)
+    original_total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    savings_percentage = serializers.IntegerField(read_only=True)
+    
+    # Statistics
+    revenue = serializers.SerializerMethodField()
+    purchase_count = serializers.IntegerField(read_only=True)
+    
+    # Persian dates
+    created_at_persian = serializers.SerializerMethodField()
+    updated_at_persian = serializers.SerializerMethodField()
+    published_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'title', 'slug', 'description', 'short_description',
+            'category', 'category_name', 'category_color', 'status',
+            'price', 'discount_price', 'current_price', 'discount_percentage',
+            'is_featured', 'duration_months', 'language', 'prerequisites',
+            'learning_objectives', 'thumbnail', 'intro_video',
+            'courses', 'course_ids', 'total_courses', 'total_hours',
+            'original_total_price', 'savings_amount', 'savings_percentage',
+            'purchase_count', 'revenue', 'rating', 'review_count',
+            'meta_title', 'meta_description', 'created_at', 'created_at_persian',
+            'updated_at', 'updated_at_persian', 'published_at', 'published_at_persian'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'published_at', 'rating', 'review_count']
+    
+    def get_revenue(self, obj):
+        purchases = PackagePurchase.objects.filter(package=obj)
+        return sum(float(purchase.amount_paid) for purchase in purchases)
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_updated_at_persian(self, obj):
+        if obj.updated_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.updated_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.published_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def create(self, validated_data):
+        course_ids = validated_data.pop('course_ids', [])
+        package = Package.objects.create(**validated_data)
+        
+        if course_ids:
+            courses = Course.objects.filter(id__in=course_ids)
+            package.courses.set(courses)
+        
+        return package
+    
+    def update(self, instance, validated_data):
+        course_ids = validated_data.pop('course_ids', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if course_ids is not None:
+            courses = Course.objects.filter(id__in=course_ids)
+            instance.courses.set(courses)
+        
+        return instance

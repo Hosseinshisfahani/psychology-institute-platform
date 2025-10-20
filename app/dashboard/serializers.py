@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import User, UserProfile, Notification
 from app.courses.models import Enrollment
 from app.tests.models import TestResult
-from app.therapy_sessions.models import Session
+# from app.therapy_sessions.models import Session  # Commented out - therapy_sessions app doesn't exist
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -29,6 +29,17 @@ class UserSerializer(serializers.ModelSerializer):
             'is_active', 'is_verified', 'is_staff', 'date_joined', 'last_login', 'profile'
         ]
         read_only_fields = ['id', 'date_joined', 'last_login', 'is_verified', 'is_staff']
+    
+    def to_representation(self, instance):
+        """Convert profile_image to full URL in the response"""
+        representation = super().to_representation(instance)
+        if instance.profile_image:
+            request = self.context.get('request')
+            if request:
+                representation['profile_image'] = request.build_absolute_uri(instance.profile_image.url)
+            else:
+                representation['profile_image'] = instance.profile_image.url
+        return representation
 
 
 class NotificationSerializer(serializers.ModelSerializer):
@@ -102,23 +113,3 @@ class TestResultSerializer(serializers.ModelSerializer):
         return None
 
 
-class SessionSerializer(serializers.ModelSerializer):
-    therapist_name = serializers.CharField(source='therapist.user.full_name', read_only=True)
-    client_name = serializers.CharField(source='client.full_name', read_only=True)
-    session_type_name = serializers.CharField(source='session_type.name', read_only=True)
-    session_date_persian = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = Session
-        fields = [
-            'id', 'therapist', 'therapist_name', 'client_name', 'session_type', 'session_type_name',
-            'scheduled_date', 'scheduled_time', 'session_date_persian', 'duration_minutes', 
-            'status', 'mode', 'location', 'meeting_link', 'price', 'is_paid'
-        ]
-    
-    def get_session_date_persian(self, obj):
-        import jdatetime
-        if obj.scheduled_date:
-            jalali_date = jdatetime.datetime.fromgregorian(datetime=obj.scheduled_date)
-            return jalali_date.strftime('%Y/%m/%d')
-        return None
