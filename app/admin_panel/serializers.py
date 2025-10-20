@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from app.blog.models import Post, Category, Tag, Comment
 from app.courses.models import Course, Enrollment
-from app.therapy_sessions.models import Session, Therapist, SessionBooking, SessionType
+from app.appointments.models import Appointment, Specialist, AppointmentType, TimeSlot
 from app.dashboard.models import Activity, Notification
 from app.workshops.models import (
     Workshop, WorkshopCategory, WorkshopSession, WorkshopRegistration,
@@ -151,86 +151,79 @@ class DashboardStatsSerializer(serializers.Serializer):
 
 
 class AdminAppointmentSerializer(serializers.ModelSerializer):
-    client_name = serializers.CharField(source='user.get_full_name', read_only=True)
-    client_email = serializers.CharField(source='user.email', read_only=True)
-    therapist_name = serializers.CharField(source='therapist.user.get_full_name', read_only=True)
-    therapist_specialization = serializers.CharField(source='therapist.specialization', read_only=True)
-    session_type_name = serializers.CharField(source='session_type.name', read_only=True)
+    client_name = serializers.CharField(source='client.get_full_name', read_only=True)
+    client_email = serializers.CharField(source='client.email', read_only=True)
+    client_phone_display = serializers.CharField(source='client_phone', read_only=True)
+    specialist_name = serializers.CharField(source='specialist.user.get_full_name', read_only=True)
+    specialist_specialization = serializers.CharField(source='specialist.get_specialization_display', read_only=True)
+    appointment_type_name = serializers.CharField(source='appointment_type.name', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
     created_at_persian = serializers.SerializerMethodField()
-    preferred_date_persian = serializers.SerializerMethodField()
-    confirmed_date_persian = serializers.SerializerMethodField()
+    appointment_date_persian = serializers.SerializerMethodField()
     
     class Meta:
-        model = SessionBooking
+        model = Appointment
         fields = [
-            'id', 'user', 'client_name', 'client_email', 'therapist', 'therapist_name',
-            'therapist_specialization', 'session_type', 'session_type_name', 'status',
-            'mode', 'preferred_date', 'preferred_time', 'preferred_date_persian',
-            'confirmed_date', 'confirmed_time', 'confirmed_date_persian',
-            'goals', 'notes', 'location', 'price', 'created_at', 'created_at_persian',
-            'expires_at', 'is_expired', 'croom_class_url', 'croom_meeting_id',
-            'croom_password', 'confirmation_notes'
+            'id', 'appointment_number', 'client', 'client_name', 'client_email',
+            'client_phone', 'client_phone_display', 'specialist', 'specialist_name',
+            'specialist_specialization', 'appointment_type', 'appointment_type_name',
+            'status', 'status_display', 'appointment_date', 'appointment_date_persian',
+            'appointment_time', 'duration_minutes', 'room_number', 'emergency_contact',
+            'reason_for_visit', 'notes', 'price', 'is_paid', 'payment_method',
+            'created_at', 'created_at_persian', 'confirmed_at', 'completed_at',
+            'cancelled_at'
         ]
-        read_only_fields = ['id', 'created_at', 'expires_at', 'is_expired']
+        read_only_fields = [
+            'id', 'appointment_number', 'created_at', 'confirmed_at',
+            'completed_at', 'cancelled_at'
+        ]
     
     def get_created_at_persian(self, obj):
         if obj.created_at:
             return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
     
-    def get_preferred_date_persian(self, obj):
-        if obj.preferred_date:
-            return jdatetime.datetime.fromgregorian(datetime=obj.preferred_date).strftime('%Y/%m/%d')
-        return None
-    
-    def get_confirmed_date_persian(self, obj):
-        if obj.confirmed_date:
-            return jdatetime.datetime.fromgregorian(datetime=obj.confirmed_date).strftime('%Y/%m/%d')
+    def get_appointment_date_persian(self, obj):
+        if obj.appointment_date:
+            return jdatetime.date.fromgregorian(date=obj.appointment_date).strftime('%Y/%m/%d')
         return None
 
 
-class AdminTherapistSerializer(serializers.ModelSerializer):
+class AdminSpecialistSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.get_full_name', read_only=True)
     user_email = serializers.CharField(source='user.email', read_only=True)
     user_phone = serializers.CharField(source='user.phone_number', read_only=True)
     specialization_display = serializers.CharField(source='get_specialization_display', read_only=True)
     created_at_persian = serializers.SerializerMethodField()
-    experience_years = serializers.SerializerMethodField()
     
     class Meta:
-        model = Therapist
+        model = Specialist
         fields = [
             'id', 'user', 'user_name', 'user_email', 'user_phone', 'specialization',
             'specialization_display', 'bio', 'education', 'certifications',
-            'experience_start_date', 'experience_years', 'hourly_rate', 'is_available',
-            'profile_image', 'created_at', 'created_at_persian'
+            'experience_years', 'room_number', 'is_available', 'profile_image',
+            'created_at', 'created_at_persian', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_created_at_persian(self, obj):
         if obj.created_at:
             return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
-    
-    def get_experience_years(self, obj):
-        if obj.experience_start_date:
-            from datetime import date
-            today = date.today()
-            return today.year - obj.experience_start_date.year
-        return None
 
 
-class AdminSessionTypeSerializer(serializers.ModelSerializer):
+class AdminAppointmentTypeSerializer(serializers.ModelSerializer):
     created_at_persian = serializers.SerializerMethodField()
     duration_display = serializers.SerializerMethodField()
     
     class Meta:
-        model = SessionType
+        model = AppointmentType
         fields = [
             'id', 'name', 'description', 'duration_minutes', 'duration_display',
-            'price', 'is_active', 'created_at', 'created_at_persian'
+            'price', 'requires_specialist', 'is_active', 'created_at', 
+            'created_at_persian', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_created_at_persian(self, obj):
         if obj.created_at:
@@ -241,8 +234,28 @@ class AdminSessionTypeSerializer(serializers.ModelSerializer):
         hours = obj.duration_minutes // 60
         minutes = obj.duration_minutes % 60
         if hours > 0:
-            return f"{hours} ساعت {minutes} دقیقه" if minutes > 0 else f"{hours} ساعت"
+            return f"{hours} ساعت {minutes} دقیقة" if minutes > 0 else f"{hours} ساعت"
         return f"{minutes} دقیقه"
+
+
+class AdminTimeSlotSerializer(serializers.ModelSerializer):
+    specialist_name = serializers.CharField(source='specialist.user.get_full_name', read_only=True)
+    day_display = serializers.CharField(source='get_day_of_week_display', read_only=True)
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = TimeSlot
+        fields = [
+            'id', 'specialist', 'specialist_name', 'day_of_week', 'day_display',
+            'start_time', 'end_time', 'is_available', 'max_appointments',
+            'created_at', 'created_at_persian', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
+        return None
 
 
 # Blog Admin Serializers
