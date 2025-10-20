@@ -9,7 +9,12 @@ from datetime import datetime, timedelta
 from django.contrib.auth import get_user_model
 from app.blog.models import Post, Category, Tag, Comment
 from app.courses.models import Course, Enrollment
-from app.therapy_sessions.models import Session, Therapist, SessionBooking, SessionType
+# from app.therapy_sessions.models import Session, Therapist, SessionBooking, SessionType  # Removed - therapy_sessions app deleted
+from app.appointments.models import (
+    Staff, AppointmentRoom, AppointmentType, StaffAvailability,
+    TimeSlot, Appointment, AppointmentCancellation, AppointmentReminder,
+    AppointmentFeedback
+)
 from app.dashboard.models import Activity, Notification
 from app.workshops.models import (
     Workshop, WorkshopCategory, WorkshopSession, WorkshopRegistration,
@@ -17,9 +22,10 @@ from app.workshops.models import (
 )
 from .serializers import (
     AdminUserSerializer, AdminPostSerializer, AdminCourseSerializer,
-    AdminSessionSerializer, AdminActivitySerializer, AdminNotificationSerializer,
-    DashboardStatsSerializer, AdminAppointmentSerializer, AdminTherapistSerializer,
-    AdminSessionTypeSerializer, AdminBlogPostSerializer, AdminCategorySerializer,
+    AdminActivitySerializer, AdminNotificationSerializer,
+    DashboardStatsSerializer, AdminAppointmentSerializer, AdminStaffSerializer,
+    AdminAppointmentTypeSerializer, AdminAppointmentRoomSerializer,
+    AdminBlogPostSerializer, AdminCategorySerializer,
     AdminTagSerializer, AdminCommentSerializer, AdminWorkshopSerializer,
     AdminWorkshopCategorySerializer, AdminWorkshopSessionSerializer,
     AdminWorkshopRegistrationSerializer
@@ -54,16 +60,16 @@ class DashboardStatsAPIView(views.APIView):
         # Course statistics
         total_courses = Course.objects.count()
         
-        # Session statistics
-        total_sessions = Session.objects.count()
-        completed_sessions = Session.objects.filter(status='completed').count()
-        pending_sessions = Session.objects.filter(status='scheduled').count()
+        # Appointment statistics
+        total_appointments = Appointment.objects.count()
+        completed_appointments = Appointment.objects.filter(status='completed').count()
+        pending_appointments = Appointment.objects.filter(status='pending').count()
+        confirmed_appointments = Appointment.objects.filter(status='confirmed').count()
         
-        # Calculate average session rating
-        avg_rating = Session.objects.filter(
-            status='completed',
-            rating__isnull=False
-        ).aggregate(avg_rating=Avg('rating'))['avg_rating'] or 0
+        # Calculate average appointment rating
+        avg_rating = AppointmentFeedback.objects.aggregate(
+            avg_rating=Avg('overall_rating')
+        )['avg_rating'] or 0
         
         # Revenue calculations
         total_revenue = Enrollment.objects.aggregate(
@@ -79,13 +85,14 @@ class DashboardStatsAPIView(views.APIView):
         stats = {
             'total_users': total_users,
             'total_courses': total_courses,
-            'total_sessions': total_sessions,
+            'total_appointments': total_appointments,
             'total_revenue': total_revenue,
             'active_users': active_users,
-            'pending_sessions': pending_sessions,
+            'pending_appointments': pending_appointments,
+            'confirmed_appointments': confirmed_appointments,
             'new_users_this_month': new_users_this_month,
-            'completed_sessions': completed_sessions,
-            'average_session_rating': round(avg_rating, 1),
+            'completed_appointments': completed_appointments,
+            'average_appointment_rating': round(avg_rating, 1),
             'monthly_revenue': monthly_revenue,
         }
         
@@ -152,15 +159,7 @@ class AdminCourseDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         return Course.objects.all()
 
-class AdminSessionListAPIView(generics.ListAPIView):
-    """
-    List all sessions for admin
-    """
-    serializer_class = AdminSessionSerializer
-    permission_classes = [AdminPermission]
-    
-    def get_queryset(self):
-        return Session.objects.all().select_related('user', 'therapist__user', 'session_type').order_by('-created_at')
+# AdminSessionListAPIView removed - replaced by AdminAppointmentListAPIView for in-person appointments
 
 class AdminActivityListAPIView(generics.ListAPIView):
     """
@@ -381,163 +380,178 @@ def bulk_course_action(request):
 
 class AdminAppointmentListAPIView(generics.ListAPIView):
     """
-    List all appointment bookings for admin
+    List all appointments for admin
     """
     serializer_class = AdminAppointmentSerializer
     permission_classes = [AdminPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['status', 'mode', 'therapist', 'session_type']
-    search_fields = ['user__first_name', 'user__last_name', 'user__email', 'therapist__user__first_name', 'therapist__user__last_name']
-    ordering_fields = ['created_at', 'preferred_date', 'preferred_time']
+    filterset_fields = ['status', 'staff', 'appointment_type', 'is_paid']
+    search_fields = ['client__first_name', 'client__last_name', 'client__email', 'staff__user__first_name', 'staff__user__last_name', 'phone_number']
+    ordering_fields = ['created_at', 'date', 'start_time']
     ordering = ['-created_at']
     
     def get_queryset(self):
-        return SessionBooking.objects.all().select_related(
-            'user', 'therapist__user', 'session_type'
+        return Appointment.objects.all().select_related(
+            'client', 'staff__user', 'appointment_type', 'room'
         )
 
 class AdminAppointmentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     """
-    Get, update, or delete an appointment booking
+    Get, update, or delete an appointment
     """
     serializer_class = AdminAppointmentSerializer
     permission_classes = [AdminPermission]
     
     def get_queryset(self):
-        return SessionBooking.objects.all().select_related(
-            'user', 'therapist__user', 'session_type'
+        return Appointment.objects.all().select_related(
+            'client', 'staff__user', 'appointment_type', 'room'
         )
 
 @api_view(['POST'])
 @permission_classes([AdminPermission])
 def confirm_appointment(request, appointment_id):
     """
-    Confirm an appointment booking
+    Confirm an appointment
     """
-    appointment = get_object_or_404(SessionBooking, id=appointment_id)
+    appointment = get_object_or_404(Appointment, id=appointment_id)
     
     if appointment.status != 'pending':
         return Response(
-            {'error': 'این نوبت قبلاً تایید یا رد شده است'}, 
+            {'error': 'این وقت ملاقات قبلاً تایید یا لغو شده است'}, 
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    confirmed_date = request.data.get('confirmed_date')
-    confirmed_time = request.data.get('confirmed_time')
-    croom_class_url = request.data.get('croom_class_url', '')
-    croom_meeting_id = request.data.get('croom_meeting_id', '')
-    croom_password = request.data.get('croom_password', '')
-    confirmation_notes = request.data.get('confirmation_notes', '')
+    # Assign room if provided
+    room_id = request.data.get('room_id')
+    if room_id:
+        try:
+            room = AppointmentRoom.objects.get(id=room_id, is_available=True)
+            appointment.room = room
+        except AppointmentRoom.DoesNotExist:
+            return Response(
+                {'error': 'اتاق انتخاب شده یافت نشد یا در دسترس نیست'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
     
-    if not all([confirmed_date, confirmed_time]):
-        return Response(
-            {'error': 'تاریخ و زمان تایید الزامی است'}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    # Add internal notes if provided
+    internal_notes = request.data.get('internal_notes', '')
+    if internal_notes:
+        appointment.internal_notes = internal_notes
     
-    try:
-        from datetime import datetime
-        confirmed_date_obj = datetime.strptime(confirmed_date, '%Y-%m-%d').date()
-        confirmed_time_obj = datetime.strptime(confirmed_time, '%H:%M').time()
-    except ValueError:
-        return Response(
-            {'error': 'فرمت تاریخ یا زمان نامعتبر است'}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    # Update appointment with croom details
-    appointment.croom_class_url = croom_class_url
-    appointment.croom_meeting_id = croom_meeting_id
-    appointment.croom_password = croom_password
-    
-    # Confirm appointment and create session
-    session = appointment.confirm_booking(
-        confirmed_date_obj,
-        confirmed_time_obj,
-        request.user,
-        confirmation_notes
-    )
+    # Confirm the appointment
+    appointment.confirm(request.user)
     
     return Response({
-        'message': 'نوبت با موفقیت تایید شد',
-        'session_id': session.id,
-        'croom_class_url': croom_class_url,
-        'croom_meeting_id': croom_meeting_id
+        'message': 'وقت ملاقات با موفقیت تایید شد',
+        'appointment_id': appointment.id,
+        'room': appointment.room.name if appointment.room else None
     })
 
 @api_view(['POST'])
 @permission_classes([AdminPermission])
 def reject_appointment(request, appointment_id):
     """
-    Reject an appointment booking
+    Reject/Cancel an appointment
     """
-    appointment = get_object_or_404(SessionBooking, id=appointment_id)
+    appointment = get_object_or_404(Appointment, id=appointment_id)
     
-    if appointment.status != 'pending':
+    if appointment.status in ['completed', 'cancelled']:
         return Response(
-            {'error': 'این نوبت قبلاً تایید یا رد شده است'}, 
+            {'error': 'این وقت ملاقات قبلاً انجام شده یا لغو شده است'}, 
             status=status.HTTP_400_BAD_REQUEST
         )
     
     rejection_reason = request.data.get('rejection_reason', '')
     
-    appointment.status = 'rejected'
-    appointment.confirmation_notes = rejection_reason
-    appointment.save()
+    # Cancel the appointment
+    appointment.cancel(rejection_reason)
+    
+    # Create cancellation record
+    AppointmentCancellation.objects.create(
+        appointment=appointment,
+        cancelled_by=request.user,
+        reason='staff_request',
+        explanation=rejection_reason
+    )
     
     return Response({
-        'message': 'نوبت رد شد'
+        'message': 'وقت ملاقات لغو شد'
     })
 
-class AdminTherapistListAPIView(generics.ListCreateAPIView):
+class AdminStaffListAPIView(generics.ListCreateAPIView):
     """
-    List and create therapists for admin
+    List and create staff members for admin
     """
-    serializer_class = AdminTherapistSerializer
+    serializer_class = AdminStaffSerializer
     permission_classes = [AdminPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['specialization', 'is_available']
-    search_fields = ['user__first_name', 'user__last_name', 'user__email', 'bio']
-    ordering_fields = ['hourly_rate', 'created_at']
+    filterset_fields = ['role', 'is_available', 'accepts_appointments']
+    search_fields = ['user__first_name', 'user__last_name', 'user__email', 'bio', 'specializations']
+    ordering_fields = ['created_at']
     ordering = ['-created_at']
     
     def get_queryset(self):
-        return Therapist.objects.all().select_related('user')
+        return Staff.objects.all().select_related('user')
 
-class AdminTherapistDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+class AdminStaffDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     """
-    Get, update, or delete a therapist
+    Get, update, or delete a staff member
     """
-    serializer_class = AdminTherapistSerializer
+    serializer_class = AdminStaffSerializer
     permission_classes = [AdminPermission]
     
     def get_queryset(self):
-        return Therapist.objects.all().select_related('user')
+        return Staff.objects.all().select_related('user')
 
-class AdminSessionTypeListAPIView(generics.ListCreateAPIView):
+class AdminAppointmentTypeListAPIView(generics.ListCreateAPIView):
     """
-    List and create session types for admin
+    List and create appointment types for admin
     """
-    serializer_class = AdminSessionTypeSerializer
+    serializer_class = AdminAppointmentTypeSerializer
     permission_classes = [AdminPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['is_active']
+    filterset_fields = ['is_active', 'requires_preparation']
     search_fields = ['name', 'description']
     ordering_fields = ['price', 'duration_minutes', 'created_at']
     ordering = ['-created_at']
     
     def get_queryset(self):
-        return SessionType.objects.all()
+        return AppointmentType.objects.all()
 
-class AdminSessionTypeDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+class AdminAppointmentTypeDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     """
-    Get, update, or delete a session type
+    Get, update, or delete an appointment type
     """
-    serializer_class = AdminSessionTypeSerializer
+    serializer_class = AdminAppointmentTypeSerializer
     permission_classes = [AdminPermission]
     
     def get_queryset(self):
-        return SessionType.objects.all()
+        return AppointmentType.objects.all()
+
+class AdminAppointmentRoomListAPIView(generics.ListCreateAPIView):
+    """
+    List and create appointment rooms for admin
+    """
+    serializer_class = AdminAppointmentRoomSerializer
+    permission_classes = [AdminPermission]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['floor', 'is_available']
+    search_fields = ['name', 'room_number', 'facilities']
+    ordering_fields = ['floor', 'room_number', 'capacity']
+    ordering = ['floor', 'room_number']
+    
+    def get_queryset(self):
+        return AppointmentRoom.objects.all()
+
+class AdminAppointmentRoomDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Get, update, or delete an appointment room
+    """
+    serializer_class = AdminAppointmentRoomSerializer
+    permission_classes = [AdminPermission]
+    
+    def get_queryset(self):
+        return AppointmentRoom.objects.all()
 
 
 # Blog Admin Views

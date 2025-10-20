@@ -2,12 +2,13 @@ from django.urls import path
 from .api_views import (
     DashboardStatsAPIView, AdminUserListAPIView, AdminUserDetailAPIView,
     AdminPostListAPIView, AdminPostDetailAPIView, AdminCourseListAPIView,
-    AdminCourseDetailAPIView, AdminSessionListAPIView, AdminActivityListAPIView,
+    AdminCourseDetailAPIView, AdminActivityListAPIView,
     AdminNotificationListAPIView, toggle_user_status, bulk_user_action,
     admin_analytics, send_notification, export_users, bulk_course_action,
     AdminAppointmentListAPIView, AdminAppointmentDetailAPIView, confirm_appointment,
-    reject_appointment, AdminTherapistListAPIView, AdminTherapistDetailAPIView,
-    AdminSessionTypeListAPIView, AdminSessionTypeDetailAPIView,
+    reject_appointment, AdminStaffListAPIView, AdminStaffDetailAPIView,
+    AdminAppointmentTypeListAPIView, AdminAppointmentTypeDetailAPIView,
+    AdminAppointmentRoomListAPIView, AdminAppointmentRoomDetailAPIView,
     AdminBlogPostListAPIView, AdminBlogPostDetailAPIView, bulk_blog_post_action,
     AdminBlogCategoryListAPIView, AdminBlogCategoryDetailAPIView,
     AdminBlogTagListAPIView, AdminBlogTagDetailAPIView,
@@ -15,8 +16,10 @@ from .api_views import (
     AdminWorkshopListAPIView, AdminWorkshopDetailAPIView, AdminWorkshopSessionListAPIView,
     AdminWorkshopSessionDetailAPIView, AdminWorkshopRegistrationListAPIView,
     bulk_workshop_action, generate_croom_meeting_link, approve_workshop_registration,
-    reject_workshop_registration
+    reject_workshop_registration, AdminPackageListAPIView, AdminPackageDetailAPIView,
+    AdminPackageCategoryListAPIView, AdminPackageCategoryDetailAPIView, bulk_package_action
 )
+from .upload_api import upload_file
 
 urlpatterns = [
     # Dashboard
@@ -39,9 +42,6 @@ urlpatterns = [
     path('courses/<int:pk>/', AdminCourseDetailAPIView.as_view(), name='api_admin_course_detail'),
     path('courses/bulk-action/', bulk_course_action, name='api_bulk_course_action'),
     
-    # Sessions
-    path('sessions/', AdminSessionListAPIView.as_view(), name='api_admin_sessions'),
-    
     # Activities and Notifications
     path('activities/', AdminActivityListAPIView.as_view(), name='api_admin_activities'),
     path('notifications/', AdminNotificationListAPIView.as_view(), name='api_admin_notifications'),
@@ -53,13 +53,17 @@ urlpatterns = [
     path('appointments/<int:appointment_id>/confirm/', confirm_appointment, name='api_confirm_appointment'),
     path('appointments/<int:appointment_id>/reject/', reject_appointment, name='api_reject_appointment'),
     
-    # Therapist Management
-    path('therapists/', AdminTherapistListAPIView.as_view(), name='api_admin_therapists'),
-    path('therapists/<int:pk>/', AdminTherapistDetailAPIView.as_view(), name='api_admin_therapist_detail'),
+    # Staff Management
+    path('staff/', AdminStaffListAPIView.as_view(), name='api_admin_staff'),
+    path('staff/<int:pk>/', AdminStaffDetailAPIView.as_view(), name='api_admin_staff_detail'),
     
-    # Session Types Management
-    path('session-types/', AdminSessionTypeListAPIView.as_view(), name='api_admin_session_types'),
-    path('session-types/<int:pk>/', AdminSessionTypeDetailAPIView.as_view(), name='api_admin_session_type_detail'),
+    # Appointment Types Management
+    path('appointment-types/', AdminAppointmentTypeListAPIView.as_view(), name='api_admin_appointment_types'),
+    path('appointment-types/<int:pk>/', AdminAppointmentTypeDetailAPIView.as_view(), name='api_admin_appointment_type_detail'),
+    
+    # Appointment Rooms Management
+    path('appointment-rooms/', AdminAppointmentRoomListAPIView.as_view(), name='api_admin_appointment_rooms'),
+    path('appointment-rooms/<int:pk>/', AdminAppointmentRoomDetailAPIView.as_view(), name='api_admin_appointment_room_detail'),
     
     # Blog Management
     path('blog/posts/', AdminBlogPostListAPIView.as_view(), name='api_admin_blog_posts'),
@@ -93,4 +97,14 @@ urlpatterns = [
     path('workshops/<int:workshop_id>/registrations/', AdminWorkshopRegistrationListAPIView.as_view(), name='api_admin_workshop_registrations'),
     path('workshops/registrations/<int:registration_id>/approve/', approve_workshop_registration, name='api_approve_workshop_registration'),
     path('workshops/registrations/<int:registration_id>/reject/', reject_workshop_registration, name='api_reject_workshop_registration'),
+    
+    # Package Management
+    path('packages/', AdminPackageListAPIView.as_view(), name='api_admin_packages'),
+    path('packages/<int:pk>/', AdminPackageDetailAPIView.as_view(), name='api_admin_package_detail'),
+    path('packages/bulk-action/', bulk_package_action, name='api_bulk_package_action'),
+    path('packages/categories/', AdminPackageCategoryListAPIView.as_view(), name='api_admin_package_categories'),
+    path('packages/categories/<int:pk>/', AdminPackageCategoryDetailAPIView.as_view(), name='api_admin_package_category_detail'),
+    
+    # File Upload
+    path('upload/', upload_file, name='api_upload_file'),
 ]

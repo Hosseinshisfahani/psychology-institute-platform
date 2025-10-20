@@ -59,7 +59,7 @@ INSTALLED_APPS = [
     'app.tests',
     'app.courses',
     'app.dashboard',
-    'app.therapy_sessions',
+    'app.appointments',  # New app for in-person appointments
     'app.payment',
     'app.reports',
     'app.sales',
