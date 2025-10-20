@@ -6,8 +6,9 @@ from .api_views import (
     AdminNotificationListAPIView, toggle_user_status, bulk_user_action,
     admin_analytics, send_notification, export_users, bulk_course_action,
     AdminAppointmentListAPIView, AdminAppointmentDetailAPIView, confirm_appointment,
-    reject_appointment, AdminTherapistListAPIView, AdminTherapistDetailAPIView,
-    AdminSessionTypeListAPIView, AdminSessionTypeDetailAPIView,
+    reject_appointment, AdminSpecialistListAPIView, AdminSpecialistDetailAPIView,
+    AdminAppointmentTypeListAPIView, AdminAppointmentTypeDetailAPIView,
+    AdminTimeSlotListAPIView, AdminTimeSlotDetailAPIView,
     AdminBlogPostListAPIView, AdminBlogPostDetailAPIView, bulk_blog_post_action,
     AdminBlogCategoryListAPIView, AdminBlogCategoryDetailAPIView,
     AdminBlogTagListAPIView, AdminBlogTagDetailAPIView,
@@ -53,13 +54,17 @@ urlpatterns = [
     path('appointments/<int:appointment_id>/confirm/', confirm_appointment, name='api_confirm_appointment'),
     path('appointments/<int:appointment_id>/reject/', reject_appointment, name='api_reject_appointment'),
     
-    # Therapist Management
-    path('therapists/', AdminTherapistListAPIView.as_view(), name='api_admin_therapists'),
-    path('therapists/<int:pk>/', AdminTherapistDetailAPIView.as_view(), name='api_admin_therapist_detail'),
+    # Specialist Management
+    path('specialists/', AdminSpecialistListAPIView.as_view(), name='api_admin_specialists'),
+    path('specialists/<int:pk>/', AdminSpecialistDetailAPIView.as_view(), name='api_admin_specialist_detail'),
     
-    # Session Types Management
-    path('session-types/', AdminSessionTypeListAPIView.as_view(), name='api_admin_session_types'),
-    path('session-types/<int:pk>/', AdminSessionTypeDetailAPIView.as_view(), name='api_admin_session_type_detail'),
+    # Appointment Types Management
+    path('appointment-types/', AdminAppointmentTypeListAPIView.as_view(), name='api_admin_appointment_types'),
+    path('appointment-types/<int:pk>/', AdminAppointmentTypeDetailAPIView.as_view(), name='api_admin_appointment_type_detail'),
+    
+    # Time Slots Management
+    path('time-slots/', AdminTimeSlotListAPIView.as_view(), name='api_admin_time_slots'),
+    path('time-slots/<int:pk>/', AdminTimeSlotDetailAPIView.as_view(), name='api_admin_time_slot_detail'),
     
     # Blog Management
     path('blog/posts/', AdminBlogPostListAPIView.as_view(), name='api_admin_blog_posts'),
