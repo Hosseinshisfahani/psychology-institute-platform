@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from app.blog.models import Post, Category, Tag, Comment
 from app.courses.models import Course, Enrollment
 from app.therapy_sessions.models import Session, Therapist, SessionBooking, SessionType
+from app.appointments.models import Appointment, Staff, Room, AppointmentType, TimeSlot
 from app.dashboard.models import Activity, Notification
 from app.workshops.models import (
     Workshop, WorkshopCategory, WorkshopSession, WorkshopRegistration,

@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     'app.workshops',
     'app.packages',
     'app.cohorts',
+    'app.appointments',
 ]
 
 MIDDLEWARE = [

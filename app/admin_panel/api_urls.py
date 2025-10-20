@@ -5,9 +5,10 @@ from .api_views import (
     AdminCourseDetailAPIView, AdminSessionListAPIView, AdminActivityListAPIView,
     AdminNotificationListAPIView, toggle_user_status, bulk_user_action,
     admin_analytics, send_notification, export_users, bulk_course_action,
-    AdminAppointmentListAPIView, AdminAppointmentDetailAPIView, confirm_appointment,
-    reject_appointment, AdminTherapistListAPIView, AdminTherapistDetailAPIView,
-    AdminSessionTypeListAPIView, AdminSessionTypeDetailAPIView,
+    # Old therapy sessions appointments - will be replaced
+    # AdminAppointmentListAPIView, AdminAppointmentDetailAPIView, confirm_appointment,
+    # reject_appointment, AdminTherapistListAPIView, AdminTherapistDetailAPIView,
+    # AdminSessionTypeListAPIView, AdminSessionTypeDetailAPIView,
     AdminBlogPostListAPIView, AdminBlogPostDetailAPIView, bulk_blog_post_action,
     AdminBlogCategoryListAPIView, AdminBlogCategoryDetailAPIView,
     AdminBlogTagListAPIView, AdminBlogTagDetailAPIView,
@@ -16,6 +17,18 @@ from .api_views import (
     AdminWorkshopSessionDetailAPIView, AdminWorkshopRegistrationListAPIView,
     bulk_workshop_action, generate_croom_meeting_link, approve_workshop_registration,
     reject_workshop_registration
+)
+
+# Import new appointments views
+from app.appointments.api_views import (
+    AdminAppointmentListAPIView as NewAdminAppointmentListAPIView,
+    AdminAppointmentDetailAPIView as NewAdminAppointmentDetailAPIView,
+    confirm_appointment as new_confirm_appointment,
+    reject_appointment as new_reject_appointment,
+    AdminStaffListAPIView, AdminStaffDetailAPIView,
+    AdminRoomListAPIView, AdminRoomDetailAPIView,
+    AdminAppointmentTypeListAPIView, AdminAppointmentTypeDetailAPIView,
+    AdminTimeSlotListAPIView, AdminTimeSlotDetailAPIView
 )
 
 urlpatterns = [
@@ -47,19 +60,41 @@ urlpatterns = [
     path('notifications/', AdminNotificationListAPIView.as_view(), name='api_admin_notifications'),
     path('notifications/send/', send_notification, name='api_send_notification'),
     
-    # Appointment Management
-    path('appointments/', AdminAppointmentListAPIView.as_view(), name='api_admin_appointments'),
-    path('appointments/<int:pk>/', AdminAppointmentDetailAPIView.as_view(), name='api_admin_appointment_detail'),
-    path('appointments/<int:appointment_id>/confirm/', confirm_appointment, name='api_confirm_appointment'),
-    path('appointments/<int:appointment_id>/reject/', reject_appointment, name='api_reject_appointment'),
+    # Old Therapy Sessions Appointment Management - Commented out
+    # path('appointments/', AdminAppointmentListAPIView.as_view(), name='api_admin_appointments'),
+    # path('appointments/<int:pk>/', AdminAppointmentDetailAPIView.as_view(), name='api_admin_appointment_detail'),
+    # path('appointments/<int:appointment_id>/confirm/', confirm_appointment, name='api_confirm_appointment'),
+    # path('appointments/<int:appointment_id>/reject/', reject_appointment, name='api_reject_appointment'),
     
-    # Therapist Management
-    path('therapists/', AdminTherapistListAPIView.as_view(), name='api_admin_therapists'),
-    path('therapists/<int:pk>/', AdminTherapistDetailAPIView.as_view(), name='api_admin_therapist_detail'),
+    # New In-Person Appointment Management
+    path('in-person-appointments/', NewAdminAppointmentListAPIView.as_view(), name='api_admin_in_person_appointments'),
+    path('in-person-appointments/<int:pk>/', NewAdminAppointmentDetailAPIView.as_view(), name='api_admin_in_person_appointment_detail'),
+    path('in-person-appointments/<int:appointment_id>/confirm/', new_confirm_appointment, name='api_confirm_in_person_appointment'),
+    path('in-person-appointments/<int:appointment_id>/reject/', new_reject_appointment, name='api_reject_in_person_appointment'),
     
-    # Session Types Management
-    path('session-types/', AdminSessionTypeListAPIView.as_view(), name='api_admin_session_types'),
-    path('session-types/<int:pk>/', AdminSessionTypeDetailAPIView.as_view(), name='api_admin_session_type_detail'),
+    # Staff Management (for in-person appointments)
+    path('appointment-staff/', AdminStaffListAPIView.as_view(), name='api_admin_appointment_staff'),
+    path('appointment-staff/<int:pk>/', AdminStaffDetailAPIView.as_view(), name='api_admin_appointment_staff_detail'),
+    
+    # Room Management
+    path('rooms/', AdminRoomListAPIView.as_view(), name='api_admin_rooms'),
+    path('rooms/<int:pk>/', AdminRoomDetailAPIView.as_view(), name='api_admin_room_detail'),
+    
+    # Appointment Types Management
+    path('appointment-types/', AdminAppointmentTypeListAPIView.as_view(), name='api_admin_appointment_types'),
+    path('appointment-types/<int:pk>/', AdminAppointmentTypeDetailAPIView.as_view(), name='api_admin_appointment_type_detail'),
+    
+    # Time Slots Management
+    path('time-slots/', AdminTimeSlotListAPIView.as_view(), name='api_admin_time_slots'),
+    path('time-slots/<int:pk>/', AdminTimeSlotDetailAPIView.as_view(), name='api_admin_time_slot_detail'),
+    
+    # Old Therapist Management - Commented out
+    # path('therapists/', AdminTherapistListAPIView.as_view(), name='api_admin_therapists'),
+    # path('therapists/<int:pk>/', AdminTherapistDetailAPIView.as_view(), name='api_admin_therapist_detail'),
+    
+    # Old Session Types Management - Commented out
+    # path('session-types/', AdminSessionTypeListAPIView.as_view(), name='api_admin_session_types'),
+    # path('session-types/<int:pk>/', AdminSessionTypeDetailAPIView.as_view(), name='api_admin_session_type_detail'),
     
     # Blog Management
     path('blog/posts/', AdminBlogPostListAPIView.as_view(), name='api_admin_blog_posts'),
