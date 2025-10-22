@@ -1,9 +1,9 @@
 from django.urls import path
 from .api_views import (
     AppointmentListAPIView, AppointmentDetailAPIView, reschedule_appointment,
-    cancel_appointment, TherapistListAPIView, TherapistAvailabilityAPIView,
+    cancel_appointment, TherapistListAPIView, TherapistDetailAPIView, TherapistAvailabilityAPIView,
     AppointmentTypeListAPIView, ClinicLocationListAPIView,
-    CancellationPolicyListAPIView, appointment_statistics
+    CancellationPolicyListAPIView, appointment_statistics, appointment_availability
 )
 
 urlpatterns = [
@@ -12,9 +12,11 @@ urlpatterns = [
     path('<int:pk>/', AppointmentDetailAPIView.as_view(), name='api_appointment_detail'),
     path('<int:appointment_id>/reschedule/', reschedule_appointment, name='api_appointment_reschedule'),
     path('<int:appointment_id>/cancel/', cancel_appointment, name='api_appointment_cancel'),
+    path('availability/', appointment_availability, name='api_appointment_availability'),
     
     # Therapists
     path('therapists/', TherapistListAPIView.as_view(), name='api_therapist_list'),
+    path('therapists/<int:therapist_id>/', TherapistDetailAPIView.as_view(), name='api_therapist_detail'),
     path('therapists/<int:therapist_id>/availability/', TherapistAvailabilityAPIView.as_view(), name='api_therapist_availability'),
     
     # Reference data

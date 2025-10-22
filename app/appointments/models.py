@@ -46,6 +46,12 @@ class AppointmentType(models.Model):
         verbose_name='قیمت'
     )
     color = models.CharField(max_length=7, default='#007bff', verbose_name='رنگ')
+    # Link appointment types to therapist specializations
+    specializations = models.JSONField(
+        default=list, 
+        verbose_name='تخصص‌های مرتبط',
+        help_text='لیست تخصص‌هایی که این نوع نوبت برای آن‌ها مناسب است'
+    )
     is_active = models.BooleanField(default=True, verbose_name='فعال')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')

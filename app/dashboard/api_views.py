@@ -355,6 +355,24 @@ class LogoutAPIView(APIView):
         })
 
 
+class AuthCheckAPIView(APIView):
+    """API endpoint to check authentication status"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request):
+        if request.user.is_authenticated:
+            serializer = UserSerializer(request.user, context={'request': request})
+            return Response({
+                'authenticated': True,
+                'user': serializer.data
+            })
+        else:
+            return Response({
+                'authenticated': False,
+                'user': None
+            })
+
+
 class ProfileAPIView(APIView):
     """API endpoint for user profile"""
     permission_classes = [permissions.IsAuthenticated]

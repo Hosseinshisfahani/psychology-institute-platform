@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from django.db import transaction
+from django.db import transaction, models
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth import get_user_model
@@ -55,11 +55,9 @@ class AppointmentListAPIView(generics.ListCreateAPIView):
             )
     
     def perform_create(self, serializer):
-        # Set client to current user if they are a client
-        if self.request.user.user_type == 'client':
-            serializer.save(client=self.request.user)
-        else:
-            serializer.save()
+        # Set client to current authenticated user
+        # All users (client, therapist, admin, staff) can book appointments for themselves
+        serializer.save(client=self.request.user)
 
 
 class AppointmentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
@@ -130,18 +128,16 @@ def cancel_appointment(request, appointment_id):
     if appointment.status in ['cancelled', 'completed']:
         return Response({'error': 'این نوبت قبلاً لغو یا تکمیل شده است'}, status=status.HTTP_400_BAD_REQUEST)
     
-    serializer = AppointmentCancellationSerializer(data=request.data)
+    serializer = AppointmentCancellationSerializer(
+        data={'reason': request.data.get('reason', '')},
+        context={'appointment': appointment, 'cancelled_by': request.user}
+    )
     if serializer.is_valid():
         try:
             with transaction.atomic():
-                cancellation = serializer.save(
-                    appointment=appointment,
-                    cancelled_by=request.user
-                )
+                cancellation = serializer.save()
                 return Response({
-                    'message': 'نوبت با موفقیت لغو شد',
-                    'cancellation_fee': float(cancellation.cancellation_fee),
-                    'refund_amount': float(cancellation.refund_amount)
+                    'message': 'نوبت با موفقیت لغو شد'
                 }, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -151,7 +147,7 @@ def cancel_appointment(request, appointment_id):
 
 class TherapistListAPIView(APIView):
     """List available therapists"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     
     def get(self, request):
         therapists = User.objects.filter(
@@ -162,20 +158,56 @@ class TherapistListAPIView(APIView):
         
         data = []
         for therapist in therapists:
+            # Build absolute URL for profile image
+            profile_image_url = None
+            if therapist.profile_image:
+                profile_image_url = request.build_absolute_uri(therapist.profile_image.url)
+            
             data.append({
                 'id': therapist.id,
                 'name': therapist.full_name,
                 'specialization': therapist.specialization,
                 'experience_years': therapist.experience_years,
                 'hourly_rate': float(therapist.hourly_rate),
-                'profile_image': therapist.profile_image.url if therapist.profile_image else None
+                'profile_image': profile_image_url
             })
+        return Response(data)
+
+
+class TherapistDetailAPIView(APIView):
+    """Get detailed information about a specific therapist"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, therapist_id):
+        therapist = get_object_or_404(User, id=therapist_id, user_type='therapist')
+        
+        # Build absolute URL for profile image
+        profile_image_url = None
+        if therapist.profile_image:
+            profile_image_url = request.build_absolute_uri(therapist.profile_image.url)
+        
+        data = {
+            'id': therapist.id,
+            'name': therapist.full_name,
+            'specialization': therapist.specialization,
+            'experience_years': therapist.experience_years,
+            'hourly_rate': float(therapist.hourly_rate),
+            'profile_image': profile_image_url,
+            'bio': getattr(therapist, 'bio', ''),
+            'license_number': therapist.license_number,
+            'is_verified': getattr(therapist, 'is_verified', False),
+            'is_available': therapist.is_available,
+            'gender': getattr(therapist, 'gender', ''),
+            'phone_number': therapist.phone_number,
+            'email': therapist.email,
+        }
+        
         return Response(data)
 
 
 class TherapistAvailabilityAPIView(APIView):
     """Get therapist's available time slots"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     
     def get(self, request, therapist_id):
         therapist = get_object_or_404(User, id=therapist_id, user_type='therapist')
@@ -257,24 +289,90 @@ class TherapistAvailabilityAPIView(APIView):
 
 
 class AppointmentTypeListAPIView(generics.ListAPIView):
-    """List appointment types"""
-    permission_classes = [permissions.IsAuthenticated]
+    """List appointment types, optionally filtered by therapist specialization"""
+    permission_classes = [permissions.AllowAny]
     serializer_class = AppointmentTypeSerializer
-    queryset = AppointmentType.objects.filter(is_active=True)
+    
+    def get_queryset(self):
+        queryset = AppointmentType.objects.filter(is_active=True)
+        
+        # Filter by therapist specialization if therapist_id is provided
+        therapist_id = self.request.query_params.get('therapist_id')
+        if therapist_id:
+            try:
+                therapist = User.objects.get(id=therapist_id, user_type='therapist')
+                therapist_specialization = therapist.specialization
+                
+                if therapist_specialization:
+                    # Filter appointment types that include this specialization
+                    # or have no specializations (general types)
+                    # Use a more compatible approach for SQLite
+                    from django.db.models import Q
+                    # Filter by checking if any of the appointment type specializations
+                    # match any part of the therapist's specialization
+                    filtered_ids = []
+                    for apt in queryset:
+                        # Include general types (no specializations)
+                        if not apt.specializations or len(apt.specializations) == 0:
+                            filtered_ids.append(apt.id)
+                        else:
+                            # Check if any appointment type specialization matches
+                            # any part of the therapist's specialization
+                            for apt_spec in apt.specializations:
+                                if apt_spec in therapist_specialization or therapist_specialization in apt_spec:
+                                    filtered_ids.append(apt.id)
+                                    break
+                    
+                    queryset = queryset.filter(id__in=filtered_ids)
+            except User.DoesNotExist:
+                pass
+        
+        return queryset
 
 
 class ClinicLocationListAPIView(generics.ListAPIView):
     """List clinic locations"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     serializer_class = ClinicLocationSerializer
     queryset = ClinicLocation.objects.filter(is_active=True)
 
 
 class CancellationPolicyListAPIView(generics.ListAPIView):
     """List cancellation policies"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     serializer_class = CancellationPolicySerializer
     queryset = CancellationPolicy.objects.filter(is_active=True)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def appointment_availability(request):
+    """Get available time slots for a specific date"""
+    date = request.query_params.get('date')
+    
+    if not date:
+        return Response({'error': 'تاریخ الزامی است'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        target_date = datetime.strptime(date, '%Y-%m-%d').date()
+    except ValueError:
+        return Response({'error': 'فرمت تاریخ نامعتبر است'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Get all booked times for this date
+    booked_times = Appointment.objects.filter(
+        scheduled_datetime__date=target_date,
+        status__in=['scheduled', 'confirmed']
+    ).values_list('scheduled_datetime', flat=True)
+    
+    # Convert to time strings for frontend
+    booked_time_strings = []
+    for dt in booked_times:
+        booked_time_strings.append(dt.strftime('%H:%M'))
+    
+    return Response({
+        'date': target_date,
+        'booked_times': booked_time_strings
+    })
 
 
 @api_view(['GET'])

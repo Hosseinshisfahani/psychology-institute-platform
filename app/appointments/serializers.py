@@ -92,7 +92,7 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Appointment
         fields = [
-            'client', 'therapist', 'appointment_type', 'location',
+            'therapist', 'appointment_type', 'location',
             'scheduled_datetime', 'duration_minutes', 'notes'
         ]
     
@@ -151,36 +151,42 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
         """Check if there's an overlapping appointment"""
         end_datetime = scheduled_datetime + timedelta(minutes=duration_minutes)
         
-        return Appointment.objects.filter(
+        # Get all existing appointments for this therapist
+        existing_appointments = Appointment.objects.filter(
             therapist=therapist,
-            status__in=['scheduled', 'confirmed'],
-            scheduled_datetime__lt=end_datetime
-        ).exclude(
-            scheduled_datetime__gte=end_datetime
-        ).exists()
+            status__in=['scheduled', 'confirmed']
+        )
+        
+        # Check for overlaps manually
+        for appointment in existing_appointments:
+            existing_end = appointment.scheduled_datetime + timedelta(minutes=appointment.duration_minutes)
+            
+            # Check if appointments overlap
+            if (scheduled_datetime < existing_end and 
+                end_datetime > appointment.scheduled_datetime):
+                return True
+        
+        return False
 
 
 class AppointmentCancellationSerializer(serializers.ModelSerializer):
     class Meta:
         model = AppointmentCancellation
-        fields = ['appointment', 'cancelled_by', 'reason']
+        fields = ['reason']
     
     def create(self, validated_data):
-        appointment = validated_data['appointment']
-        cancelled_by = validated_data['cancelled_by']
+        # Get appointment and cancelled_by from the context passed by the view
+        appointment = self.context.get('appointment')
+        cancelled_by = self.context.get('cancelled_by')
         reason = validated_data['reason']
         
-        # Calculate cancellation fee based on policy
-        cancellation_fee = self._calculate_cancellation_fee(appointment)
-        refund_amount = appointment.appointment_type.price - cancellation_fee
-        
-        # Create cancellation record
+        # Create cancellation record without fees
         cancellation = AppointmentCancellation.objects.create(
             appointment=appointment,
             cancelled_by=cancelled_by,
             reason=reason,
-            cancellation_fee=cancellation_fee,
-            refund_amount=refund_amount
+            cancellation_fee=0,
+            refund_amount=0
         )
         
         # Update appointment status
@@ -188,19 +194,6 @@ class AppointmentCancellationSerializer(serializers.ModelSerializer):
         appointment.save()
         
         return cancellation
-    
-    def _calculate_cancellation_fee(self, appointment):
-        """Calculate cancellation fee based on policy"""
-        hours_until = (appointment.scheduled_datetime - timezone.now()).total_seconds() / 3600
-        
-        policy = CancellationPolicy.objects.filter(
-            hours_before_appointment__lte=hours_until,
-            is_active=True
-        ).order_by('-hours_before_appointment').first()
-        
-        if policy:
-            return appointment.appointment_type.price * (policy.cancellation_fee_percentage / 100)
-        return 0
 
 
 class AppointmentRescheduleSerializer(serializers.ModelSerializer):
