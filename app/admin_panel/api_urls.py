@@ -14,7 +14,8 @@ from .api_views import (
     AdminBlogCommentListAPIView, AdminBlogCommentDetailAPIView, bulk_blog_comment_action,
     AdminWorkshopListAPIView, AdminWorkshopDetailAPIView, AdminWorkshopSessionListAPIView,
     AdminWorkshopSessionDetailAPIView, AdminWorkshopRegistrationListAPIView,
-    bulk_workshop_action, generate_croom_meeting_link, approve_workshop_registration,
+    AdminWorkshopCategoryListAPIView, AdminWorkshopCategoryDetailAPIView,
+    bulk_workshop_action, approve_workshop_registration,
     reject_workshop_registration, AdminPackageListAPIView, AdminPackageDetailAPIView,
     AdminPackageCategoryListAPIView, AdminPackageCategoryDetailAPIView, bulk_package_action
 )
@@ -89,12 +90,15 @@ urlpatterns = [
     # Workshop Sessions
     path('workshops/<int:workshop_id>/sessions/', AdminWorkshopSessionListAPIView.as_view(), name='api_admin_workshop_sessions'),
     path('workshops/<int:workshop_id>/sessions/<int:pk>/', AdminWorkshopSessionDetailAPIView.as_view(), name='api_admin_workshop_session_detail'),
-    path('workshops/sessions/<int:session_id>/generate-croom-link/', generate_croom_meeting_link, name='api_generate_croom_meeting_link'),
     
     # Workshop Registrations
     path('workshops/<int:workshop_id>/registrations/', AdminWorkshopRegistrationListAPIView.as_view(), name='api_admin_workshop_registrations'),
     path('workshops/registrations/<int:registration_id>/approve/', approve_workshop_registration, name='api_approve_workshop_registration'),
     path('workshops/registrations/<int:registration_id>/reject/', reject_workshop_registration, name='api_reject_workshop_registration'),
+    
+    # Workshop Categories
+    path('workshops/categories/', AdminWorkshopCategoryListAPIView.as_view(), name='api_admin_workshop_categories'),
+    path('workshops/categories/<int:pk>/', AdminWorkshopCategoryDetailAPIView.as_view(), name='api_admin_workshop_category_detail'),
     
     # Package Management
     path('packages/', AdminPackageListAPIView.as_view(), name='api_admin_packages'),

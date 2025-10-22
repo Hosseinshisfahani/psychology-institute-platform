@@ -156,11 +156,9 @@ class WorkshopSession(models.Model):
     scheduled_datetime = models.DateTimeField(verbose_name='تاریخ و زمان برنامه‌ریزی شده')
     duration_minutes = models.PositiveIntegerField(verbose_name='مدت دقیقه')
     
-    # Croom integration
-    meeting_link = models.URLField(blank=True, null=True, verbose_name='لینک جلسه')
-    meeting_id = models.CharField(max_length=100, blank=True, null=True, verbose_name='شناسه جلسه')
-    meeting_password = models.CharField(max_length=50, blank=True, null=True, verbose_name='رمز عبور جلسه')
-    recording_url = models.URLField(blank=True, null=True, verbose_name='لینک ضبط')
+    # Video and Croom platform links
+    session_video = models.FileField(upload_to='workshops/session_videos/', blank=True, null=True, verbose_name='ویدیو جلسه')
+    croom_platform_link = models.URLField(blank=True, null=True, verbose_name='لینک پلتفرم سی‌روم')
     
     # Session materials
     materials = models.TextField(blank=True, null=True, verbose_name='مواد جلسه')

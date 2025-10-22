@@ -895,46 +895,6 @@ def bulk_workshop_action(request):
     
     return Response({'message': message})
 
-@api_view(['POST'])
-@permission_classes([AdminPermission])
-def generate_croom_meeting_link(request, session_id):
-    """
-    Generate Croom meeting link for a session
-    """
-    session = get_object_or_404(WorkshopSession, id=session_id)
-    
-    try:
-        from app.workshops.services.croom_service import croom_service
-        
-        # Generate meeting link using the existing service
-        meeting_data = croom_service.create_meeting(
-            title=f"{session.workshop.title} - Session {session.session_number}",
-            description=session.description or '',
-            start_time=session.scheduled_datetime,
-            duration_minutes=session.duration_minutes
-        )
-        
-        if meeting_data:
-            session.meeting_link = meeting_data.get('meeting_url')
-            session.meeting_id = meeting_data.get('meeting_id')
-            session.meeting_password = meeting_data.get('password')
-            session.save()
-            
-            return Response({
-                'message': 'لینک جلسه با موفقیت تولید شد',
-                'meeting_link': session.meeting_link,
-                'meeting_id': session.meeting_id
-            })
-        else:
-            return Response(
-                {'error': 'خطا در تولید لینک جلسه'}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-    except Exception as e:
-        return Response(
-            {'error': f'خطا در تولید لینک جلسه: {str(e)}'}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
 @api_view(['POST'])
 @permission_classes([AdminPermission])
@@ -1083,3 +1043,31 @@ def bulk_package_action(request):
         return Response({'error': 'عملیات نامعتبر است'}, status=status.HTTP_400_BAD_REQUEST)
     
     return Response({'message': message})
+
+
+# Workshop Categories Admin Views
+
+class AdminWorkshopCategoryListAPIView(generics.ListCreateAPIView):
+    """
+    List and create workshop categories for admin
+    """
+    serializer_class = AdminWorkshopCategorySerializer
+    permission_classes = [AdminPermission]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['is_active']
+    search_fields = ['name', 'description']
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']
+    
+    def get_queryset(self):
+        return WorkshopCategory.objects.all()
+
+class AdminWorkshopCategoryDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Get, update, or delete a workshop category
+    """
+    serializer_class = AdminWorkshopCategorySerializer
+    permission_classes = [AdminPermission]
+    
+    def get_queryset(self):
+        return WorkshopCategory.objects.all()

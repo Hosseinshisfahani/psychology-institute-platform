@@ -1,11 +1,13 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
+from jalali_date.widgets import AdminJalaliDateWidget, AdminSplitJalaliDateTime
 from .models import (
 # from psychology_institute.admin import persian_admin_site
     WorkshopCategory, Workshop, WorkshopSession, WorkshopRegistration,
     WorkshopSessionAttendance, InstallmentPlan, InstallmentPayment, WorkshopReview
 )
+from .forms import WorkshopAdminForm, WorkshopSessionAdminForm
 
 @admin.register(WorkshopCategory)
 class WorkshopCategoryAdmin(admin.ModelAdmin):
@@ -18,12 +20,14 @@ class WorkshopCategoryAdmin(admin.ModelAdmin):
 class WorkshopSessionInline(admin.TabularInline):
     model = WorkshopSession
     extra = 1
-    fields = ['session_number', 'title', 'scheduled_datetime', 'duration_minutes', 'is_completed']
+    fields = ['session_number', 'title', 'scheduled_datetime', 'duration_minutes', 'session_video', 'croom_platform_link', 'is_completed']
     ordering = ['session_number']
+    form = WorkshopSessionAdminForm
 
 
 @admin.register(Workshop)
 class WorkshopAdmin(admin.ModelAdmin):
+    form = WorkshopAdminForm
     list_display = [
         'title', 'category', 'instructor', 'status', 'start_date', 
         'current_participants', 'max_participants', 'price', 'created_at'
@@ -65,7 +69,7 @@ class WorkshopAdmin(admin.ModelAdmin):
         }),
     )
     
-    actions = ['publish_workshops', 'open_registration', 'generate_croom_links']
+    actions = ['publish_workshops', 'open_registration']
     
     def publish_workshops(self, request, queryset):
         updated = queryset.update(status='published')
@@ -77,39 +81,14 @@ class WorkshopAdmin(admin.ModelAdmin):
         self.message_user(request, _(f'{updated} workshops opened for registration.'))
     open_registration.short_description = _('Open registration for selected workshops')
     
-    def generate_croom_links(self, request, queryset):
-        from .services.croom_service import croom_service
-        
-        count = 0
-        for workshop in queryset:
-            for session in workshop.sessions.all():
-                if not session.meeting_link:
-                    session_data = {
-                        'title': f"{workshop.title} - Session {session.session_number}",
-                        'description': session.description or workshop.short_description,
-                        'scheduled_datetime': session.scheduled_datetime,
-                        'duration_minutes': session.duration_minutes,
-                        'instructor_name': workshop.instructor.full_name,
-                        'instructor_email': workshop.instructor.email,
-                    }
-                    
-                    result = croom_service.create_meeting(session_data)
-                    if result.get('success'):
-                        session.meeting_id = result.get('meeting_id')
-                        session.meeting_link = result.get('meeting_link')
-                        session.meeting_password = result.get('meeting_password')
-                        session.save()
-                        count += 1
-        
-        self.message_user(request, _(f'Generated Croom links for {count} sessions.'))
-    generate_croom_links.short_description = _('Generate Croom meeting links for sessions')
 
 
 @admin.register(WorkshopSession)
 class WorkshopSessionAdmin(admin.ModelAdmin):
+    form = WorkshopSessionAdminForm
     list_display = [
         'workshop', 'session_number', 'title', 'scheduled_datetime', 
-        'duration_minutes', 'has_meeting_link', 'is_completed'
+        'duration_minutes', 'is_completed'
     ]
     list_filter = ['workshop', 'is_completed', 'scheduled_datetime']
     search_fields = ['title', 'description', 'workshop__title']
@@ -123,7 +102,7 @@ class WorkshopSessionAdmin(admin.ModelAdmin):
             'fields': ('scheduled_datetime', 'duration_minutes')
         }),
         (_('Croom Integration'), {
-            'fields': ('meeting_link', 'meeting_id', 'meeting_password', 'recording_url')
+            'fields': ('session_video', 'croom_platform_link')
         }),
         (_('Materials'), {
             'fields': ('materials', 'homework')
@@ -137,10 +116,6 @@ class WorkshopSessionAdmin(admin.ModelAdmin):
         }),
     )
     
-    def has_meeting_link(self, obj):
-        return bool(obj.meeting_link)
-    has_meeting_link.boolean = True
-    has_meeting_link.short_description = _('Has Meeting Link')
 
 
 class InstallmentPaymentInline(admin.TabularInline):

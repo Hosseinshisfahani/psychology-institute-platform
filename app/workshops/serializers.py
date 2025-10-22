@@ -25,7 +25,7 @@ class WorkshopSessionSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'session_number', 'title', 'description',
             'scheduled_datetime', 'scheduled_datetime_persian',
-            'duration_minutes', 'meeting_link', 'recording_url',
+            'duration_minutes', 'session_video', 'croom_platform_link',
             'has_recording', 'can_join', 'is_completed'
         ]
     
@@ -35,7 +35,7 @@ class WorkshopSessionSerializer(serializers.ModelSerializer):
         return None
     
     def get_has_recording(self, obj):
-        return bool(obj.recording_url)
+        return bool(obj.session_video)
     
     def get_can_join(self, obj):
         """Check if session is currently joinable"""
@@ -66,8 +66,17 @@ class WorkshopListSerializer(serializers.ModelSerializer):
     
     def get_start_date_persian(self, obj):
         if obj.start_date:
-            jdate = jdatetime.date.fromgregorian(date=obj.start_date)
-            return jdate.strftime('%Y/%m/%d')
+            # Check if the date is already in Persian format (year between 1300-1500)
+            if hasattr(obj.start_date, 'year') and 1300 <= obj.start_date.year <= 1500:
+                # Date is already in Persian calendar, just format it
+                return obj.start_date.strftime('%Y/%m/%d')
+            else:
+                # Date is in Gregorian calendar, convert to Persian
+                try:
+                    jdate = jdatetime.date.fromgregorian(date=obj.start_date)
+                    return jdate.strftime('%Y/%m/%d')
+                except Exception:
+                    return obj.start_date.strftime('%Y/%m/%d')
         return None
 
 
@@ -149,19 +158,47 @@ class WorkshopDetailSerializer(serializers.ModelSerializer):
     
     def get_start_date_persian(self, obj):
         if obj.start_date:
-            jdate = jdatetime.date.fromgregorian(date=obj.start_date)
-            return jdate.strftime('%Y/%m/%d')
+            # Check if the date is already in Persian format (year between 1300-1500)
+            if hasattr(obj.start_date, 'year') and 1300 <= obj.start_date.year <= 1500:
+                # Date is already in Persian calendar, just format it
+                return obj.start_date.strftime('%Y/%m/%d')
+            else:
+                # Date is in Gregorian calendar, convert to Persian
+                try:
+                    jdate = jdatetime.date.fromgregorian(date=obj.start_date)
+                    return jdate.strftime('%Y/%m/%d')
+                except Exception:
+                    return obj.start_date.strftime('%Y/%m/%d')
         return None
     
     def get_end_date_persian(self, obj):
         if obj.end_date:
-            jdate = jdatetime.date.fromgregorian(date=obj.end_date)
-            return jdate.strftime('%Y/%m/%d')
+            # Check if the date is already in Persian format (year between 1300-1500)
+            if hasattr(obj.end_date, 'year') and 1300 <= obj.end_date.year <= 1500:
+                # Date is already in Persian calendar, just format it
+                return obj.end_date.strftime('%Y/%m/%d')
+            else:
+                # Date is in Gregorian calendar, convert to Persian
+                try:
+                    jdate = jdatetime.date.fromgregorian(date=obj.end_date)
+                    return jdate.strftime('%Y/%m/%d')
+                except Exception:
+                    return obj.end_date.strftime('%Y/%m/%d')
         return None
     
     def get_registration_deadline_persian(self, obj):
         if obj.registration_deadline:
-            return jdatetime.datetime.fromgregorian(datetime=obj.registration_deadline).strftime('%Y/%m/%d - %H:%M')
+            # Check if the datetime is already in Persian format (year between 1300-1500)
+            if hasattr(obj.registration_deadline, 'year') and 1300 <= obj.registration_deadline.year <= 1500:
+                # Datetime is already in Persian calendar, just format it
+                return obj.registration_deadline.strftime('%Y/%m/%d - %H:%M')
+            else:
+                # Datetime is in Gregorian calendar, convert to Persian
+                try:
+                    jdatetime_obj = jdatetime.datetime.fromgregorian(datetime=obj.registration_deadline)
+                    return jdatetime_obj.strftime('%Y/%m/%d - %H:%M')
+                except Exception:
+                    return obj.registration_deadline.strftime('%Y/%m/%d - %H:%M')
         return None
 
 

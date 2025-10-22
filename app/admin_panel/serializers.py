@@ -10,6 +10,7 @@ from app.workshops.models import (
 )
 from app.packages.models import Package, PackageCategory, PackagePurchase
 import jdatetime
+from datetime import datetime
 
 User = get_user_model()
 
@@ -3153,7 +3154,7 @@ class AdminWorkshopSessionSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'session_number', 'title', 'description', 'scheduled_datetime',
             'scheduled_datetime_persian', 'duration_minutes', 'duration_display',
-            'meeting_link', 'meeting_id', 'meeting_password', 'recording_url',
+            'session_video', 'croom_platform_link',
             'materials', 'homework', 'is_completed', 'has_meeting_link',
             'attendance_count', 'created_at'
         ]
@@ -3161,8 +3162,38 @@ class AdminWorkshopSessionSerializer(serializers.ModelSerializer):
     
     def get_scheduled_datetime_persian(self, obj):
         if obj.scheduled_datetime:
-            return jdatetime.datetime.fromgregorian(datetime=obj.scheduled_datetime).strftime('%Y/%m/%d - %H:%M')
+            # Check if the datetime is already in Persian format (year between 1300-1500)
+            if hasattr(obj.scheduled_datetime, 'year') and 1300 <= obj.scheduled_datetime.year <= 1500:
+                # Datetime is already in Persian calendar, just format it
+                return obj.scheduled_datetime.strftime('%Y/%m/%d - %H:%M')
+            else:
+                # Datetime is in Gregorian calendar, convert to Persian
+                try:
+                    jdatetime_obj = jdatetime.datetime.fromgregorian(datetime=obj.scheduled_datetime)
+                    return jdatetime_obj.strftime('%Y/%m/%d - %H:%M')
+                except Exception:
+                    return obj.scheduled_datetime.strftime('%Y/%m/%d - %H:%M')
         return None
+    
+    def get_duration_display(self, obj):
+        """Return duration in a human-readable format"""
+        hours = obj.duration_minutes // 60
+        minutes = obj.duration_minutes % 60
+        if hours > 0 and minutes > 0:
+            return f"{hours} ساعت و {minutes} دقیقه"
+        elif hours > 0:
+            return f"{hours} ساعت"
+        else:
+            return f"{minutes} دقیقه"
+    
+    def get_has_meeting_link(self, obj):
+        """Check if session has a meeting link"""
+        return bool(obj.croom_platform_link)
+    
+    def get_attendance_count(self, obj):
+        """Get count of attendees who attended"""
+        from app.workshops.models import WorkshopSessionAttendance
+        return WorkshopSessionAttendance.objects.filter(session=obj, attended=True).count()
 
 
 # Package Admin Serializers
@@ -3295,11 +3326,6 @@ class AdminPackageSerializer(serializers.ModelSerializer):
             return f"{hours} ساعت {minutes} دقیقه" if minutes > 0 else f"{hours} ساعت"
         return f"{minutes} دقیقه"
     
-    def get_has_meeting_link(self, obj):
-        return bool(obj.meeting_link)
-    
-    def get_attendance_count(self, obj):
-        return WorkshopSessionAttendance.objects.filter(session=obj, attended=True).count()
 
 
 class AdminWorkshopRegistrationSerializer(serializers.ModelSerializer):
@@ -3736,6 +3762,12 @@ class AdminWorkshopSerializer(serializers.ModelSerializer):
     created_at_persian = serializers.SerializerMethodField()
     published_at_persian = serializers.SerializerMethodField()
     
+    # Persian prices
+    price_persian = serializers.SerializerMethodField()
+    discount_price_persian = serializers.SerializerMethodField()
+    current_price_persian = serializers.SerializerMethodField()
+    installment_amount_persian = serializers.SerializerMethodField()
+    
     # Computed fields
     current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     discount_percentage = serializers.IntegerField(read_only=True)
@@ -3749,8 +3781,9 @@ class AdminWorkshopSerializer(serializers.ModelSerializer):
             'id', 'title', 'slug', 'description', 'short_description',
             'category', 'category_name', 'category_color', 'instructor',
             'instructor_name', 'instructor_email', 'status', 'difficulty',
-            'price', 'discount_price', 'current_price', 'discount_percentage',
-            'payment_type', 'installment_months', 'installment_amount',
+            'price', 'price_persian', 'discount_price', 'discount_price_persian', 
+            'current_price', 'current_price_persian', 'discount_percentage',
+            'payment_type', 'installment_months', 'installment_amount', 'installment_amount_persian',
             'start_date', 'start_date_persian', 'end_date', 'end_date_persian',
             'registration_deadline', 'registration_deadline_persian',
             'total_hours', 'language', 'prerequisites', 'learning_objectives',
@@ -3780,8 +3813,85 @@ class AdminWorkshopSerializer(serializers.ModelSerializer):
     
     def get_start_date_persian(self, obj):
         if obj.start_date:
-            jdate = jdatetime.date.fromgregorian(date=obj.start_date)
-            return jdate.strftime('%Y/%m/%d')
+            # Check if the date is already in Persian format (year between 1300-1500)
+            if hasattr(obj.start_date, 'year') and 1300 <= obj.start_date.year <= 1500:
+                # Date is already in Persian calendar, just format it
+                return obj.start_date.strftime('%Y/%m/%d')
+            else:
+                # Date is in Gregorian calendar, convert to Persian
+                try:
+                    jdate = jdatetime.date.fromgregorian(date=obj.start_date)
+                    return jdate.strftime('%Y/%m/%d')
+                except Exception:
+                    return obj.start_date.strftime('%Y/%m/%d')
+        return None
+    
+    def get_end_date_persian(self, obj):
+        if obj.end_date:
+            # Check if the date is already in Persian format (year between 1300-1500)
+            if hasattr(obj.end_date, 'year') and 1300 <= obj.end_date.year <= 1500:
+                # Date is already in Persian calendar, just format it
+                return obj.end_date.strftime('%Y/%m/%d')
+            else:
+                # Date is in Gregorian calendar, convert to Persian
+                try:
+                    jdate = jdatetime.date.fromgregorian(date=obj.end_date)
+                    return jdate.strftime('%Y/%m/%d')
+                except Exception:
+                    return obj.end_date.strftime('%Y/%m/%d')
+        return None
+    
+    def get_registration_deadline_persian(self, obj):
+        if obj.registration_deadline:
+            # Check if the datetime is already in Persian format (year between 1300-1500)
+            if hasattr(obj.registration_deadline, 'year') and 1300 <= obj.registration_deadline.year <= 1500:
+                # Datetime is already in Persian calendar, just format it
+                return obj.registration_deadline.strftime('%Y/%m/%d %H:%M')
+            else:
+                # Datetime is in Gregorian calendar, convert to Persian
+                try:
+                    jdatetime_obj = jdatetime.datetime.fromgregorian(datetime=obj.registration_deadline)
+                    return jdatetime_obj.strftime('%Y/%m/%d %H:%M')
+                except Exception:
+                    return obj.registration_deadline.strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            try:
+                jdatetime_obj = jdatetime.datetime.fromgregorian(datetime=obj.created_at)
+                return jdatetime_obj.strftime('%Y/%m/%d %H:%M')
+            except Exception:
+                return obj.created_at.strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_published_at_persian(self, obj):
+        if obj.published_at:
+            try:
+                jdatetime_obj = jdatetime.datetime.fromgregorian(datetime=obj.published_at)
+                return jdatetime_obj.strftime('%Y/%m/%d %H:%M')
+            except Exception:
+                return obj.published_at.strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_price_persian(self, obj):
+        if obj.price:
+            return f"{obj.price:,.0f} تومان"
+        return None
+    
+    def get_discount_price_persian(self, obj):
+        if obj.discount_price:
+            return f"{obj.discount_price:,.0f} تومان"
+        return None
+    
+    def get_current_price_persian(self, obj):
+        if obj.current_price:
+            return f"{obj.current_price:,.0f} تومان"
+        return None
+    
+    def get_installment_amount_persian(self, obj):
+        if obj.installment_amount:
+            return f"{obj.installment_amount:,.0f} تومان"
         return None
 
 
