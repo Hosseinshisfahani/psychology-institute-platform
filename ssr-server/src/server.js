@@ -298,7 +298,7 @@ const generateStructuredDataForRoute = (path, query, routeData = {}) => {
     name: siteName,
     description: siteDescription,
     url: siteUrl,
-    logo: `${siteUrl}/images/logo.png`,
+    logo: `${siteUrl}/images/1744027219152.png`,
     address: {
       '@type': 'PostalAddress',
       addressCountry: 'IR',

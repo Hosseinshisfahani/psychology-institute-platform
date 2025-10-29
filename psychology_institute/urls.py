@@ -46,6 +46,7 @@ urlpatterns = [
     path('api/workshops/', include('app.workshops.api_urls')),
     path('api/packages/', include('app.packages.api_urls')),
     path('api/appointments/', include('app.appointments.api_urls')),
+    path('api/payment/', include('app.payment.api_urls')),
     
     # Redirect root to React frontend
     path('', RedirectView.as_view(url='http://localhost:3000', permanent=False), name='home_redirect'),

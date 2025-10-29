@@ -13,6 +13,7 @@ urlpatterns = [
     
     # Registration
     path('<slug:workshop_slug>/register/', api_views.register_workshop, name='register'),
+    path('<slug:workshop_slug>/complete-payment/', api_views.complete_workshop_payment, name='complete_payment'),
     path('<slug:workshop_slug>/add-to-cart/', api_views.add_workshop_to_cart, name='add_to_cart'),
     
     # User workshops

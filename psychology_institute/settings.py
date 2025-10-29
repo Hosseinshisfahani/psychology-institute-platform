@@ -304,3 +304,16 @@ JALALI_DATE_DEFAULT_FORMAT = '%Y/%m/%d'
 JALALI_DATE_DEFAULT_DATETIME_FORMAT = '%Y/%m/%d %H:%M:%S'
 JALALI_DATE_DEFAULT_DATE_FORMAT = '%Y/%m/%d'
 JALALI_DATE_DEFAULT_TIME_FORMAT = '%H:%M:%S'
+
+# Zarinpal Payment Gateway Settings
+# Default to test/sandbox merchant ID - update to production ID when deploying
+ZARINPAL_MERCHANT_ID = config('ZARINPAL_MERCHANT_ID', default='512a778d-3908-4299-948a-fec4245c48ef')
+ZARINPAL_SANDBOX = config('ZARINPAL_SANDBOX', default=True, cast=bool)
+
+# Construct callback URL from site settings
+SITE_URL = config('SITE_URL', default='http://localhost:8000')
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+ZARINPAL_CALLBACK_URL = config(
+    'ZARINPAL_CALLBACK_URL', 
+    default=f'{SITE_URL}/api/payment/verify/'
+)

@@ -232,8 +232,61 @@ def financial_report_api(request):
             'created_at': order.created_at,
         })
     
+    # Get successful payments (completed payments)
+    from app.payment.models import Payment
+    successful_payments = Payment.objects.filter(
+        order__user=user,
+        status='completed'
+    ).select_related('order', 'payment_method').order_by('-completed_at', '-created_at')
+    
+    payments_data = []
+    for payment in successful_payments:
+        # Get workshop info if this payment is for a workshop
+        workshop_title = None
+        for item in payment.order.items.all():
+            if item.item_type == 'workshop':
+                try:
+                    from app.workshops.models import Workshop
+                    workshop = Workshop.objects.get(id=item.item_id)
+                    workshop_title = workshop.title
+                    break
+                except:
+                    pass
+        
+        payments_data.append({
+            'id': payment.id,
+            'order_number': payment.order.order_number,
+            'order_id': payment.order.id,
+            'amount': str(payment.amount),
+            'payment_method': payment.payment_method.name if payment.payment_method else 'نامشخص',
+            'transaction_id': payment.gateway_transaction_id or payment.gateway_response.get('ref_id', ''),
+            'workshop_title': workshop_title,
+            'completed_at': payment.completed_at or payment.created_at,
+            'created_at': payment.created_at,
+        })
+    
+    # Get remaining installments (pending installments with details)
+    remaining_installments = []
+    for registration in workshop_registrations:
+        if hasattr(registration, 'installment_plan'):
+            plan = registration.installment_plan
+            pending_payments = plan.payments.filter(status='pending').order_by('installment_number')
+            for payment in pending_payments:
+                remaining_installments.append({
+                    'id': payment.id,
+                    'workshop_title': registration.workshop.title,
+                    'workshop_slug': registration.workshop.slug,
+                    'installment_number': payment.installment_number,
+                    'total_installments': plan.number_of_installments,
+                    'amount': str(payment.amount),
+                    'due_date': payment.due_date,
+                    'due_date_persian': payment.due_date.strftime('%Y/%m/%d') if payment.due_date else None,
+                    'is_overdue': payment.is_overdue,
+                    'registration_id': registration.id,
+                })
+    
     # Calculate financial summary
-    total_spent = sum(order.total_amount for order in orders)
+    total_spent = sum(order.total_amount for order in orders if order.payment_status == 'completed')
     
     # Count pending installments
     pending_installments_count = sum(
@@ -252,6 +305,8 @@ def financial_report_api(request):
         'package_purchases': packages_data,
         'course_purchases': courses_data,
         'installment_payments': installment_payments,
+        'successful_payments': payments_data,
+        'remaining_installments': remaining_installments,
         'total_spent': str(total_spent),
         'pending_installments_count': pending_installments_count,
         'overdue_installments_count': overdue_installments_count,

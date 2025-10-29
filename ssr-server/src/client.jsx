@@ -24,3 +24,6 @@ if (container) {
 // Clean up global variables
 delete window.__INITIAL_DATA__;
 delete window.__INITIAL_STATE__;
+
+
+

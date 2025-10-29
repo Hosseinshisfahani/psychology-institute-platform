@@ -4,7 +4,7 @@ from rest_framework.decorators import api_view, permission_classes
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
 from decimal import Decimal
 from .models import (
     Workshop, WorkshopCategory, WorkshopSession, WorkshopRegistration,
@@ -16,7 +16,8 @@ from .serializers import (
     WorkshopSessionAttendanceSerializer, InstallmentPaymentSerializer, WorkshopReviewSerializer
 )
 from .services.croom_service import croom_service
-from app.payment.models import Cart, CartItem, Order
+from app.payment.models import Cart, CartItem, Order, OrderItem, Payment, PaymentMethod
+from app.payment.zarinpal import ZarinpalPayment
 from dateutil.relativedelta import relativedelta
 
 
@@ -95,9 +96,106 @@ def register_workshop(request, workshop_slug):
         )
     
     # Check if registration deadline has passed
-    if timezone.now() > workshop.registration_deadline:
+    # Django stores datetimes in UTC when USE_TZ=True
+    now = timezone.now()
+    deadline = workshop.registration_deadline
+    
+    if not deadline:
         return Response(
-            {'error': 'مهلت ثبت‌نام به پایان رسیده است'},
+            {'error': 'مهلت ثبت‌نام تعریف نشده است'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # CRITICAL FIX: Check if deadline is stored as Persian (Jalali) date
+    # Persian years are typically in range 1300-1500 (vs Gregorian 1900-2100+)
+    import jdatetime
+    deadline_utc = deadline
+    
+    if hasattr(deadline, 'year') and 1300 <= deadline.year <= 1500:
+        # Deadline is stored in Persian calendar format - convert to Gregorian
+        try:
+            # Extract time components from original deadline
+            hour = deadline.hour if hasattr(deadline, 'hour') else 0
+            minute = deadline.minute if hasattr(deadline, 'minute') else 0
+            second = deadline.second if hasattr(deadline, 'second') else 0
+            
+            # Create Persian datetime object
+            jdt = jdatetime.datetime(
+                deadline.year,
+                deadline.month,
+                deadline.day,
+                hour,
+                minute,
+                second
+            )
+            # Convert to Gregorian (this gives us a naive datetime)
+            gregorian_dt = jdt.togregorian()
+            
+            # Create new datetime with the converted date but preserve time
+            gregorian_datetime = datetime(
+                gregorian_dt.year,
+                gregorian_dt.month,
+                gregorian_dt.day,
+                hour,
+                minute,
+                second
+            )
+            
+            # If deadline is timezone-aware, apply the same timezone
+            if timezone.is_aware(deadline):
+                # Get the timezone from the original deadline
+                deadline_tz = deadline.tzinfo
+                deadline_utc = timezone.make_aware(gregorian_datetime, deadline_tz)
+                if deadline_tz != timezone.utc:
+                    deadline_utc = deadline_utc.astimezone(timezone.utc)
+            else:
+                # Make it timezone-aware in local timezone, then convert to UTC
+                from django.conf import settings
+                import pytz
+                local_tz = pytz.timezone(settings.TIME_ZONE)
+                deadline_local = local_tz.localize(gregorian_datetime)
+                deadline_utc = deadline_local.astimezone(timezone.utc)
+        except Exception as e:
+            # Fallback: try to handle as regular datetime
+            if timezone.is_naive(deadline):
+                from django.conf import settings
+                import pytz
+                local_tz = pytz.timezone(settings.TIME_ZONE)
+                deadline_utc = local_tz.localize(deadline).astimezone(timezone.utc)
+            else:
+                deadline_utc = deadline.astimezone(timezone.utc) if deadline.tzinfo != timezone.utc else deadline
+    else:
+        # Deadline is already in Gregorian format - ensure timezone-aware
+        if timezone.is_naive(deadline):
+            from django.conf import settings
+            import pytz
+            local_tz = pytz.timezone(settings.TIME_ZONE)
+            deadline_utc = local_tz.localize(deadline).astimezone(timezone.utc)
+        else:
+            deadline_utc = deadline.astimezone(timezone.utc) if deadline.tzinfo != timezone.utc else deadline
+    
+    # Compare in UTC
+    if now > deadline_utc:
+        # Return detailed error for debugging
+        try:
+            deadline_persian = jdatetime.datetime.fromgregorian(datetime=deadline_utc).strftime('%Y/%m/%d - %H:%M')
+            now_persian = jdatetime.datetime.fromgregorian(datetime=now).strftime('%Y/%m/%d - %H:%M')
+        except:
+            deadline_persian = str(deadline_utc)
+            now_persian = str(now)
+        
+        return Response(
+            {
+                'error': 'مهلت ثبت‌نام به پایان رسیده است',
+                'debug': {
+                    'now_utc': str(now),
+                    'deadline_utc': str(deadline_utc),
+                    'original_deadline': str(deadline),
+                    'now_persian': now_persian,
+                    'deadline_persian': deadline_persian,
+                    'difference_days': (deadline_utc - now).days if deadline_utc > now else (now - deadline_utc).days
+                }
+            },
             status=status.HTTP_400_BAD_REQUEST
         )
     
@@ -128,17 +226,21 @@ def register_workshop(request, workshop_slug):
             user=request.user,
             workshop=workshop,
             payment_type=payment_type,
-            total_amount=workshop.current_price,
+            total_amount=Decimal(str(workshop.current_price)),
             status='pending_payment'
         )
         
-        # Create installment plan if installment payment
+        # Calculate payment amount
         if payment_type == 'installment':
+            # First installment amount - ensure it's a Decimal
+            installment_amt = Decimal(str(workshop.installment_amount))
+            payment_amount = installment_amt
+            # Create installment plan
             plan = InstallmentPlan.objects.create(
                 registration=registration,
-                total_amount=workshop.current_price,
+                total_amount=Decimal(str(workshop.current_price)),
                 number_of_installments=workshop.installment_months,
-                installment_amount=workshop.installment_amount
+                installment_amount=installment_amt
             )
             
             # Create installment payment records
@@ -147,15 +249,103 @@ def register_workshop(request, workshop_slug):
                 InstallmentPayment.objects.create(
                     plan=plan,
                     installment_number=i,
-                    amount=workshop.installment_amount,
+                    amount=installment_amt,
                     due_date=due_date + relativedelta(months=i-1),
                     status='pending'
                 )
+        else:
+            # Full payment amount - ensure it's a Decimal
+            payment_amount = Decimal(str(workshop.current_price))
+        
+        # Create order for the workshop
+        order = Order.objects.create(
+            user=request.user,
+            subtotal=payment_amount,
+            discount_amount=Decimal('0'),
+            tax_amount=Decimal('0'),
+            total_amount=payment_amount,
+            payment_status='pending'
+        )
+        
+        # Create order item
+        OrderItem.objects.create(
+            order=order,
+            item_type='workshop',
+            item_id=workshop.id,
+            item_title=workshop.title,
+            quantity=1,
+            unit_price=payment_amount,
+            total_price=payment_amount
+        )
+        
+        # Create payment request to Zarrinpal
+        zarinpal_method = PaymentMethod.objects.filter(
+            payment_type='zarinpal',
+            is_active=True
+        ).first()
+        
+        if not zarinpal_method:
+            zarinpal_method = PaymentMethod.objects.create(
+                name='زرین پال',
+                payment_type='zarinpal',
+                is_active=True
+            )
+        
+        order.payment_method = zarinpal_method
+        order.save()
+        
+        # Initialize Zarinpal payment
+        zarinpal = ZarinpalPayment()
+        payment_result = zarinpal.create_payment_request(
+            order,
+            f"پرداخت کارگاه {workshop.title}"
+        )
+        
+        if not payment_result['success']:
+            # Log detailed error for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            error_details = payment_result.get('details', {})
+            logger.error(
+                f'Zarinpal payment request failed for order {order.id}: '
+                f"{payment_result.get('error')} - Details: {error_details}"
+            )
+            
+            # Return more informative error
+            error_message = payment_result.get('error', 'خطا در ایجاد درخواست پرداخت')
+            error_details_str = payment_result.get('details')
+            
+            return Response(
+                {
+                    'error': error_message,
+                    'details': error_details_str if error_details_str else None
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Link order to registration for later activation
+        # Store registration ID in payment metadata for later activation
+        try:
+            payment = Payment.objects.get(id=payment_result['payment_id'])
+            # Store registration_id in payment gateway_response metadata
+            if payment.gateway_response is None:
+                payment.gateway_response = {}
+            payment.gateway_response['registration_id'] = registration.id
+            payment.save()
+        except Payment.DoesNotExist:
+            # If payment doesn't exist, log error but don't fail
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f'Payment with ID {payment_result.get("payment_id")} not found after creation')
     
     serializer = WorkshopRegistrationSerializer(registration)
     return Response({
-        'message': 'ثبت‌نام شما با موفقیت انجام شد. لطفاً برای تکمیل ثبت‌نام، پرداخت را انجام دهید.',
-        'registration': serializer.data
+        'message': 'ثبت‌نام شما با موفقیت انجام شد. در حال انتقال به درگاه پرداخت...',
+        'registration': serializer.data,
+        'payment_url': payment_result['payment_url'],
+        'authority': payment_result['authority'],
+        'order_id': order.id,
+        'payment_id': payment_result['payment_id']
     }, status=status.HTTP_201_CREATED)
 
 
@@ -342,6 +532,144 @@ def create_workshop_review(request, workshop_slug):
         serializer.save(registration=registration)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def complete_workshop_payment(request, workshop_slug):
+    """Complete payment for an existing workshop registration"""
+    workshop = get_object_or_404(Workshop, slug=workshop_slug)
+    
+    # Check if user has a registration
+    try:
+        registration = WorkshopRegistration.objects.get(
+            user=request.user,
+            workshop=workshop,
+            status='pending_payment'
+        )
+    except WorkshopRegistration.DoesNotExist:
+        return Response(
+            {'error': 'شما در این کارگاه ثبت‌نام نکرده‌اید یا پرداخت شما تکمیل شده است'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Find existing unpaid order for this registration
+    # Look for orders with workshop items that match this workshop
+    unpaid_order = Order.objects.filter(
+        user=request.user,
+        payment_status='pending',
+        items__item_type='workshop',
+        items__item_id=workshop.id
+    ).order_by('-created_at').first()
+    
+    # If no order exists, create a new one
+    with transaction.atomic():
+        if not unpaid_order:
+            # Calculate payment amount
+            if registration.payment_type == 'installment':
+                # Find first unpaid installment
+                if hasattr(registration, 'installment_plan'):
+                    first_unpaid = registration.installment_plan.payments.filter(
+                        status='pending'
+                    ).order_by('installment_number').first()
+                    if first_unpaid:
+                        payment_amount = first_unpaid.amount
+                    else:
+                        return Response(
+                            {'error': 'همه اقساط پرداخت شده است'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                else:
+                    return Response(
+                        {'error': 'خطا در یافتن اطلاعات اقساط'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                # Full payment - calculate remaining amount
+                payment_amount = registration.total_amount - registration.amount_paid
+            
+            # Create new order
+            unpaid_order = Order.objects.create(
+                user=request.user,
+                subtotal=payment_amount,
+                discount_amount=Decimal('0'),
+                tax_amount=Decimal('0'),
+                total_amount=payment_amount,
+                payment_status='pending'
+            )
+            
+            # Create order item
+            OrderItem.objects.create(
+                order=unpaid_order,
+                item_type='workshop',
+                item_id=workshop.id,
+                item_title=workshop.title,
+                quantity=1,
+                unit_price=payment_amount,
+                total_price=payment_amount
+            )
+        else:
+            # Use existing unpaid order - ensure it's refreshed from DB
+            unpaid_order.refresh_from_db()
+    
+    # Get or create Zarinpal payment method
+    zarinpal_method = PaymentMethod.objects.filter(
+        payment_type='zarinpal',
+        is_active=True
+    ).first()
+    
+    if not zarinpal_method:
+        zarinpal_method = PaymentMethod.objects.create(
+            name='زرین پال',
+            payment_type='zarinpal',
+            is_active=True
+        )
+    
+    unpaid_order.payment_method = zarinpal_method
+    unpaid_order.save()
+    
+    # Create payment request
+    zarinpal = ZarinpalPayment()
+    payment_result = zarinpal.create_payment_request(
+        unpaid_order,
+        f"پرداخت کارگاه {workshop.title}"
+    )
+    
+    if not payment_result['success']:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(
+            f'Zarinpal payment request failed for order {unpaid_order.id}: '
+            f"{payment_result.get('error')}"
+        )
+        
+        return Response(
+            {
+                'error': payment_result.get('error', 'خطا در ایجاد درخواست پرداخت'),
+                'details': payment_result.get('details')
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Store registration_id in payment metadata
+    try:
+        payment = Payment.objects.get(id=payment_result['payment_id'])
+        if payment.gateway_response is None:
+            payment.gateway_response = {}
+        payment.gateway_response['registration_id'] = registration.id
+        payment.save()
+    except Payment.DoesNotExist:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f'Payment with ID {payment_result.get("payment_id")} not found after creation')
+    
+    return Response({
+        'message': 'در حال انتقال به درگاه پرداخت...',
+        'payment_url': payment_result['payment_url'],
+        'authority': payment_result['authority'],
+        'order_id': unpaid_order.id,
+        'payment_id': payment_result['payment_id']
+    }, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
