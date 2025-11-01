@@ -41,18 +41,34 @@ class AppointmentListAPIView(generics.ListCreateAPIView):
     def get_queryset(self):
         user = self.request.user
         if user.user_type == 'therapist':
-            return Appointment.objects.filter(therapist=user).select_related(
-                'client', 'therapist', 'appointment_type', 'location'
-            )
+            queryset = Appointment.objects.filter(therapist=user)
         elif user.user_type == 'client':
-            return Appointment.objects.filter(client=user).select_related(
-                'client', 'therapist', 'appointment_type', 'location'
-            )
+            queryset = Appointment.objects.filter(client=user)
         else:
             # Admin or staff can see all appointments
-            return Appointment.objects.all().select_related(
-                'client', 'therapist', 'appointment_type', 'location'
-            )
+            queryset = Appointment.objects.all()
+
+        queryset = queryset.select_related('client', 'therapist', 'appointment_type', 'location')
+
+        # Optional date range filtering
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+
+        if date_from:
+            try:
+                from_date = datetime.strptime(date_from, '%Y-%m-%d').date()
+                queryset = queryset.filter(scheduled_datetime__date__gte=from_date)
+            except ValueError:
+                pass
+
+        if date_to:
+            try:
+                to_date = datetime.strptime(date_to, '%Y-%m-%d').date()
+                queryset = queryset.filter(scheduled_datetime__date__lte=to_date)
+            except ValueError:
+                pass
+
+        return queryset
     
     def perform_create(self, serializer):
         # Set client to current authenticated user

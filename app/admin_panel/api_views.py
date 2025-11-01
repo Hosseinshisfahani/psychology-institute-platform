@@ -7,6 +7,7 @@ from django.db.models import Count, Sum, Avg, Q
 from django.utils import timezone
 from datetime import datetime, timedelta
 from django.contrib.auth import get_user_model
+from django.db.models.functions import TruncDate
 from app.blog.models import Post, Category, Tag, Comment
 from app.courses.models import Course, Enrollment
 # from app.therapy_sessions.models import Session, Therapist, SessionBooking, SessionType  # Removed - therapy_sessions app deleted
@@ -16,6 +17,7 @@ from app.workshops.models import (
     WorkshopSessionAttendance, InstallmentPlan, InstallmentPayment, WorkshopReview
 )
 from app.packages.models import Package, PackageCategory, PackagePurchase
+from app.payment.models import Order, Payment, PaymentMethod
 from .serializers import (
     AdminUserSerializer, AdminPostSerializer, AdminCourseSerializer,
     # AdminSessionSerializer, AdminAppointmentSerializer, AdminTherapistSerializer, AdminSessionTypeSerializer,  # Removed - therapy_sessions app deleted
@@ -297,6 +299,135 @@ def admin_analytics(request):
         ],
         'completion_rate': round(completion_rate, 1)
     })
+
+# ==========================
+# Payments Analytics (Admin)
+# ==========================
+
+@api_view(['GET'])
+@permission_classes([AdminPermission])
+def admin_payments_overview(request):
+    """
+    Overview metrics for payments.
+    Optional query params: date_from, date_to (YYYY-MM-DD)
+    """
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+
+    payments_qs = Payment.objects.all()
+    orders_qs = Order.objects.all()
+
+    # Date filtering on Payment.created_at
+    if date_from:
+        try:
+            df = datetime.strptime(date_from, '%Y-%m-%d')
+            payments_qs = payments_qs.filter(created_at__date__gte=df.date())
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            dt = datetime.strptime(date_to, '%Y-%m-%d')
+            payments_qs = payments_qs.filter(created_at__date__lte=dt.date())
+        except ValueError:
+            pass
+
+    completed_qs = payments_qs.filter(status='completed')
+    failed_qs = payments_qs.filter(status='failed')
+    cancelled_qs = payments_qs.filter(status='cancelled')
+    refunded_qs = payments_qs.filter(status='refunded')
+
+    total_revenue = completed_qs.aggregate(total=Sum('amount'))['total'] or 0
+    total_orders = orders_qs.count()
+    completed_count = completed_qs.count()
+    failed_count = failed_qs.count() + cancelled_qs.count()
+    refunds_count = refunded_qs.count()
+
+    # Method distribution (counts of completed payments by method)
+    method_counts = (
+        completed_qs.values('payment_method__name')
+        .annotate(count=Count('id'))
+        .order_by('-count')
+    )
+
+    return Response({
+        'total_revenue': str(total_revenue),
+        'total_orders': total_orders,
+        'completed_payments': completed_count,
+        'failed_payments': failed_count,
+        'refunds': refunds_count,
+        'methods': [
+            {
+                'name': m['payment_method__name'] or 'نامشخص',
+                'count': m['count'],
+            }
+            for m in method_counts
+        ],
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AdminPermission])
+def admin_payments_revenue_series(request):
+    """
+    Returns daily revenue for the last N days (default 30).
+    Query param: days (int)
+    """
+    try:
+        days = int(request.GET.get('days', '30'))
+    except ValueError:
+        days = 30
+
+    end_date = timezone.now().date()
+    start_date = end_date - timedelta(days=days - 1)
+
+    daily = (
+        Payment.objects.filter(status='completed', created_at__date__range=[start_date, end_date])
+        .annotate(day=TruncDate('created_at'))
+        .values('day')
+        .annotate(revenue=Sum('amount'))
+        .order_by('day')
+    )
+
+    # Map to full series, including zeros for missing days
+    daily_map = {entry['day'].isoformat(): float(entry['revenue']) for entry in daily}
+    series = []
+    for i in range(days):
+        d = start_date + timedelta(days=i)
+        iso = d.isoformat()
+        series.append({'date': iso, 'revenue': daily_map.get(iso, 0)})
+
+    return Response(series)
+
+
+@api_view(['GET'])
+@permission_classes([AdminPermission])
+def admin_recent_payments(request):
+    """
+    Returns recent payments list.
+    Query param: limit (default 25)
+    """
+    try:
+        limit = int(request.GET.get('limit', '25'))
+    except ValueError:
+        limit = 25
+
+    payments = (
+        Payment.objects.select_related('order', 'payment_method')
+        .order_by('-created_at')[:limit]
+    )
+
+    data = []
+    for p in payments:
+        data.append({
+            'id': p.id,
+            'order_number': p.order.order_number if p.order else '',
+            'amount': str(p.amount),
+            'status': p.status,
+            'method': p.payment_method.name if p.payment_method else 'نامشخص',
+            'created_at': p.created_at,
+        })
+
+    return Response(data)
 
 @api_view(['POST'])
 @permission_classes([AdminPermission])

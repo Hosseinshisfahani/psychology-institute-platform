@@ -55,13 +55,13 @@ wait_for_redis
 
 # Run Django management commands
 echo "Running Django migrations..."
-python manage.py migrate --noinput
+python pedendencies/manage.py migrate --noinput
 
 echo "Collecting static files..."
-python manage.py collectstatic --noinput
+python pedendencies/manage.py collectstatic --noinput
 
 echo "Creating superuser if it doesn't exist..."
-python manage.py shell << EOF
+python pedendencies/manage.py shell << EOF
 from django.contrib.auth import get_user_model
 User = get_user_model()
 if not User.objects.filter(email='admin@mrbone.ir').exists():

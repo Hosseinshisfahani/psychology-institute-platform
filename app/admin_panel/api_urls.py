@@ -17,7 +17,8 @@ from .api_views import (
     AdminWorkshopCategoryListAPIView, AdminWorkshopCategoryDetailAPIView,
     bulk_workshop_action, approve_workshop_registration,
     reject_workshop_registration, AdminPackageListAPIView, AdminPackageDetailAPIView,
-    AdminPackageCategoryListAPIView, AdminPackageCategoryDetailAPIView, bulk_package_action
+    AdminPackageCategoryListAPIView, AdminPackageCategoryDetailAPIView, bulk_package_action,
+    admin_payments_overview, admin_payments_revenue_series, admin_recent_payments
 )
 from .upload_api import upload_file
 
@@ -25,6 +26,10 @@ urlpatterns = [
     # Dashboard
     path('dashboard/stats/', DashboardStatsAPIView.as_view(), name='api_admin_dashboard_stats'),
     path('analytics/', admin_analytics, name='api_admin_analytics'),
+    # Payments Analytics
+    path('payments/overview/', admin_payments_overview, name='api_admin_payments_overview'),
+    path('payments/revenue-series/', admin_payments_revenue_series, name='api_admin_payments_revenue_series'),
+    path('payments/recent/', admin_recent_payments, name='api_admin_recent_payments'),
     
     # Users
     path('users/', AdminUserListAPIView.as_view(), name='api_admin_users'),

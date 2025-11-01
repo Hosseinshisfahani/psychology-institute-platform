@@ -35,7 +35,7 @@ services:
   django:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: pedendencies/Dockerfile
       target: production
     container_name: psychology_django_dev
     environment:
@@ -62,9 +62,9 @@ services:
       redis:
         condition: service_healthy
     command: >
-      sh -c "python manage.py migrate &&
-             python manage.py collectstatic --noinput &&
-             python manage.py runserver 0.0.0.0:8000"
+      sh -c "python pedendencies/manage.py migrate &&
+             python pedendencies/manage.py collectstatic --noinput &&
+             python pedendencies/manage.py runserver 0.0.0.0:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health/', timeout=10)"]
       interval: 30s
@@ -93,7 +93,7 @@ services:
   celery:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: pedendencies/Dockerfile
       target: production
     container_name: psychology_celery_dev
     environment:

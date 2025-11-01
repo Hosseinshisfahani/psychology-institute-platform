@@ -59,12 +59,12 @@ jobs:                                  # A workflow is made of jobs (run in para
         with:
           python-version: '3.11'        # Version to install
           cache: 'pip'                  # Enable pip cache between runs
-          cache-dependency-path: requirements.txt  # File that keys the cache
+          cache-dependency-path: pedendencies/requirements.txt  # File that keys the cache
 
       - name: Install Python dependencies
         run: |                          # Run shell commands
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r pedendencies/requirements.txt
           pip install "psycopg[binary]>=3.1"  # DB driver (binary wheel for speed)
 
       - name: Wait for Postgres (up to 60s)    # Actively poll until DB is ready
@@ -98,8 +98,8 @@ jobs:                                  # A workflow is made of jobs (run in para
           DATABASE_HOST: localhost
           DATABASE_PORT: '5432'
         run: |
-          python manage.py migrate --noinput --check   # Apply migrations (fail if issues)
-          python manage.py test --no-input -v 2        # Run tests with verbosity
+          python pedendencies/manage.py migrate --noinput --check   # Apply migrations (fail if issues)
+          python pedendencies/manage.py test --no-input -v 2        # Run tests with verbosity
 
   frontend:                              # Second job (runs in parallel with backend)
     name: Frontend (React)               # Display name

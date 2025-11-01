@@ -140,7 +140,7 @@ def main():
     print("🔄 If admin is still in English, try:")
     print("   1. Clear browser cache (Ctrl+Shift+R)")
     print("   2. Restart Django server")
-    print("   3. Run: python manage.py compilemessages")
+    print("   3. Run: python pedendencies/manage.py compilemessages")
     print("")
 
 

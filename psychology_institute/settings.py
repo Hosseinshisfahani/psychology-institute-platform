@@ -86,7 +86,7 @@ ROOT_URLCONF = 'psychology_institute.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [BASE_DIR / 'pedendencies/templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -110,7 +110,7 @@ WSGI_APPLICATION = 'psychology_institute.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': config('DATABASE_ENGINE', default='django.db.backends.sqlite3'),
-        'NAME': config('DATABASE_NAME', default=BASE_DIR / 'db.sqlite3'),
+        'NAME': config('DATABASE_NAME', default=BASE_DIR / 'pedendencies/db.sqlite3'),
         'USER': config('DATABASE_USER', default=''),
         'PASSWORD': config('DATABASE_PASSWORD', default=''),
         'HOST': config('DATABASE_HOST', default=''),
@@ -158,7 +158,7 @@ LANGUAGES = [
 ]
 
 LOCALE_PATHS = [
-    BASE_DIR / 'locale',
+    BASE_DIR / 'pedendencies/locale',
 ]
 
 
@@ -168,11 +168,11 @@ LOCALE_PATHS = [
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
-    BASE_DIR / 'static',
+    BASE_DIR / 'pedendencies/static',
 ]
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = BASE_DIR / 'pedendencies/media'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

@@ -40,7 +40,7 @@ services:
   django:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: pedendencies/Dockerfile
       target: production
     container_name: psychology_django_prod
     environment:
@@ -67,8 +67,8 @@ services:
       redis:
         condition: service_healthy
     command: >
-      sh -c "python manage.py migrate &&
-             python manage.py collectstatic --noinput &&
+      sh -c "python pedendencies/manage.py migrate &&
+             python pedendencies/manage.py collectstatic --noinput &&
              gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 120 --max-requests 1000 --max-requests-jitter 100 psychology_institute.wsgi:application"
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health/', timeout=10)"]
@@ -99,7 +99,7 @@ services:
   # Nginx Reverse Proxy
   nginx:
     build:
-      context: ./nginx
+      context: ./pedendencies/nginx
       dockerfile: Dockerfile
     container_name: psychology_nginx_prod
     ports:
@@ -108,7 +108,7 @@ services:
     volumes:
       - static_volume_prod:/var/www/static
       - media_volume_prod:/var/www/media
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./pedendencies/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       # Uncomment for SSL certificates
       # - /etc/letsencrypt:/etc/letsencrypt:ro
       # - /var/www/certbot:/var/www/certbot
@@ -128,7 +128,7 @@ services:
   celery:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: pedendencies/Dockerfile
       target: production
     container_name: psychology_celery_prod
     environment:
@@ -159,7 +159,7 @@ services:
   celery-beat:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: pedendencies/Dockerfile
       target: production
     container_name: psychology_celery_beat_prod
     environment:

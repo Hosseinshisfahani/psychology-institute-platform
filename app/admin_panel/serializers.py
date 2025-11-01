@@ -3353,6 +3353,22 @@ class AdminWorkshopRegistrationSerializer(serializers.ModelSerializer):
             return jdatetime.datetime.fromgregorian(datetime=obj.registered_at).strftime('%Y/%m/%d %H:%M')
         return None
 
+    def get_completed_at_persian(self, obj):
+        if obj.completed_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.completed_at).strftime('%Y/%m/%d %H:%M')
+        return None
+
+    def get_last_accessed_persian(self, obj):
+        if obj.last_accessed:
+            return jdatetime.datetime.fromgregorian(datetime=obj.last_accessed).strftime('%Y/%m/%d %H:%M')
+        return None
+
+    def get_payment_status(self, obj):
+        if obj.payment_type == 'full_payment':
+            return 'پرداخت کامل' if obj.amount_paid >= obj.total_amount else 'در انتظار پرداخت'
+        else:
+            return 'قسطی' if obj.amount_paid > 0 else 'در انتظار پرداخت'
+
 
 # Package Admin Serializers
 

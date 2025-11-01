@@ -404,9 +404,37 @@ def workshop_session_access(request, session_id):
     # Check if payment is completed (at least first installment)
     if registration.status == 'pending_payment':
         return Response(
-            {'error': 'لطفاً ابتدا پرداخت را تکمیل کنید'},
+            {
+                'error': 'لطفاً ابتدا پرداخت را تکمیل کنید',
+                'banner': {
+                    'type': 'warning',
+                    'message': 'برای دسترسی به جلسات، ابتدا پرداخت خود را تکمیل کنید.'
+                }
+            },
             status=status.HTTP_403_FORBIDDEN
         )
+
+    # Restrict access if there is any overdue installment
+    try:
+        plan = registration.installment_plan
+        overdue_exists = plan.payments.filter(status='pending', due_date__lt=timezone.now().date()).exists()
+        if overdue_exists:
+            # Optionally mark registration as suspended
+            if registration.status != 'suspended':
+                registration.status = 'suspended'
+                registration.save(update_fields=['status'])
+            return Response(
+                {
+                    'error': 'به علت عدم پرداخت قسط سررسید شده، دسترسی شما محدود شده است',
+                    'banner': {
+                        'type': 'error',
+                        'message': 'قسط بعدی شما سررسید شده است. تا زمان تسویه، دسترسی به محتوا محدود است.'
+                    }
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+    except WorkshopRegistration.installment_plan.RelatedObjectDoesNotExist:
+        pass
     
     # Get or create attendance record
     attendance, created = WorkshopSessionAttendance.objects.get_or_create(
@@ -486,6 +514,11 @@ def workshop_installments(request, workshop_slug):
         
         plan = registration.installment_plan
         payments = plan.payments.all().order_by('installment_number')
+
+        # Determine next pending payment
+        next_payment = payments.filter(status='pending').order_by('due_date', 'installment_number').first()
+        has_overdue = payments.filter(status='pending', due_date__lt=timezone.now().date()).exists()
+        next_payment_data = InstallmentPaymentSerializer(next_payment).data if next_payment else None
         
         return Response({
             'plan': {
@@ -494,7 +527,9 @@ def workshop_installments(request, workshop_slug):
                 'installment_amount': float(plan.installment_amount),
                 'total_paid': float(plan.total_paid),
                 'remaining_amount': float(plan.remaining_amount),
-                'is_fully_paid': plan.is_fully_paid
+                'is_fully_paid': plan.is_fully_paid,
+                'has_overdue': has_overdue,
+                'next_payment': next_payment_data
             },
             'payments': InstallmentPaymentSerializer(payments, many=True).data
         })

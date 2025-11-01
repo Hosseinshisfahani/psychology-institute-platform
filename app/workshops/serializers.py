@@ -31,7 +31,18 @@ class WorkshopSessionSerializer(serializers.ModelSerializer):
     
     def get_scheduled_datetime_persian(self, obj):
         if obj.scheduled_datetime:
-            return jdatetime.datetime.fromgregorian(datetime=obj.scheduled_datetime).strftime('%Y/%m/%d - %H:%M')
+            dt = obj.scheduled_datetime
+            # Some deployments have stored Persian (Jalali) datetimes directly.
+            # If the year looks like a Persian year (1300-1500), just format it.
+            try:
+                if hasattr(dt, 'year') and 1300 <= dt.year <= 1500:
+                    return dt.strftime('%Y/%m/%d - %H:%M')
+                # Otherwise, convert from Gregorian to Persian
+                jdt = jdatetime.datetime.fromgregorian(datetime=dt)
+                return jdt.strftime('%Y/%m/%d - %H:%M')
+            except Exception:
+                # Fallback safe formatting
+                return dt.strftime('%Y/%m/%d - %H:%M')
         return None
     
     def get_has_recording(self, obj):
@@ -146,12 +157,20 @@ class WorkshopDetailSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             try:
                 registration = WorkshopRegistration.objects.get(user=request.user, workshop=obj)
-                return {
+                status_payload = {
                     'is_registered': True,
                     'status': registration.status,
                     'payment_type': registration.payment_type,
                     'progress_percentage': registration.progress_percentage,
                 }
+                # Attach next payment info for installment registrations
+                if registration.payment_type == 'installment' and hasattr(registration, 'installment_plan'):
+                    payments_qs = registration.installment_plan.payments.all().order_by('due_date', 'installment_number')
+                    next_payment = payments_qs.filter(status='pending').first()
+                    overdue_exists = payments_qs.filter(status='pending', due_date__lt=jdatetime.date.today().togregorian()).exists()
+                    status_payload['has_overdue'] = overdue_exists
+                    status_payload['next_payment'] = InstallmentPaymentSerializer(next_payment).data if next_payment else None
+                return status_payload
             except WorkshopRegistration.DoesNotExist:
                 return {'is_registered': False}
         return {'is_registered': False}

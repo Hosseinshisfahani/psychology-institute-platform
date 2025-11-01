@@ -47,15 +47,15 @@ if ! docker info > /dev/null 2>&1; then
 fi
 
 # Check if docker-compose file exists
-COMPOSE_FILE="docker-compose.yml"
+COMPOSE_FILE="pedendencies/docker-compose.yml"
 if [ "$ENVIRONMENT" = "production" ]; then
-    COMPOSE_FILE="docker-compose.prod.yml"
+    COMPOSE_FILE="pedendencies/docker-compose.prod.yml"
     
     # Check if production env file exists
     if [ ! -f ".env.production" ]; then
         print_warning ".env.production not found. Creating from template..."
-        if [ -f "env.production.example" ]; then
-            cp env.production.example .env.production
+        if [ -f "pedendencies/env.example" ]; then
+            cp pedendencies/env.example .env.production
             print_warning "Please edit .env.production with your actual values before deploying!"
             print_warning "Run: nano .env.production"
             exit 1
@@ -151,8 +151,8 @@ print_status "Useful commands:"
 echo "  - View logs: docker-compose -f $COMPOSE_FILE logs -f"
 echo "  - Stop services: docker-compose -f $COMPOSE_FILE down"
 echo "  - Restart services: docker-compose -f $COMPOSE_FILE restart"
-echo "  - Access Django shell: docker-compose -f $COMPOSE_FILE exec django python manage.py shell"
-echo "  - Create superuser: docker-compose -f $COMPOSE_FILE exec django python manage.py createsuperuser"
+echo "  - Access Django shell: docker-compose -f $COMPOSE_FILE exec django python pedendencies/manage.py shell"
+echo "  - Create superuser: docker-compose -f $COMPOSE_FILE exec django python pedendencies/manage.py createsuperuser"
 
 if [ "$ENVIRONMENT" = "production" ]; then
     echo "  - Database backup: docker-compose -f $COMPOSE_FILE exec postgres pg_dump -U postgres psychology_institute > backup.sql"

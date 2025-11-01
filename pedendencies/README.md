@@ -101,10 +101,10 @@ cd psychology-institute
 2. **راه‌اندازی محیط توسعه**
 ```bash
 # اجرای تمام سرویس‌ها
-docker-compose up --build
+docker-compose -f pedendencies/docker-compose.yml up --build
 
 # یا در پس‌زمینه
-docker-compose up -d --build
+docker-compose -f pedendencies/docker-compose.yml up -d --build
 ```
 
 3. **دسترسی به اپلیکیشن**
@@ -114,7 +114,7 @@ docker-compose up -d --build
 
 4. **ایجاد ابرکاربر**
 ```bash
-docker-compose exec django python manage.py createsuperuser
+docker-compose -f pedendencies/docker-compose.yml exec django python pedendencies/manage.py createsuperuser
 ```
 
 #### راه‌اندازی Production
@@ -122,7 +122,7 @@ docker-compose exec django python manage.py createsuperuser
 1. **تنظیم متغیرهای محیطی**
 ```bash
 # کپی کردن فایل نمونه
-cp env.production.example .env.production
+cp pedendencies/env.example .env.production
 
 # ویرایش فایل با اطلاعات واقعی
 nano .env.production
@@ -136,10 +136,10 @@ python -c "from django.core.management.utils import get_random_secret_key; print
 3. **راه‌اندازی Production**
 ```bash
 # راه‌اندازی اولیه
-docker-compose -f docker-compose.prod.yml up -d --build
+docker-compose -f pedendencies/docker-compose.prod.yml up -d --build
 
 # یا استفاده از اسکریپت deployment
-./deploy.sh production
+pedendencies/scripts/deploy.sh production
 ```
 
 4. **دسترسی به اپلیکیشن Production**
@@ -171,33 +171,33 @@ source venv/bin/activate  # در Windows: venv\Scripts\activate
 
 3. **نصب وابستگی‌ها**
 ```bash
-pip install -r requirements.txt
+pip install -r pedendencies/requirements.txt
 ```
 
 4. **تنظیم متغیرهای محیطی**
 ```bash
-cp env.example .env
+cp pedendencies/env.example .env
 # فایل .env را ویرایش کنید
 ```
 
 5. **اجرای مایگریشن‌ها**
 ```bash
-python manage.py migrate
+python pedendencies/manage.py migrate
 ```
 
 6. **ایجاد ابرکاربر**
 ```bash
-python manage.py createsuperuser
+python pedendencies/manage.py createsuperuser
 ```
 
 7. **ایجاد داده‌های نمونه**
 ```bash
-python manage.py populate_sample_data
+python pedendencies/manage.py populate_sample_data
 ```
 
 8. **اجرای سرور**
 ```bash
-python manage.py runserver
+python pedendencies/manage.py runserver
 ```
 
 ## Docker Deployment
@@ -207,46 +207,46 @@ python manage.py runserver
 #### Development
 ```bash
 # اجرای سرویس‌ها
-docker-compose up --build
+docker-compose -f pedendencies/docker-compose.yml up --build
 
 # اجرا در پس‌زمینه
-docker-compose up -d --build
+docker-compose -f pedendencies/docker-compose.yml up -d --build
 
 # مشاهده لاگ‌ها
-docker-compose logs -f
+docker-compose -f pedendencies/docker-compose.yml logs -f
 
 # توقف سرویس‌ها
-docker-compose down
+docker-compose -f pedendencies/docker-compose.yml down
 
 # دسترسی به Django shell
-docker-compose exec django python manage.py shell
+docker-compose -f pedendencies/docker-compose.yml exec django python pedendencies/manage.py shell
 
 # اجرای مایگریشن
-docker-compose exec django python manage.py migrate
+docker-compose -f pedendencies/docker-compose.yml exec django python pedendencies/manage.py migrate
 
 # جمع‌آوری فایل‌های استاتیک
-docker-compose exec django python manage.py collectstatic
+docker-compose -f pedendencies/docker-compose.yml exec django python pedendencies/manage.py collectstatic
 ```
 
 #### Production
 ```bash
 # راه‌اندازی اولیه
-docker-compose -f docker-compose.prod.yml up -d --build
+docker-compose -f pedendencies/docker-compose.prod.yml up -d --build
 
 # استفاده از اسکریپت deployment
-./deploy.sh production
+pedendencies/scripts/deploy.sh production
 
 # مشاهده لاگ‌ها
-docker-compose -f docker-compose.prod.yml logs -f
+docker-compose -f pedendencies/docker-compose.prod.yml logs -f
 
 # بک‌آپ دیتابیس
-docker-compose -f docker-compose.prod.yml exec postgres pg_dump -U postgres psychology_institute > backup.sql
+docker-compose -f pedendencies/docker-compose.prod.yml exec postgres pg_dump -U postgres psychology_institute > backup.sql
 
 # توقف سرویس‌ها
-docker-compose -f docker-compose.prod.yml down
+docker-compose -f pedendencies/docker-compose.prod.yml down
 
 # راه‌اندازی مجدد
-docker-compose -f docker-compose.prod.yml restart
+docker-compose -f pedendencies/docker-compose.prod.yml restart
 ```
 
 ### تنظیم SSL (HTTPS)
@@ -266,13 +266,13 @@ sudo certbot certonly --webroot -w /var/www/certbot -d mrbone.ir -d www.mrbone.i
 
 3. **فعال‌سازی HTTPS در Nginx**
 ```bash
-# ویرایش فایل nginx/nginx.conf
+# ویرایش فایل pedendencies/nginx/nginx.conf
 # حذف کامنت از بخش HTTPS server
 ```
 
 4. **راه‌اندازی مجدد Nginx**
 ```bash
-docker-compose -f docker-compose.prod.yml restart nginx
+docker-compose -f pedendencies/docker-compose.prod.yml restart nginx
 ```
 
 ## ساختار پروژه
@@ -287,15 +287,19 @@ psychology_institute/
 ├── payment/                 # سیستم پرداخت
 ├── reports/                 # گزارش‌گیری
 ├── sales/                   # فروش به موسسات
-├── templates/               # قالب‌های HTML
-├── static/                  # فایل‌های استاتیک
-├── media/                   # فایل‌های رسانه‌ای
-├── nginx/                   # تنظیمات Nginx
-├── scripts/                 # اسکریپت‌های کمکی
-├── Dockerfile               # Docker برای Backend
-├── docker-compose.yml       # Docker Compose برای Development
-├── docker-compose.prod.yml  # Docker Compose برای Production
-└── deploy.sh                # اسکریپت Deployment
+├── pedendencies/
+│   ├── templates/               # قالب‌های HTML
+│   ├── static/                  # فایل‌های استاتیک
+│   ├── media/                   # فایل‌های رسانه‌ای
+│   ├── nginx/                   # تنظیمات Nginx
+│   ├── scripts/                 # اسکریپت‌های کمکی
+│   ├── Dockerfile               # Docker برای Backend
+│   ├── docker-compose.yml       # Docker Compose برای Development
+│   ├── docker-compose.prod.yml  # Docker Compose برای Production
+│   ├── requirements.txt         # وابستگی‌های Python
+│   ├── env.example              # نمونه فایل متغیرهای محیطی
+│   ├── README.md                # مستندات
+│   └── .gitignore               # فایل‌های Git ignore
 ```
 
 ## تنظیمات مهم
