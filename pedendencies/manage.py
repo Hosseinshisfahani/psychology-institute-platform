@@ -2,6 +2,17 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+from pathlib import Path
+
+# Add the project root to Python path so manage.py can find psychology_institute
+# This allows manage.py to work from pedendencies/ directory
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+# Change to project root directory so Django can find all modules and paths correctly
+# This ensures that when Django looks for files relative to BASE_DIR in settings.py,
+# it will find them correctly
+os.chdir(PROJECT_ROOT)
 
 
 def main():
