@@ -19,6 +19,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     profile = UserProfileSerializer(read_only=True)
     full_name = serializers.CharField(read_only=True)
+    # Explicitly define national_id to override automatic UniqueValidator
+    national_id = serializers.CharField(max_length=10, required=False, allow_blank=True, allow_null=True)
     
     class Meta:
         model = User
@@ -29,6 +31,28 @@ class UserSerializer(serializers.ModelSerializer):
             'is_active', 'is_verified', 'is_staff', 'date_joined', 'last_login', 'profile'
         ]
         read_only_fields = ['id', 'date_joined', 'last_login', 'is_verified', 'is_staff']
+    
+    def validate_national_id(self, value):
+        """Validate national_id uniqueness, excluding current user instance"""
+        # Convert empty string to None to match model's blank=True, null=True
+        if value == '':
+            return None
+            
+        if value:
+            # Get the current instance if updating, or None if creating
+            instance = self.instance
+            
+            # Check if another user with this national_id exists
+            queryset = User.objects.filter(national_id=value)
+            
+            # If updating, exclude the current instance from the check
+            if instance:
+                queryset = queryset.exclude(pk=instance.pk)
+            
+            if queryset.exists():
+                raise serializers.ValidationError("کاربری با این کد ملی قبلا ثبت شده")
+        
+        return value
     
     def to_representation(self, instance):
         """Convert profile_image to full URL in the response"""

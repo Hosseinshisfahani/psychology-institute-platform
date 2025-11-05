@@ -4,15 +4,22 @@ import os
 import sys
 from pathlib import Path
 
-# Add the project root to Python path so manage.py can find psychology_institute
-# This allows manage.py to work from pedendencies/ directory
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
+# Get the absolute path to this manage.py file
+MANAGE_PY_PATH = Path(__file__).resolve()
 
-# Change to project root directory so Django can find all modules and paths correctly
-# This ensures that when Django looks for files relative to BASE_DIR in settings.py,
-# it will find them correctly
-os.chdir(PROJECT_ROOT)
+# Project root is the parent of pedendencies directory
+PROJECT_ROOT = MANAGE_PY_PATH.parent.parent
+
+# Add project root to Python path so we can import psychology_institute module
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+# Update sys.argv[0] to absolute path for Django's autoreload
+sys.argv[0] = str(MANAGE_PY_PATH)
+
+# Change working directory to project root
+# This ensures Django finds templates, static files, etc. with correct relative paths
+os.chdir(str(PROJECT_ROOT))
 
 
 def main():
