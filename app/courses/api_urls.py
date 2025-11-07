@@ -10,13 +10,15 @@ from .api_views import (
     user_purchases,
     purchase_course,
     CourseListAPIView,
-    CourseCategoryListAPIView
+    CourseCategoryListAPIView,
+    CourseDetailAPIView
 )
 
 urlpatterns = [
     # Course listing and categories
     path('', CourseListAPIView.as_view(), name='api_course_list'),
     path('categories/', CourseCategoryListAPIView.as_view(), name='api_course_categories'),
+    path('<slug:slug>/', CourseDetailAPIView.as_view(), name='api_course_detail'),
     
     # Course learning
     path('learn/<slug:slug>/', CourseLearnAPIView.as_view(), name='api_course_learn'),

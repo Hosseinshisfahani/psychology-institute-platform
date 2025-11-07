@@ -107,6 +107,35 @@ class Course(models.Model):
         return 0
 
 
+class CourseVideo(models.Model):
+    """Videos associated with a course"""
+    
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='videos', verbose_name='دوره')
+    title = models.CharField(max_length=200, verbose_name='عنوان')
+    description = models.TextField(blank=True, null=True, verbose_name='توضیحات')
+    video_file = models.FileField(upload_to='courses/videos/', blank=True, null=True, verbose_name='فایل ویدیو')
+    video_url = models.URLField(blank=True, null=True, verbose_name='لینک ویدیو')
+    attachment_file = models.FileField(upload_to='courses/videos/attachments/', blank=True, null=True, verbose_name='فایل پیوست')
+    duration_minutes = models.PositiveIntegerField(blank=True, null=True, verbose_name='مدت دقیقه')
+    order = models.PositiveIntegerField(default=0, verbose_name='ترتیب')
+    is_preview = models.BooleanField(default=False, verbose_name='پیش‌نمایش')
+    allow_download = models.BooleanField(default=False, verbose_name='اجازه دانلود')
+    is_active = models.BooleanField(default=True, verbose_name='فعال')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
+    
+    class Meta:
+        verbose_name = _('ویدیو دوره')
+        verbose_name_plural = _('ویدیوهای دوره')
+        ordering = ['order', 'created_at']
+        indexes = [
+            models.Index(fields=['course', 'order']),
+        ]
+    
+    def __str__(self):
+        return f"{self.course.title} - {self.title}"
+
+
 class CourseModule(models.Model):
     """Modules within a course"""
     

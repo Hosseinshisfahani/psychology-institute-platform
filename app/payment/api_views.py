@@ -29,24 +29,45 @@ class CartAPIView(APIView):
         # Format response for frontend
         items_data = []
         for item in cart.items.all():
-            # Fetch actual item title based on type
-            item_title = f"{item.get_item_type_display()} #{item.item_id}"
-            items_data.append({
+            item_data = {
                 'id': item.id,
                 'item_type': item.item_type,
                 'item_id': item.item_id,
                 'quantity': item.quantity,
                 'unit_price': float(item.unit_price),
                 'total_price': float(item.total_price),
-                'item_title': item_title
-            })
+                'added_at': item.added_at.isoformat() if item.added_at else None
+            }
+            
+            # Fetch full course details if item is a course
+            if item.item_type == 'course':
+                try:
+                    from app.courses.models import Course
+                    course = Course.objects.select_related('category', 'instructor').get(id=item.item_id)
+                    item_data['course'] = {
+                        'id': course.id,
+                        'title': course.title,
+                        'slug': course.slug,
+                        'thumbnail': request.build_absolute_uri(course.thumbnail.url) if course.thumbnail else None,
+                        'price': float(course.price) if course.price else 0,
+                        'discount_price': float(course.discount_price) if course.discount_price else None,
+                        'instructor_name': course.instructor.full_name if course.instructor else 'نامشخص'
+                    }
+                except Course.DoesNotExist:
+                    # Course was deleted, skip it or mark as invalid
+                    item_data['course'] = None
+            else:
+                # For other item types, just add the title
+                item_data['item_title'] = f"{item.get_item_type_display()} #{item.item_id}"
+            
+            items_data.append(item_data)
         
         return Response({
             'items': items_data,
+            'total_items': cart.item_count,
             'subtotal': float(cart.total_amount),
             'discount': 0,  # TODO: Implement discount calculation
-            'total': float(cart.total_amount),
-            'item_count': cart.item_count
+            'total': float(cart.total_amount)
         })
     
     @transaction.atomic

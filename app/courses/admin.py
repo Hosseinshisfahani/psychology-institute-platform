@@ -1,9 +1,16 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from .models import (
-    CourseCategory, Course, CourseModule, Lesson, 
+    CourseCategory, Course, CourseVideo, CourseModule, Lesson, 
     Enrollment, LessonProgress, CoursePurchase, CourseReview, Coupon
 )
+
+
+class CourseVideoInline(admin.TabularInline):
+    """Inline admin for course videos"""
+    model = CourseVideo
+    extra = 1
+    fields = ['title', 'description', 'video_file', 'video_url', 'attachment_file', 'duration_minutes', 'order', 'is_preview', 'allow_download', 'is_active']
 
 
 class LessonInline(admin.TabularInline):
@@ -24,6 +31,37 @@ class CourseCategoryAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at',)
 
 
+@admin.register(CourseVideo)
+class CourseVideoAdmin(admin.ModelAdmin):
+    """Admin configuration for CourseVideo model"""
+    
+    list_display = ('title', 'course', 'order', 'duration_minutes', 'is_preview', 'is_active', 'created_at')
+    list_filter = ('is_active', 'is_preview', 'allow_download', 'created_at', 'course__category')
+    search_fields = ('title', 'description', 'course__title')
+    ordering = ('course', 'order', 'created_at')
+    readonly_fields = ('created_at', 'updated_at')
+    
+    fieldsets = (
+        (None, {
+            'fields': ('course', 'title', 'description', 'order')
+        }),
+        (_('Video'), {
+            'fields': ('video_file', 'video_url', 'duration_minutes')
+        }),
+        (_('Attachment'), {
+            'fields': ('attachment_file',),
+            'description': _('فایل پیوست برای ویدیو (مثل PDF، فایل تمرین، و غیره)')
+        }),
+        (_('Settings'), {
+            'fields': ('is_preview', 'allow_download', 'is_active')
+        }),
+        (_('Timestamps'), {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
     """Admin configuration for Course model"""
@@ -33,6 +71,7 @@ class CourseAdmin(admin.ModelAdmin):
     search_fields = ('title', 'description', 'instructor__first_name', 'instructor__last_name')
     prepopulated_fields = {'slug': ('title',)}
     readonly_fields = ('created_at', 'updated_at', 'enrollment_count', 'rating', 'review_count')
+    inlines = [CourseVideoInline]
     
     fieldsets = (
         (None, {

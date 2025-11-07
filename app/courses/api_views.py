@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Course, Lesson, Enrollment, LessonProgress, Coupon, CoursePurchase, CourseCategory
-from .serializers import CourseDetailSerializer, LessonProgressSerializer, EnrollmentSerializer, CourseListSerializer, CourseCategorySerializer
+from .serializers import CourseDetailSerializer, LessonProgressSerializer, EnrollmentSerializer, CourseListSerializer, CourseCategorySerializer, CourseDetailPublicSerializer
 from app.payment.models import Cart, CartItem
 
 class CourseLearnAPIView(generics.RetrieveAPIView):
@@ -350,3 +350,20 @@ class CourseCategoryListAPIView(generics.ListAPIView):
     
     def get_queryset(self):
         return CourseCategory.objects.filter(is_active=True).order_by('name')
+
+
+class CourseDetailAPIView(generics.RetrieveAPIView):
+    """
+    API view for course detail page (public)
+    """
+    serializer_class = CourseDetailPublicSerializer
+    permission_classes = [permissions.AllowAny]
+    lookup_field = 'slug'
+    
+    def get_queryset(self):
+        return Course.objects.filter(status='published').select_related('category', 'instructor').prefetch_related('videos')
+    
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context

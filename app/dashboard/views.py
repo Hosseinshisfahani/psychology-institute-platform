@@ -211,7 +211,7 @@ class CustomLoginView(BaseLoginView):
     redirect_authenticated_user = True
     
     def get_success_url(self):
-        return reverse_lazy('dashboard:dashboard')
+        return '/'
     
     def form_valid(self, form):
         # Handle remember me functionality
@@ -231,7 +231,7 @@ class CustomSignupView(FormView):
     """Custom signup view"""
     template_name = 'account/signup.html'
     form_class = CustomSignupForm
-    success_url = reverse_lazy('dashboard:dashboard')
+    success_url = '/'
     
     def form_valid(self, form):
         user = form.save()

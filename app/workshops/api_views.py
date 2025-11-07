@@ -442,20 +442,21 @@ def workshop_session_access(request, session_id):
         session=session
     )
     
-    # Get personalized meeting link
-    meeting_link = session.meeting_link
-    if meeting_link and request.user:
-        personalized_link = croom_service.get_meeting_link(
-            session.meeting_id,
-            {'name': request.user.full_name, 'email': request.user.email}
-        )
-        if personalized_link:
-            meeting_link = personalized_link
+    # Get meeting link from croom_platform_link
+    meeting_link = session.croom_platform_link
+    
+    # Note: If personalized meeting links are needed, meeting_id should be stored in the model
+    # or extracted from the croom_platform_link URL. For now, we use the platform link directly.
+    
+    # Get recording URL from session_video if available
+    recording_url = None
+    if session.session_video:
+        recording_url = session.session_video.url
     
     return Response({
         'session': WorkshopSessionSerializer(session).data,
         'meeting_link': meeting_link,
-        'recording_url': session.recording_url,
+        'recording_url': recording_url,
         'can_join': session.scheduled_datetime and (
             session.scheduled_datetime - timezone.timedelta(minutes=15) <= timezone.now()
         ),
