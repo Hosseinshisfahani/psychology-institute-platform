@@ -50,6 +50,7 @@ urlpatterns = [
     path('api/packages/', include('app.packages.api_urls')),
     path('api/appointments/', include('app.appointments.api_urls')),
     path('api/payment/', include('app.payment.api_urls')),
+    path('api/chat/', include('app.chat.api_urls')),
     
     # Redirect root to React frontend
     path('', RedirectView.as_view(url='http://localhost:3000', permanent=False), name='home_redirect'),
@@ -66,6 +67,7 @@ urlpatterns = [
     path('workshops/', include('app.workshops.urls')),
     path('packages/', include('app.packages.urls')),
     path('appointments/', include('app.appointments.urls')),
+    path('chat/', include('app.chat.urls')),
 ]
 
 # Serve media files in development

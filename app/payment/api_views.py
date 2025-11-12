@@ -53,9 +53,29 @@ class CartAPIView(APIView):
                         'discount_price': float(course.discount_price) if course.discount_price else None,
                         'instructor_name': course.instructor.full_name if course.instructor else 'نامشخص'
                     }
+                    item_data['item_title'] = course.title
                 except Course.DoesNotExist:
                     # Course was deleted, skip it or mark as invalid
                     item_data['course'] = None
+            elif item.item_type == 'package':
+                try:
+                    from app.packages.models import Package
+                    package = Package.objects.select_related('category').get(id=item.item_id)
+                    item_data['package'] = {
+                        'id': package.id,
+                        'title': package.title,
+                        'slug': package.slug,
+                        'thumbnail': request.build_absolute_uri(package.thumbnail.url) if package.thumbnail else None,
+                        'price': float(package.price) if package.price else 0,
+                        'discount_price': float(package.discount_price) if package.discount_price else None,
+                        'current_price': float(package.current_price),
+                        'category_name': package.category.name if package.category else None,
+                        'total_courses': package.total_courses
+                    }
+                    item_data['item_title'] = package.title
+                except Package.DoesNotExist:
+                    item_data['package'] = None
+                    item_data['item_title'] = f"{item.get_item_type_display()} #{item.item_id}"
             else:
                 # For other item types, just add the title
                 item_data['item_title'] = f"{item.get_item_type_display()} #{item.item_id}"
@@ -236,6 +256,29 @@ def process_payment(request):
                 
                 # Initialize Zarinpal payment
                 zarinpal = ZarinpalPayment()
+                
+                # Reuse recent pending payment if still valid
+                existing_payment = order.payments.filter(
+                    payment_method=zarinpal_method,
+                    status='pending'
+                ).order_by('-created_at').first()
+                
+                if existing_payment and existing_payment.gateway_transaction_id:
+                    if not zarinpal.is_authority_expired(existing_payment):
+                        payment_url = zarinpal.extract_payment_url(existing_payment)
+                        expires_at = zarinpal.extract_payment_expiry(existing_payment)
+                        return Response({
+                            'success': True,
+                            'payment_url': payment_url,
+                            'authority': existing_payment.gateway_transaction_id,
+                            'order_id': order.id,
+                            'payment_id': existing_payment.id,
+                            'expires_at': expires_at,
+                            'existing_payment': True
+                        })
+                    else:
+                        zarinpal.mark_payment_expired(existing_payment)
+                
                 payment_result = zarinpal.create_payment_request(
                     order, 
                     f"پرداخت سفارش {order.order_number}"
@@ -243,7 +286,7 @@ def process_payment(request):
                 
                 if payment_result['success']:
                     # Clear cart if not using existing order
-                    if not order_id:
+                    if not order_id and 'cart' in locals():
                         cart.items.all().delete()
                     
                     return Response({
@@ -251,7 +294,9 @@ def process_payment(request):
                         'payment_url': payment_result['payment_url'],
                         'authority': payment_result['authority'],
                         'order_id': order.id,
-                        'payment_id': payment_result['payment_id']
+                        'payment_id': payment_result['payment_id'],
+                        'expires_at': payment_result.get('expires_at'),
+                        'existing_payment': False
                     })
                 else:
                     return Response(

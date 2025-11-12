@@ -84,8 +84,8 @@ class Package(models.Model):
     published_at = models.DateTimeField(blank=True, null=True, verbose_name='تاریخ انتشار')
     
     class Meta:
-        verbose_name = _('بسته آموزشی')
-        verbose_name_plural = _('بسته‌های آموزشی')
+        verbose_name = _('پکیج آموزشی')
+        verbose_name_plural = _('پکیج‌های آموزشی')
         ordering = ['-created_at']
     
     def __str__(self):

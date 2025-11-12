@@ -7,3 +7,7 @@ class PackagesConfig(AppConfig):
     name = 'app.packages'
     verbose_name = _('پکیج‌ها')
     verbose_name_plural = _('پکیج‌ها')
+
+    def ready(self):
+        # Import signal handlers to ensure package course access is granted after purchase
+        import app.packages.signals  # noqa: F401

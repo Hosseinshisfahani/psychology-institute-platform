@@ -1,6 +1,8 @@
 import requests
 from django.conf import settings
 from django.utils import timezone
+from datetime import timedelta
+from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 from .models import Payment, Order, PaymentMethod
 
 
@@ -10,6 +12,11 @@ class ZarinpalPayment:
     def __init__(self):
         self.merchant_id = getattr(settings, 'ZARINPAL_MERCHANT_ID', '')
         self.sandbox = getattr(settings, 'ZARINPAL_SANDBOX', True)
+        self.authority_timeout_minutes = getattr(
+            settings,
+            'ZARINPAL_AUTHORITY_EXPIRATION_MINUTES',
+            10
+        )
         
         # Get callback URL from settings or construct it
         callback_url = getattr(settings, 'ZARINPAL_CALLBACK_URL', '')
@@ -32,6 +39,87 @@ class ZarinpalPayment:
             self.verify_url = 'https://api.zarinpal.com/pg/v4/payment/verify.json'
             self.start_pay_url = 'https://www.zarinpal.com/pg/StartPay/'
             self.api_version = 4
+    
+    # ------------------------------------------------------------------
+    # Helper utilities
+    # ------------------------------------------------------------------
+    def _normalize_amount(self, amount):
+        """Normalize decimal amount to whole Toman using half-up rounding"""
+        if amount is None:
+            return Decimal('0')
+        try:
+            decimal_amount = Decimal(str(amount))
+        except (InvalidOperation, TypeError):
+            return Decimal('0')
+        return decimal_amount.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+    
+    def _amount_to_rials(self, amount):
+        """Convert Toman amount to rial integer value as expected by v4 API"""
+        normalized = self._normalize_amount(amount)
+        return int(normalized * 10)
+    
+    def get_start_pay_url(self, authority):
+        """Build StartPay URL for a given authority"""
+        authority = (authority or '').strip()
+        return f"{self.start_pay_url}{authority}"
+    
+    def calculate_authority_expiry(self, reference_time=None):
+        """Calculate expiry datetime for an authority"""
+        reference_time = reference_time or timezone.now()
+        return reference_time + timedelta(minutes=self.authority_timeout_minutes)
+    
+    def is_authority_expired(self, payment):
+        """Return True if the stored authority is expired"""
+        if not payment or not payment.gateway_transaction_id:
+            return True
+        if not payment.created_at:
+            return True
+        return timezone.now() >= self.calculate_authority_expiry(payment.created_at)
+    
+    def extract_payment_url(self, payment):
+        """Extract stored payment URL or rebuild it from authority"""
+        if not payment:
+            return None
+        response = payment.gateway_response or {}
+        data = response.get('data')
+        if isinstance(data, dict):
+            url = data.get('payment_url')
+            if url:
+                return url
+        return self.get_start_pay_url(payment.gateway_transaction_id) if payment.gateway_transaction_id else None
+    
+    def extract_payment_expiry(self, payment):
+        """Extract stored expiry timestamp or compute one"""
+        if not payment:
+            return None
+        response = payment.gateway_response or {}
+        data = response.get('data')
+        if isinstance(data, dict):
+            expires_at = data.get('expires_at')
+            if expires_at:
+                return expires_at
+        if payment.created_at:
+            expiry_dt = self.calculate_authority_expiry(payment.created_at)
+            return expiry_dt.isoformat()
+        return None
+    
+    def mark_payment_expired(self, payment):
+        """Mark a pending payment as expired/failed"""
+        if not payment:
+            return
+        response = payment.gateway_response or {}
+        timestamp = timezone.now().isoformat()
+        data = response.get('data')
+        if isinstance(data, dict):
+            data['authority_expired'] = True
+            data['authority_expired_at'] = timestamp
+            response['data'] = data
+        else:
+            response['authority_expired'] = True
+            response['authority_expired_at'] = timestamp
+        payment.gateway_response = response
+        payment.status = 'failed'
+        payment.save(update_fields=['status', 'gateway_response'])
     
     def _get_payment_method(self):
         """Get or create Zarinpal payment method"""
@@ -56,10 +144,18 @@ class ZarinpalPayment:
                 'error': 'Merchant ID تنظیم نشده است'
             }
         
+        amount_toman = self._normalize_amount(getattr(order, 'total_amount', None))
+        if amount_toman <= 0:
+            logger.error('Attempted to create payment request with non-positive amount', extra={'order_id': order.id})
+            return {
+                'success': False,
+                'error': 'مبلغ سفارش نامعتبر است'
+            }
+        
         # Log payment request details (without full merchant ID for security)
         logger.info(
             f'Creating Zarinpal payment request: Order {order.id}, '
-            f'Amount: {order.total_amount}, API Version: {self.api_version}, '
+            f'Amount: {amount_toman}, API Version: {self.api_version}, '
             f'Sandbox: {self.sandbox}, Callback: {self.callback_url}, '
             f'Merchant ID: {self.merchant_id[:8]}...'
         )
@@ -70,7 +166,7 @@ class ZarinpalPayment:
                 # Zarinpal API v4 format
                 data = {
                     'merchant_id': self.merchant_id,
-                    'amount': int(order.total_amount * 10),  # API v4 uses Rials (amount * 10)
+                    'amount': self._amount_to_rials(amount_toman),  # API v4 uses Rials (amount * 10)
                     'description': description,
                     'callback_url': self.callback_url,
                     'metadata': {
@@ -179,11 +275,27 @@ class ZarinpalPayment:
                 status='pending'
             )
             
+            issued_at = timezone.now()
+            expires_at = self.calculate_authority_expiry(issued_at)
+            payment_url = self.get_start_pay_url(authority)
+            
+            # Augment result payload with helpful metadata
+            data_section = result.get('data') if isinstance(result, dict) else {}
+            if isinstance(data_section, dict):
+                data_section.setdefault('authority', authority)
+                data_section['issued_at'] = issued_at.isoformat()
+                data_section['expires_at'] = expires_at.isoformat()
+                data_section['payment_url'] = payment_url
+                result['data'] = data_section
+                payment.gateway_response = result
+                payment.save(update_fields=['gateway_response'])
+            
             return {
                 'success': True,
                 'authority': authority,
-                'payment_url': f"{self.start_pay_url}{authority}",
-                'payment_id': payment.id
+                'payment_url': payment_url,
+                'payment_id': payment.id,
+                'expires_at': expires_at.isoformat()
             }
                 
         except requests.RequestException as e:
@@ -214,7 +326,7 @@ class ZarinpalPayment:
             if self.api_version == 4:
                 data = {
                     'merchant_id': self.merchant_id,
-                    'amount': int(amount * 10),  # API v4 uses Rials
+                    'amount': self._amount_to_rials(amount),  # API v4 uses Rials
                     'authority': authority
                 }
             else:

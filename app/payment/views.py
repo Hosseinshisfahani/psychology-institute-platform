@@ -111,6 +111,22 @@ class CheckoutView(LoginRequiredMixin, CreateView):
             
             # Initialize Zarinpal payment
             zarinpal = ZarinpalPayment()
+            
+            # Reuse existing pending payment if the authority is still valid
+            if order.payment_method and order.payment_method.payment_type == 'zarinpal':
+                existing_payment = order.payments.filter(
+                    payment_method=order.payment_method,
+                    status='pending'
+                ).order_by('-created_at').first()
+                
+                if existing_payment and existing_payment.gateway_transaction_id:
+                    if not zarinpal.is_authority_expired(existing_payment):
+                        payment_url = zarinpal.extract_payment_url(existing_payment)
+                        cart.items.all().delete()
+                        return HttpResponseRedirect(payment_url)
+                    else:
+                        zarinpal.mark_payment_expired(existing_payment)
+            
             payment_result = zarinpal.create_payment_request(
                 order, 
                 f"پرداخت سفارش {order.order_number}"

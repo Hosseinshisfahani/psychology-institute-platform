@@ -124,31 +124,37 @@ def add_package_to_cart(request, package_slug):
     # Check if already purchased
     if PackagePurchase.objects.filter(user=request.user, package=package).exists():
         return Response(
-            {'error': 'شما قبلاً این بسته را خریداری کرده‌اید'},
+            {
+                'error': 'شما قبلاً این بسته را خریداری کرده‌اید',
+                'cart_url': '/payment/cart/'
+            },
             status=status.HTTP_400_BAD_REQUEST
         )
     
     cart, created = Cart.objects.get_or_create(user=request.user)
     
-    # Check if already in cart
-    if CartItem.objects.filter(cart=cart, item_type='package', item_id=package.id).exists():
-        return Response(
-            {'error': 'این بسته در سبد خرید شما موجود است'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    CartItem.objects.create(
+    cart_item, item_created = CartItem.objects.get_or_create(
         cart=cart,
         item_type='package',
         item_id=package.id,
-        unit_price=package.current_price,
-        quantity=1
+        defaults={
+            'unit_price': package.current_price,
+            'quantity': 1
+        }
     )
     
+    if not item_created:
+        cart_item.unit_price = package.current_price
+        cart_item.quantity = 1
+        cart_item.save(update_fields=['unit_price', 'quantity'])
+    
+    message = 'بسته به سبد خرید اضافه شد' if item_created else 'این بسته پیش‌تر در سبد خرید شما وجود داشت. اطلاعات آن به‌روزرسانی شد.'
+    
     return Response({
-        'message': 'بسته به سبد خرید اضافه شد',
-        'cart_total': float(cart.total_amount)
-    }, status=status.HTTP_201_CREATED)
+        'message': message,
+        'status': 'added' if item_created else 'existing',
+        'cart_url': '/payment/cart/'
+    }, status=status.HTTP_201_CREATED if item_created else status.HTTP_200_OK)
 
 
 @api_view(['GET'])

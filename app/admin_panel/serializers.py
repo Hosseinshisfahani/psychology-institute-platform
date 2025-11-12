@@ -447,13 +447,16 @@ class AdminCourseSerializer(serializers.ModelSerializer):
     enrollment_count = serializers.SerializerMethodField()
     revenue = serializers.SerializerMethodField()
     created_at_persian = serializers.SerializerMethodField()
+    thumbnail = serializers.SerializerMethodField()
+    category = serializers.SerializerMethodField()
     
     class Meta:
         model = Course
         fields = [
-            'id', 'title', 'slug', 'description', 'instructor', 'instructor_name',
+            'id', 'title', 'slug', 'description', 'short_description',
+            'instructor', 'instructor_name', 'category',
             'price', 'discount_price', 'status', 'enrollment_count', 'revenue',
-            'created_at', 'created_at_persian'
+            'thumbnail', 'created_at', 'created_at_persian'
         ]
     
     def get_enrollment_count(self, obj):
@@ -468,6 +471,23 @@ class AdminCourseSerializer(serializers.ModelSerializer):
         if obj.created_at:
             return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
+    
+    def get_thumbnail(self, obj):
+        if not obj.thumbnail:
+            return None
+        request = self.context.get('request')
+        url = obj.thumbnail.url
+        if request:
+            return request.build_absolute_uri(url)
+        return url
+    
+    def get_category(self, obj):
+        if not obj.category:
+            return None
+        return {
+            'id': obj.category.id,
+            'name': obj.category.name,
+        }
 
 
 # Package Admin Serializers
