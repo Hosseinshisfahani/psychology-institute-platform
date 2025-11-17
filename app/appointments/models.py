@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -44,6 +45,14 @@ class AppointmentType(models.Model):
         decimal_places=2, 
         default=0,
         verbose_name='قیمت'
+    )
+    requires_deposit = models.BooleanField(default=True, verbose_name='نیاز به ودیعه')
+    deposit_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('100000.00'),
+        verbose_name='مبلغ ودیعه',
+        help_text='در صورت نیاز به ودیعه، مبلغ آن را وارد کنید'
     )
     color = models.CharField(max_length=7, default='#007bff', verbose_name='رنگ')
     # Link appointment types to therapist specializations
@@ -137,6 +146,7 @@ class Appointment(models.Model):
     """Main booking model"""
     
     STATUS_CHOICES = [
+        ('pending_deposit', _('در انتظار ودیعه')),
         ('scheduled', _('رزرو شده')),
         ('confirmed', _('تأیید شده')),
         ('completed', _('تکمیل شده')),
@@ -182,6 +192,31 @@ class Appointment(models.Model):
         verbose_name='وضعیت'
     )
     notes = models.TextField(blank=True, null=True, verbose_name='یادداشت‌ها')
+    deposit_required = models.BooleanField(default=False, verbose_name='نیاز به ودیعه')
+    deposit_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('100000.00'),
+        verbose_name='مبلغ ودیعه'
+    )
+    deposit_paid = models.BooleanField(default=False, verbose_name='ودیعه پرداخت شده است؟')
+    deposit_paid_at = models.DateTimeField(blank=True, null=True, verbose_name='تاریخ پرداخت ودیعه')
+    deposit_order = models.OneToOneField(
+        'payment.Order',
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='appointment_deposit',
+        verbose_name='سفارش ودیعه'
+    )
+    deposit_payment = models.OneToOneField(
+        'payment.Payment',
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='appointment_deposit',
+        verbose_name='پرداخت ودیعه'
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
     
@@ -203,6 +238,28 @@ class Appointment(models.Model):
         """Calculate appointment end time"""
         from datetime import timedelta
         return self.scheduled_datetime + timedelta(minutes=self.duration_minutes)
+
+    def mark_deposit_paid(self, payment=None, commit=True):
+        """Mark appointment deposit as paid and update status"""
+        self.deposit_paid = True
+        if not self.deposit_paid_at:
+            self.deposit_paid_at = timezone.now()
+        if payment:
+            self.deposit_payment = payment
+            if payment.order:
+                self.deposit_order = payment.order
+        if self.status == 'pending_deposit':
+            self.status = 'scheduled'
+        update_fields = [
+            'deposit_paid',
+            'deposit_paid_at',
+            'deposit_payment',
+            'deposit_order',
+            'status',
+            'updated_at'
+        ]
+        if commit:
+            self.save(update_fields=update_fields)
 
 
 class AppointmentCancellation(models.Model):

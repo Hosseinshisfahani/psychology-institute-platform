@@ -7,7 +7,8 @@ from django.db import transaction, models
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth import get_user_model
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
+from decimal import Decimal
 from .models import (
     ClinicLocation, AppointmentType, TherapistSchedule, TherapistTimeOff,
     Appointment, AppointmentCancellation, AppointmentReschedule,
@@ -20,6 +21,8 @@ from .serializers import (
     CancellationPolicySerializer, AppointmentReminderSerializer,
     TherapistAvailabilitySerializer
 )
+from app.payment.models import Order, OrderItem, PaymentMethod, Payment
+from app.payment.zarinpal import ZarinpalPayment
 
 User = get_user_model()
 
@@ -29,7 +32,12 @@ class AppointmentListAPIView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status', 'therapist', 'appointment_type', 'location']
-    search_fields = ['therapist__first_name', 'therapist__last_name', 'client__first_name', 'client__last_name']
+    search_fields = [
+        'therapist__first_name', 'therapist__last_name', 
+        'therapist__email', 'therapist__phone_number', 'therapist__national_id',
+        'client__first_name', 'client__last_name',
+        'client__email', 'client__phone_number', 'client__national_id'
+    ]
     ordering_fields = ['scheduled_datetime', 'created_at']
     ordering = ['-scheduled_datetime']
     
@@ -74,6 +82,102 @@ class AppointmentListAPIView(generics.ListCreateAPIView):
         # Set client to current authenticated user
         # All users (client, therapist, admin, staff) can book appointments for themselves
         serializer.save(client=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            appointment = serializer.save(client=request.user)
+            deposit_payload = None
+
+            if appointment.deposit_required and appointment.deposit_amount > Decimal('0'):
+                deposit_payload = self._initiate_deposit_payment(request.user, appointment)
+
+        output_serializer = AppointmentSerializer(
+            appointment,
+            context=self.get_serializer_context()
+        )
+        response_data = output_serializer.data
+
+        if deposit_payload:
+            response_data['deposit'] = deposit_payload
+
+        headers = self.get_success_headers(output_serializer.data)
+        return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def _initiate_deposit_payment(self, user, appointment):
+        deposit_amount = appointment.deposit_amount
+
+        if deposit_amount <= Decimal('0'):
+            raise serializers.ValidationError({'deposit': 'مبلغ ودیعه نامعتبر است'})
+
+        order = Order.objects.create(
+            user=user,
+            subtotal=deposit_amount,
+            discount_amount=Decimal('0.00'),
+            tax_amount=Decimal('0.00'),
+            total_amount=deposit_amount,
+            payment_status='pending'
+        )
+
+        OrderItem.objects.create(
+            order=order,
+            item_type='appointment_deposit',
+            item_id=appointment.id,
+            item_title=f"ودیعه نوبت #{appointment.id}",
+            quantity=1,
+            unit_price=deposit_amount,
+            total_price=deposit_amount
+        )
+
+        payment_method, _ = PaymentMethod.objects.get_or_create(
+            payment_type='zarinpal',
+            defaults={
+                'name': 'زرین پال',
+                'is_active': True
+            }
+        )
+
+        order.payment_method = payment_method
+        order.save(update_fields=['payment_method'])
+
+        zarinpal = ZarinpalPayment()
+        payment_result = zarinpal.create_payment_request(
+            order,
+            description=f"پرداخت ودیعه نوبت {appointment.id}"
+        )
+
+        if not payment_result.get('success'):
+            raise serializers.ValidationError({
+                'deposit': payment_result.get('error', 'خطا در ایجاد پرداخت ودیعه')
+            })
+
+        payment_id = payment_result.get('payment_id')
+        authority = payment_result.get('authority')
+        payment_url = payment_result.get('payment_url')
+        expires_at = payment_result.get('expires_at')
+
+        try:
+            payment = Payment.objects.get(id=payment_id)
+        except Payment.DoesNotExist:  # pragma: no cover
+            raise serializers.ValidationError({'deposit': 'ثبت پرداخت ودیعه ناموفق بود'})
+
+        appointment.deposit_order = order
+        appointment.deposit_payment = payment
+        appointment.save(update_fields=['deposit_order', 'deposit_payment'])
+
+        return {
+            'required': True,
+            'amount': str(deposit_amount),
+            'currency': 'IRT',
+            'order_id': order.id,
+            'order_number': order.order_number,
+            'payment_id': payment_id,
+            'authority': authority,
+            'payment_url': payment_url,
+            'expires_at': expires_at
+        }
 
 
 class AppointmentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
@@ -144,6 +248,19 @@ def cancel_appointment(request, appointment_id):
     if appointment.status in ['cancelled', 'completed']:
         return Response({'error': 'این نوبت قبلاً لغو یا تکمیل شده است'}, status=status.HTTP_400_BAD_REQUEST)
     
+    now = timezone.now()
+    time_difference = appointment.scheduled_datetime - now
+    within_24_hours = 0 <= time_difference.total_seconds() <= 24 * 3600
+    confirm_flag = str(request.data.get('confirm', 'false')).lower() in ['true', '1', 'yes']
+    is_admin_or_staff = request.user.is_staff or request.user.is_superuser
+    
+    # Admin/staff can bypass the 24-hour confirmation requirement
+    if within_24_hours and not confirm_flag and not is_admin_or_staff:
+        return Response({
+            'requires_confirmation': True,
+            'warning': 'در صورت کنسل کردن نوبت در این بازه زمانی، ودیعه شما بازگردانده نخواهد شد.'
+        }, status=status.HTTP_200_OK)
+    
     serializer = AppointmentCancellationSerializer(
         data={'reason': request.data.get('reason', '')},
         context={'appointment': appointment, 'cancelled_by': request.user}
@@ -152,8 +269,17 @@ def cancel_appointment(request, appointment_id):
         try:
             with transaction.atomic():
                 cancellation = serializer.save()
+
+                if within_24_hours and appointment.deposit_paid:
+                    cancellation.cancellation_fee = appointment.deposit_amount
+                    cancellation.refund_amount = Decimal('0.00')
+                    cancellation.policy_applied = 'deposit_forfeit_24h'
+                    cancellation.save(update_fields=['cancellation_fee', 'refund_amount', 'policy_applied'])
+                
                 return Response({
-                    'message': 'نوبت با موفقیت لغو شد'
+                    'message': 'نوبت با موفقیت لغو شد',
+                    'deposit_forfeit': bool(within_24_hours and appointment.deposit_paid),
+                    'warning': 'در صورت کنسل کردن نوبت در این بازه زمانی، ودیعه شما بازگردانده نخواهد شد.' if within_24_hours else None
                 }, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -293,15 +419,22 @@ class TherapistAvailabilityAPIView(APIView):
         end_time = start_time + timedelta(minutes=duration_minutes)
         
         # Check for overlapping appointments
-        overlapping = Appointment.objects.filter(
+        # An appointment overlaps if:
+        # - It starts before the new appointment ends AND
+        # - It ends after the new appointment starts
+        existing_appointments = Appointment.objects.filter(
             therapist=therapist,
-            status__in=['scheduled', 'confirmed'],
-            scheduled_datetime__lt=end_time
-        ).exclude(
-            scheduled_datetime__gte=end_time
-        ).exists()
+            status__in=['scheduled', 'confirmed', 'pending_deposit']
+        )
         
-        return not overlapping
+        for appointment in existing_appointments:
+            existing_end = appointment.scheduled_datetime + timedelta(minutes=appointment.duration_minutes)
+            
+            # Check if appointments overlap
+            if (start_time < existing_end and end_time > appointment.scheduled_datetime):
+                return False
+        
+        return True
 
 
 class AppointmentTypeListAPIView(generics.ListAPIView):
@@ -363,32 +496,160 @@ class CancellationPolicyListAPIView(generics.ListAPIView):
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 def appointment_availability(request):
-    """Get available time slots for a specific date"""
-    date = request.query_params.get('date')
-    
-    if not date:
-        return Response({'error': 'تاریخ الزامی است'}, status=status.HTTP_400_BAD_REQUEST)
-    
+    """Get unavailable time slots for a specific date, therapist, and location"""
     try:
-        target_date = datetime.strptime(date, '%Y-%m-%d').date()
-    except ValueError:
-        return Response({'error': 'فرمت تاریخ نامعتبر است'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Get all booked times for this date
-    booked_times = Appointment.objects.filter(
-        scheduled_datetime__date=target_date,
-        status__in=['scheduled', 'confirmed']
-    ).values_list('scheduled_datetime', flat=True)
-    
-    # Convert to time strings for frontend
-    booked_time_strings = []
-    for dt in booked_times:
-        booked_time_strings.append(dt.strftime('%H:%M'))
-    
-    return Response({
-        'date': target_date,
-        'booked_times': booked_time_strings
-    })
+        date = request.query_params.get('date')
+        therapist_id = request.query_params.get('therapist_id')
+        location_id = request.query_params.get('location_id')
+        
+        # Safely parse duration_minutes
+        try:
+            duration_minutes = int(request.query_params.get('duration_minutes', 60))
+        except (ValueError, TypeError):
+            duration_minutes = 60
+        
+        if not date:
+            return Response({'error': 'تاریخ الزامی است'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            target_date = datetime.strptime(date, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'error': 'فرمت تاریخ نامعتبر است'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        unavailable_times = []
+        
+        # If therapist_id is provided, check therapist-specific availability
+        if therapist_id:
+            try:
+                therapist_id_int = int(therapist_id)
+            except (ValueError, TypeError):
+                return Response({'error': 'شناسه درمانگر نامعتبر است'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                therapist = User.objects.get(id=therapist_id_int, user_type='therapist')
+                day_of_week = target_date.weekday()
+                
+                # Check if therapist has schedule for this day
+                schedules = TherapistSchedule.objects.filter(
+                    therapist=therapist,
+                    day_of_week=day_of_week,
+                    is_active=True
+                )
+                
+                if location_id:
+                    try:
+                        location_id_int = int(location_id)
+                        schedules = schedules.filter(location_id=location_id_int)
+                    except (ValueError, TypeError):
+                        # If location_id is invalid, continue without filtering by location
+                        pass
+                
+                # If no schedule exists, all times are unavailable
+                if not schedules.exists():
+                    # Return all possible times as unavailable (9:00 to 21:00 in 30-min increments)
+                    for hour in range(9, 22):
+                        for minute in [0, 30]:
+                            if hour == 21 and minute > 0:
+                                break
+                            unavailable_times.append(f"{hour:02d}:{minute:02d}")
+                    return Response({
+                        'date': str(target_date),
+                        'booked_times': unavailable_times
+                    })
+                
+                # Check if therapist is on time off
+                time_off = TherapistTimeOff.objects.filter(
+                    therapist=therapist,
+                    start_date__lte=target_date,
+                    end_date__gte=target_date,
+                    is_approved=True
+                ).exists()
+                
+                if time_off:
+                    # All times are unavailable
+                    for hour in range(9, 22):
+                        for minute in [0, 30]:
+                            if hour == 21 and minute > 0:
+                                break
+                            unavailable_times.append(f"{hour:02d}:{minute:02d}")
+                    return Response({
+                        'date': str(target_date),
+                        'booked_times': unavailable_times
+                    })
+                
+                # Get all possible time slots for the day (9:00 to 21:00 in 30-min increments)
+                # Make sure to use timezone-aware datetimes for comparison with appointment datetimes
+                all_slots = []
+                for hour in range(9, 22):
+                    for minute in [0, 30]:
+                        if hour == 21 and minute > 0:
+                            break
+                        # Create naive datetime first
+                        naive_slot_time = datetime.combine(target_date, time(hour, minute))
+                        # Make it timezone-aware using the current timezone
+                        slot_time = timezone.make_aware(naive_slot_time)
+                        all_slots.append((slot_time, f"{hour:02d}:{minute:02d}"))
+                
+                # Check each slot against therapist schedule and existing appointments
+                for slot_datetime, slot_time_str in all_slots:
+                    slot_end = slot_datetime + timedelta(minutes=duration_minutes)
+                    slot_start_time = slot_datetime.time()
+                    slot_end_time = slot_end.time()
+                    
+                    # Check if slot is within any schedule
+                    slot_in_schedule = False
+                    for schedule in schedules:
+                        # Check if the slot fits completely within this schedule
+                        if schedule.start_time <= slot_start_time and slot_end_time <= schedule.end_time:
+                            slot_in_schedule = True
+                            break
+                    
+                    # If not in schedule, mark as unavailable
+                    if not slot_in_schedule:
+                        unavailable_times.append(slot_time_str)
+                        continue
+                    
+                    # Check for overlapping appointments (across all locations for this therapist)
+                    overlapping_appointments = Appointment.objects.filter(
+                        therapist=therapist,
+                        status__in=['scheduled', 'confirmed', 'pending_deposit']
+                    )
+                    
+                    for appointment in overlapping_appointments:
+                        existing_end = appointment.scheduled_datetime + timedelta(minutes=appointment.duration_minutes)
+                        # Check if appointments overlap (both datetimes are now timezone-aware)
+                        if (slot_datetime < existing_end and slot_end > appointment.scheduled_datetime):
+                            unavailable_times.append(slot_time_str)
+                            break
+                
+            except User.DoesNotExist:
+                return Response({'error': 'درمانگر یافت نشد'}, status=status.HTTP_404_NOT_FOUND)
+            except Exception as e:
+                # Log the error for debugging
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f'Error in appointment_availability: {str(e)}', exc_info=True)
+                return Response({'error': f'خطا در دریافت اطلاعات: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            # If no therapist_id, just return all booked times (backward compatibility)
+            booked_times = Appointment.objects.filter(
+                scheduled_datetime__date=target_date,
+                status__in=['scheduled', 'confirmed', 'pending_deposit']
+            ).values_list('scheduled_datetime', flat=True)
+            
+            for dt in booked_times:
+                unavailable_times.append(dt.strftime('%H:%M'))
+        
+        return Response({
+            'date': str(target_date),
+            'booked_times': unavailable_times
+        })
+    except Exception as e:
+        # Catch any unexpected errors
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f'Unexpected error in appointment_availability: {str(e)}', exc_info=True)
+        return Response({'error': 'خطای سرور در دریافت اطلاعات'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])

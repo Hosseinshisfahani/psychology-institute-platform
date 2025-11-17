@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import datetime, timedelta
+from decimal import Decimal
 from .models import (
     ClinicLocation, AppointmentType, TherapistSchedule, TherapistTimeOff,
     Appointment, AppointmentCancellation, AppointmentReschedule,
@@ -21,7 +22,17 @@ class ClinicLocationSerializer(serializers.ModelSerializer):
 class AppointmentTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = AppointmentType
-        fields = ['id', 'name', 'description', 'default_duration_minutes', 'price', 'color', 'is_active']
+        fields = [
+            'id',
+            'name',
+            'description',
+            'default_duration_minutes',
+            'price',
+            'requires_deposit',
+            'deposit_amount',
+            'color',
+            'is_active'
+        ]
         read_only_fields = ['id']
 
 
@@ -64,9 +75,9 @@ class AppointmentListSerializer(serializers.ModelSerializer):
             'id', 'client', 'client_name', 'therapist', 'therapist_name',
             'appointment_type', 'appointment_type_name', 'location', 'location_name',
             'scheduled_datetime', 'duration_minutes', 'status', 'status_display',
-            'created_at'
+            'deposit_required', 'deposit_amount', 'deposit_paid', 'created_at'
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'created_at', 'deposit_required', 'deposit_amount', 'deposit_paid']
 
 
 class AppointmentSerializer(serializers.ModelSerializer):
@@ -83,9 +94,18 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'id', 'client', 'client_name', 'therapist', 'therapist_name',
             'appointment_type', 'appointment_type_name', 'location', 'location_name',
             'scheduled_datetime', 'end_datetime', 'duration_minutes', 'status', 
-            'status_display', 'notes', 'created_at', 'updated_at'
+            'status_display', 'notes', 'deposit_required', 'deposit_amount',
+            'deposit_paid', 'deposit_paid_at', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = [
+            'id',
+            'created_at',
+            'updated_at',
+            'deposit_required',
+            'deposit_amount',
+            'deposit_paid',
+            'deposit_paid_at'
+        ]
 
 
 class AppointmentCreateSerializer(serializers.ModelSerializer):
@@ -101,9 +121,11 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
         therapist = data['therapist']
         scheduled_datetime = data['scheduled_datetime']
         duration_minutes = data['duration_minutes']
+        appointment_type = data['appointment_type']
+        location = data.get('location')
         
         # Check if therapist is available at this time
-        if not self._is_therapist_available(therapist, scheduled_datetime, duration_minutes):
+        if not self._is_therapist_available(therapist, scheduled_datetime, duration_minutes, location):
             raise serializers.ValidationError("درمانگر در این زمان در دسترس نیست")
         
         # Check for overlapping appointments
@@ -113,27 +135,37 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
         # Check minimum advance booking (1 hour)
         if scheduled_datetime <= timezone.now() + timedelta(hours=1):
             raise serializers.ValidationError("نوبت باید حداقل یک ساعت قبل رزرو شود")
+
+        if appointment_type.requires_deposit and appointment_type.deposit_amount <= Decimal('0'):
+            raise serializers.ValidationError("برای این نوع نوبت مبلغ ودیعه تعریف نشده است")
         
         return data
     
-    def _is_therapist_available(self, therapist, scheduled_datetime, duration_minutes):
+    def _is_therapist_available(self, therapist, scheduled_datetime, duration_minutes, location=None):
         """Check if therapist is available based on schedule and time off"""
         # Check if therapist has schedule for this day
         day_of_week = scheduled_datetime.weekday()
         start_time = scheduled_datetime.time()
         end_time = (scheduled_datetime + timedelta(minutes=duration_minutes)).time()
         
-        # Check regular schedule
-        schedule = TherapistSchedule.objects.filter(
+        # Check regular schedule - filter by location if provided
+        schedules = TherapistSchedule.objects.filter(
             therapist=therapist,
             day_of_week=day_of_week,
             is_active=True
-        ).first()
+        )
         
-        if not schedule:
-            return False
+        if location:
+            schedules = schedules.filter(location=location)
         
-        if not (schedule.start_time <= start_time and end_time <= schedule.end_time):
+        # Check if any schedule covers this time slot
+        schedule_found = False
+        for schedule in schedules:
+            if schedule.start_time <= start_time and end_time <= schedule.end_time:
+                schedule_found = True
+                break
+        
+        if not schedule_found:
             return False
         
         # Check time off
@@ -154,7 +186,7 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
         # Get all existing appointments for this therapist
         existing_appointments = Appointment.objects.filter(
             therapist=therapist,
-            status__in=['scheduled', 'confirmed']
+            status__in=['scheduled', 'confirmed', 'pending_deposit']
         )
         
         # Check for overlaps manually
@@ -167,6 +199,23 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
                 return True
         
         return False
+
+    def create(self, validated_data):
+        appointment_type = validated_data['appointment_type']
+        requires_deposit = bool(
+            appointment_type.requires_deposit and appointment_type.deposit_amount > Decimal('0')
+        )
+
+        if requires_deposit:
+            validated_data['deposit_required'] = True
+            validated_data['deposit_amount'] = appointment_type.deposit_amount
+            validated_data['status'] = 'pending_deposit'
+        else:
+            validated_data['deposit_required'] = False
+            validated_data['deposit_amount'] = Decimal('0.00')
+            validated_data.setdefault('status', 'scheduled')
+
+        return super().create(validated_data)
 
 
 class AppointmentCancellationSerializer(serializers.ModelSerializer):

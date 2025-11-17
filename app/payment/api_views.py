@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
@@ -405,6 +407,21 @@ def payment_verify(request):
             payment.order.paid_at = timezone.now()
             payment.order.transaction_id = verify_result.get('ref_id', '')
             payment.order.save()
+
+            appointment_ids = []
+            try:
+                deposit_items = payment.order.items.filter(item_type='appointment_deposit')
+                if deposit_items.exists():
+                    from app.appointments.models import Appointment
+
+                    appointment_ids = list(deposit_items.values_list('item_id', flat=True))
+                    appointments = Appointment.objects.filter(id__in=appointment_ids)
+
+                    for appointment in appointments:
+                        appointment.mark_deposit_paid(payment=payment)
+            except Exception as e:  # pragma: no cover - safeguard to avoid breaking payment flow
+                logger = logging.getLogger(__name__)
+                logger.error(f'Error marking appointment deposit as paid: {e}')
             
             # Activate workshop registration if this order is for a workshop
             registration_id = None
@@ -459,18 +476,20 @@ def payment_verify(request):
                         registration.save()
             except Exception as e:
                 # Log error but don't fail the payment verification
-                import logging
                 logger = logging.getLogger(__name__)
                 logger.error(f'Error activating workshop registration: {str(e)}')
             
             if is_api_call:
-                return Response({
+                response_payload = {
                     'success': True,
                     'message': 'پرداخت با موفقیت انجام شد',
                     'order_id': payment.order.id,
                     'order_number': payment.order.order_number,
                     'ref_id': verify_result.get('ref_id')
-                })
+                }
+                if appointment_ids:
+                    response_payload['appointment_ids'] = appointment_ids
+                return Response(response_payload)
             else:
                 # Redirect to frontend success page - redirect to My Workshops for workshop payments
                 frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
@@ -478,7 +497,11 @@ def payment_verify(request):
                     # Redirect to My Workshops page for workshop payments
                     return redirect(f'{frontend_url}/dashboard/my-workshops?payment=success')
                 else:
-                    return redirect(f'{frontend_url}/payment/success?order_id={payment.order.id}&ref_id={verify_result.get("ref_id", "")}')
+                    query = f'order_id={payment.order.id}&ref_id={verify_result.get("ref_id", "")}'
+                    if appointment_ids:
+                        # Use the first appointment ID for backwards compatibility
+                        query += f'&appointment_id={appointment_ids[0]}'
+                    return redirect(f'{frontend_url}/payment/success?{query}')
         else:
             payment.status = 'failed'
             payment.gateway_response = verify_result
