@@ -29,5 +29,12 @@ urlpatterns = [
     # Reviews
     path('<slug:workshop_slug>/reviews/', api_views.workshop_reviews, name='reviews'),
     path('<slug:workshop_slug>/review/', api_views.create_workshop_review, name='create_review'),
+    
+    # Certificates
+    path('<slug:workshop_slug>/certificate/generate/', api_views.generate_certificate, name='generate_certificate'),
+    path('<slug:workshop_slug>/certificate/', api_views.get_certificate, name='get_certificate'),
+    path('certificates/my/', api_views.user_certificates, name='user_certificates'),
+    path('certificates/<int:certificate_id>/download/', api_views.download_certificate, name='download_certificate'),
+    path('certificates/verify/<str:verification_code>/', api_views.verify_certificate, name='verify_certificate'),
 ]
 

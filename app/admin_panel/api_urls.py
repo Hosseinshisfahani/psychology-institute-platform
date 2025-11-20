@@ -3,8 +3,9 @@ from .api_views import (
     DashboardStatsAPIView, AdminUserListAPIView, AdminUserDetailAPIView,
     AdminPostListAPIView, AdminPostDetailAPIView, AdminCourseListAPIView,
     AdminCourseDetailAPIView, AdminActivityListAPIView,
-    AdminNotificationListAPIView, toggle_user_status, bulk_user_action,
-    admin_analytics, send_notification, export_users, bulk_course_action,
+    AdminNotificationListAPIView, admin_notification_count, mark_notification_read,
+    mark_notification_unread, mark_all_notifications_read, delete_notification,
+    toggle_user_status, bulk_user_action, admin_analytics, send_notification, export_users, bulk_course_action,
     # AdminSessionListAPIView, AdminAppointmentListAPIView, AdminAppointmentDetailAPIView, confirm_appointment,  # Removed - therapy_sessions app deleted
     # reject_appointment, AdminTherapistListAPIView, AdminTherapistDetailAPIView,  # Removed - therapy_sessions app deleted
     # AdminSessionTypeListAPIView, AdminSessionTypeDetailAPIView,  # Removed - therapy_sessions app deleted
@@ -18,7 +19,8 @@ from .api_views import (
     bulk_workshop_action, approve_workshop_registration,
     reject_workshop_registration, AdminPackageListAPIView, AdminPackageDetailAPIView,
     AdminPackageCategoryListAPIView, AdminPackageCategoryDetailAPIView, bulk_package_action,
-    admin_payments_overview, admin_payments_revenue_series, admin_recent_payments
+    admin_payments_overview, admin_payments_revenue_series, admin_recent_payments,
+    admin_user_financial_logs
 )
 from .upload_api import upload_file
 
@@ -35,6 +37,7 @@ urlpatterns = [
     path('users/', AdminUserListAPIView.as_view(), name='api_admin_users'),
     path('users/<int:pk>/', AdminUserDetailAPIView.as_view(), name='api_admin_user_detail'),
     path('users/<int:user_id>/toggle-status/', toggle_user_status, name='api_toggle_user_status'),
+    path('users/<int:user_id>/financial-logs/', admin_user_financial_logs, name='api_admin_user_financial_logs'),
     path('users/bulk-action/', bulk_user_action, name='api_bulk_user_action'),
     path('users/export/', export_users, name='api_export_users'),
     
@@ -53,6 +56,11 @@ urlpatterns = [
     # Activities and Notifications
     path('activities/', AdminActivityListAPIView.as_view(), name='api_admin_activities'),
     path('notifications/', AdminNotificationListAPIView.as_view(), name='api_admin_notifications'),
+    path('notifications/count/', admin_notification_count, name='api_admin_notification_count'),
+    path('notifications/<int:notification_id>/read/', mark_notification_read, name='api_mark_notification_read'),
+    path('notifications/<int:notification_id>/unread/', mark_notification_unread, name='api_mark_notification_unread'),
+    path('notifications/mark-all-read/', mark_all_notifications_read, name='api_mark_all_notifications_read'),
+    path('notifications/<int:notification_id>/delete/', delete_notification, name='api_delete_notification'),
     path('notifications/send/', send_notification, name='api_send_notification'),
     
     # Appointment Management - commented out due to therapy_sessions app deletion

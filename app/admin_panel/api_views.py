@@ -17,7 +17,7 @@ from app.workshops.models import (
     WorkshopSessionAttendance, InstallmentPlan, InstallmentPayment, WorkshopReview
 )
 from app.packages.models import Package, PackageCategory, PackagePurchase
-from app.payment.models import Order, Payment, PaymentMethod
+from app.payment.models import Order, Payment, PaymentMethod, OrderItem
 from .serializers import (
     AdminUserSerializer, AdminPostSerializer, AdminCourseSerializer,
     # AdminSessionSerializer, AdminAppointmentSerializer, AdminTherapistSerializer, AdminSessionTypeSerializer,  # Removed - therapy_sessions app deleted
@@ -199,9 +199,72 @@ class AdminNotificationListAPIView(generics.ListAPIView):
     """
     serializer_class = AdminNotificationSerializer
     permission_classes = [AdminPermission]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['is_read']
+    search_fields = ['title', 'message', 'user__first_name', 'user__last_name', 'user__email']
+    ordering_fields = ['created_at', 'is_read']
+    ordering = ['-created_at']
     
     def get_queryset(self):
-        return Notification.objects.all().select_related('user').order_by('-created_at')
+        queryset = Notification.objects.all().select_related('user').order_by('-created_at')
+        
+        # Filter by is_read if provided as query parameter
+        is_read = self.request.query_params.get('is_read')
+        if is_read is not None:
+            is_read_bool = is_read.lower() in ('true', '1', 'yes')
+            queryset = queryset.filter(is_read=is_read_bool)
+        
+        return queryset
+
+@api_view(['GET'])
+@permission_classes([AdminPermission])
+def admin_notification_count(request):
+    """
+    Get unread notification count for admin
+    """
+    unread_count = Notification.objects.filter(is_read=False).count()
+    return Response({'unread_count': unread_count})
+
+@api_view(['PATCH'])
+@permission_classes([AdminPermission])
+def mark_notification_read(request, notification_id):
+    """
+    Mark a notification as read
+    """
+    notification = get_object_or_404(Notification, id=notification_id)
+    notification.is_read = True
+    notification.save()
+    return Response({'message': 'اعلان به عنوان خوانده شده علامت گذاری شد'})
+
+@api_view(['PATCH'])
+@permission_classes([AdminPermission])
+def mark_notification_unread(request, notification_id):
+    """
+    Mark a notification as unread
+    """
+    notification = get_object_or_404(Notification, id=notification_id)
+    notification.is_read = False
+    notification.save()
+    return Response({'message': 'اعلان به عنوان خوانده نشده علامت گذاری شد'})
+
+@api_view(['POST'])
+@permission_classes([AdminPermission])
+def mark_all_notifications_read(request):
+    """
+    Mark all notifications as read
+    """
+    Notification.objects.filter(is_read=False).update(is_read=True)
+    return Response({'message': 'همه اعلان‌ها به عنوان خوانده شده علامت گذاری شدند'})
+
+@api_view(['DELETE'])
+@permission_classes([AdminPermission])
+def delete_notification(request, notification_id):
+    """
+    Delete a notification
+    """
+    notification = get_object_or_404(Notification, id=notification_id)
+    notification.delete()
+    return Response({'message': 'اعلان حذف شد'}, status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['POST'])
 @permission_classes([AdminPermission])
@@ -309,13 +372,20 @@ def admin_analytics(request):
 def admin_payments_overview(request):
     """
     Overview metrics for payments.
-    Optional query params: date_from, date_to (YYYY-MM-DD)
+    Optional query params: date_from, date_to (YYYY-MM-DD), item_type (course, workshop, package, test, session, appointment_deposit)
     """
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
+    item_type = request.GET.get('item_type')  # Filter by section
 
     payments_qs = Payment.objects.all()
     orders_qs = Order.objects.all()
+
+    # Filter by item_type (section) - filter payments by order items
+    if item_type:
+        order_ids = OrderItem.objects.filter(item_type=item_type).values_list('order_id', flat=True).distinct()
+        payments_qs = payments_qs.filter(order_id__in=order_ids)
+        orders_qs = orders_qs.filter(id__in=order_ids)
 
     # Date filtering on Payment.created_at
     if date_from:
@@ -370,18 +440,27 @@ def admin_payments_overview(request):
 def admin_payments_revenue_series(request):
     """
     Returns daily revenue for the last N days (default 30).
-    Query param: days (int)
+    Query param: days (int), item_type (course, workshop, package, test, session, appointment_deposit)
     """
     try:
         days = int(request.GET.get('days', '30'))
     except ValueError:
         days = 30
 
+    item_type = request.GET.get('item_type')  # Filter by section
+
     end_date = timezone.now().date()
     start_date = end_date - timedelta(days=days - 1)
 
+    payments_qs = Payment.objects.filter(status='completed', created_at__date__range=[start_date, end_date])
+
+    # Filter by item_type (section)
+    if item_type:
+        order_ids = OrderItem.objects.filter(item_type=item_type).values_list('order_id', flat=True).distinct()
+        payments_qs = payments_qs.filter(order_id__in=order_ids)
+
     daily = (
-        Payment.objects.filter(status='completed', created_at__date__range=[start_date, end_date])
+        payments_qs
         .annotate(day=TruncDate('created_at'))
         .values('day')
         .annotate(revenue=Sum('amount'))
@@ -404,20 +483,31 @@ def admin_payments_revenue_series(request):
 def admin_recent_payments(request):
     """
     Returns recent payments list.
-    Query param: limit (default 25)
+    Query param: limit (default 25), item_type (course, workshop, package, test, session, appointment_deposit)
     """
     try:
         limit = int(request.GET.get('limit', '25'))
     except ValueError:
         limit = 25
 
-    payments = (
-        Payment.objects.select_related('order', 'payment_method')
-        .order_by('-created_at')[:limit]
-    )
+    item_type = request.GET.get('item_type')  # Filter by section
+
+    payments_qs = Payment.objects.select_related('order', 'payment_method')
+
+    # Filter by item_type (section)
+    if item_type:
+        order_ids = OrderItem.objects.filter(item_type=item_type).values_list('order_id', flat=True).distinct()
+        payments_qs = payments_qs.filter(order_id__in=order_ids)
+
+    payments = payments_qs.order_by('-created_at')[:limit]
 
     data = []
     for p in payments:
+        # Get item types from order items
+        item_types = []
+        if p.order:
+            item_types = list(p.order.items.values_list('item_type', flat=True).distinct())
+        
         data.append({
             'id': p.id,
             'order_number': p.order.order_number if p.order else '',
@@ -425,9 +515,122 @@ def admin_recent_payments(request):
             'status': p.status,
             'method': p.payment_method.name if p.payment_method else 'نامشخص',
             'created_at': p.created_at,
+            'item_types': item_types,  # List of item types in this order
         })
 
     return Response(data)
+
+
+@api_view(['GET'])
+@permission_classes([AdminPermission])
+def admin_user_financial_logs(request, user_id):
+    """
+    Get financial logs (orders, payments, refunds) for a specific user.
+    Query params: limit (default 50), date_from, date_to
+    """
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({'error': 'کاربر یافت نشد'}, status=status.HTTP_404_NOT_FOUND)
+    
+    try:
+        limit = int(request.GET.get('limit', '50'))
+    except ValueError:
+        limit = 50
+    
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    
+    # Get all orders for this user
+    orders_qs = Order.objects.filter(user=user).select_related('payment_method').prefetch_related('items', 'payments')
+    
+    # Date filtering
+    if date_from:
+        try:
+            df = datetime.strptime(date_from, '%Y-%m-%d')
+            orders_qs = orders_qs.filter(created_at__date__gte=df.date())
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            dt = datetime.strptime(date_to, '%Y-%m-%d')
+            orders_qs = orders_qs.filter(created_at__date__lte=dt.date())
+        except ValueError:
+            pass
+    
+    orders = orders_qs.order_by('-created_at')[:limit]
+    
+    # Build financial logs
+    logs = []
+    for order in orders:
+        # Get order items with their types
+        order_items = []
+        for item in order.items.all():
+            order_items.append({
+                'id': item.id,
+                'item_type': item.item_type,
+                'item_title': item.item_title,
+                'quantity': item.quantity,
+                'unit_price': str(item.unit_price),
+                'total_price': str(item.total_price),
+            })
+        
+        # Get payments for this order
+        payments = []
+        for payment in order.payments.all():
+            payments.append({
+                'id': payment.id,
+                'amount': str(payment.amount),
+                'status': payment.status,
+                'method': payment.payment_method.name if payment.payment_method else 'نامشخص',
+                'gateway_transaction_id': payment.gateway_transaction_id,
+                'created_at': payment.created_at,
+                'completed_at': payment.completed_at,
+            })
+        
+        logs.append({
+            'order_id': order.id,
+            'order_number': order.order_number,
+            'status': order.status,
+            'payment_status': order.payment_status,
+            'subtotal': str(order.subtotal),
+            'tax_amount': str(order.tax_amount),
+            'discount_amount': str(order.discount_amount),
+            'total_amount': str(order.total_amount),
+            'payment_method': order.payment_method.name if order.payment_method else None,
+            'transaction_id': order.transaction_id,
+            'created_at': order.created_at,
+            'paid_at': order.paid_at,
+            'items': order_items,
+            'payments': payments,
+        })
+    
+    # Calculate summary statistics
+    total_orders = Order.objects.filter(user=user).count()
+    total_spent = Payment.objects.filter(
+        order__user=user,
+        status='completed'
+    ).aggregate(total=Sum('amount'))['total'] or 0
+    
+    total_refunded = Payment.objects.filter(
+        order__user=user,
+        status='refunded'
+    ).aggregate(total=Sum('amount'))['total'] or 0
+    
+    return Response({
+        'user': {
+            'id': user.id,
+            'full_name': user.full_name,
+            'email': user.email,
+        },
+        'summary': {
+            'total_orders': total_orders,
+            'total_spent': str(total_spent),
+            'total_refunded': str(total_refunded),
+        },
+        'logs': logs,
+    })
+
 
 @api_view(['POST'])
 @permission_classes([AdminPermission])

@@ -5,7 +5,8 @@ from jalali_date.widgets import AdminJalaliDateWidget, AdminSplitJalaliDateTime
 from .models import (
 # from psychology_institute.admin import persian_admin_site
     WorkshopCategory, Workshop, WorkshopSession, WorkshopRegistration,
-    WorkshopSessionAttendance, InstallmentPlan, InstallmentPayment, WorkshopReview
+    WorkshopSessionAttendance, InstallmentPlan, InstallmentPayment, WorkshopReview,
+    WorkshopCertificate
 )
 from .forms import WorkshopAdminForm, WorkshopSessionAdminForm
 
@@ -272,3 +273,93 @@ class WorkshopReviewAdmin(admin.ModelAdmin):
         updated = queryset.update(is_approved=False)
         self.message_user(request, _(f'{updated} reviews rejected.'))
     reject_reviews.short_description = _('Reject selected reviews')
+
+
+@admin.register(WorkshopCertificate)
+class WorkshopCertificateAdmin(admin.ModelAdmin):
+    list_display = [
+        'certificate_number', 'user_name', 'workshop_title', 'status',
+        'issued_at', 'verification_code', 'certificate_file_link'
+    ]
+    list_filter = ['status', 'issued_at', 'created_at']
+    search_fields = [
+        'certificate_number', 'verification_code',
+        'registration__user__email',
+        'registration__user__first_name',
+        'registration__user__last_name',
+        'registration__workshop__title'
+    ]
+    readonly_fields = [
+        'certificate_number', 'verification_code', 'created_at',
+        'updated_at', 'issued_at', 'revoked_at'
+    ]
+    
+    fieldsets = (
+        (_('Certificate Information'), {
+            'fields': ('registration', 'certificate_number', 'status', 'verification_code')
+        }),
+        (_('Certificate File'), {
+            'fields': ('certificate_file',)
+        }),
+        (_('Issue Details'), {
+            'fields': ('issued_at', 'issued_by')
+        }),
+        (_('Revocation'), {
+            'fields': ('revoked_at', 'revocation_reason'),
+            'classes': ('collapse',)
+        }),
+        (_('Timestamps'), {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    actions = ['issue_certificates', 'revoke_certificates', 'regenerate_certificates']
+    
+    def user_name(self, obj):
+        return obj.registration.user.full_name
+    user_name.short_description = _('User')
+    
+    def workshop_title(self, obj):
+        return obj.registration.workshop.title
+    workshop_title.short_description = _('Workshop')
+    
+    def certificate_file_link(self, obj):
+        if obj.certificate_file:
+            return format_html(
+                '<a href="{}" target="_blank">Download</a>',
+                obj.certificate_file.url
+            )
+        return '-'
+    certificate_file_link.short_description = _('Certificate File')
+    
+    def issue_certificates(self, request, queryset):
+        """Issue selected certificates"""
+        from .services.certificate_service import certificate_service
+        count = 0
+        for certificate in queryset:
+            if certificate.status == 'pending':
+                if certificate_service.generate_and_save_certificate(certificate):
+                    count += 1
+        self.message_user(request, _(f'{count} certificates issued successfully.'))
+    issue_certificates.short_description = _('Issue selected certificates')
+    
+    def revoke_certificates(self, request, queryset):
+        """Revoke selected certificates"""
+        from django.utils import timezone
+        updated = queryset.filter(status='issued').update(
+            status='revoked',
+            revoked_at=timezone.now()
+        )
+        self.message_user(request, _(f'{updated} certificates revoked.'))
+    revoke_certificates.short_description = _('Revoke selected certificates')
+    
+    def regenerate_certificates(self, request, queryset):
+        """Regenerate certificate PDFs"""
+        from .services.certificate_service import certificate_service
+        count = 0
+        for certificate in queryset:
+            if certificate_service.generate_and_save_certificate(certificate):
+                count += 1
+        self.message_user(request, _(f'{count} certificates regenerated successfully.'))
+    regenerate_certificates.short_description = _('Regenerate selected certificates')

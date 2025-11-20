@@ -330,6 +330,11 @@ class CourseListAPIView(generics.ListAPIView):
         if category_slug:
             queryset = queryset.filter(category__slug=category_slug)
         
+        # Filter by instructor ID if provided
+        instructor_id = self.request.query_params.get('instructor')
+        if instructor_id:
+            queryset = queryset.filter(instructor_id=instructor_id)
+        
         # Filter by price range
         min_price = self.request.query_params.get('min_price')
         max_price = self.request.query_params.get('max_price')

@@ -41,9 +41,8 @@ class User(AbstractUser):
     ]
     
     GENDER_CHOICES = [
-        ('M', _('Male')),
-        ('F', _('Female')),
-        ('O', _('Other')),
+        ('M', _('آقای')),
+        ('F', _('خانم')),
     ]
     
     # Remove username field since we're using email-based authentication
@@ -51,6 +50,8 @@ class User(AbstractUser):
     email = models.EmailField(_('آدرس ایمیل'), unique=True)
     user_type = models.CharField(max_length=20, choices=USER_TYPES, default='client', verbose_name='نوع کاربر')
     phone_number = models.CharField(max_length=15, blank=True, null=True, verbose_name='شماره تلفن')
+    first_name_en = models.CharField(max_length=150, blank=True, null=True, verbose_name='نام لاتین')
+    last_name_en = models.CharField(max_length=150, blank=True, null=True, verbose_name='نام خانوادگی لاتین')
     national_id = models.CharField(max_length=10, blank=True, null=True, unique=True, verbose_name='کد ملی')
     birth_date = models.DateField(blank=True, null=True, verbose_name='تاریخ تولد')
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, blank=True, null=True, verbose_name='جنسیت')
@@ -162,3 +163,46 @@ class Notification(models.Model):
     
     def __str__(self):
         return f"{self.title} - {self.user.full_name}"
+
+
+class OTPCode(models.Model):
+    """OTP code for SMS verification"""
+    
+    phone_number = models.CharField(max_length=15, verbose_name='شماره تلفن')
+    code = models.CharField(max_length=10, verbose_name='کد تایید')
+    purpose = models.CharField(
+        max_length=20,
+        choices=[
+            ('signup', _('ثبت‌نام')),
+            ('login', _('ورود')),
+            ('password_reset', _('بازیابی رمز عبور')),
+        ],
+        default='signup',
+        verbose_name='هدف'
+    )
+    is_verified = models.BooleanField(default=False, verbose_name='تایید شده')
+    is_used = models.BooleanField(default=False, verbose_name='استفاده شده')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    expires_at = models.DateTimeField(verbose_name='تاریخ انقضا')
+    verified_at = models.DateTimeField(blank=True, null=True, verbose_name='تاریخ تایید')
+    
+    class Meta:
+        verbose_name = _('کد تایید')
+        verbose_name_plural = _('کدهای تایید')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['phone_number', 'code', 'is_verified']),
+            models.Index(fields=['phone_number', 'purpose']),
+        ]
+    
+    def __str__(self):
+        return f"OTP for {self.phone_number} - {self.code}"
+    
+    def is_expired(self):
+        """Check if OTP code has expired"""
+        from django.utils import timezone
+        return timezone.now() > self.expires_at
+    
+    def is_valid(self):
+        """Check if OTP code is valid (not expired, not used, not verified)"""
+        return not self.is_expired() and not self.is_used and not self.is_verified

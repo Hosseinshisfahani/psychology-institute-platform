@@ -42,6 +42,7 @@ class ChatMessage(models.Model):
         verbose_name='ارسال کننده'
     )
     message = models.TextField(verbose_name='پیام')
+    attachment = models.FileField(upload_to='chat_attachments/', null=True, blank=True, verbose_name='فایل پیوست')
     is_from_admin = models.BooleanField(default=False, verbose_name='پیام ادمین')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ارسال')
     read_at = models.DateTimeField(null=True, blank=True, verbose_name='تاریخ خوانده شدن')

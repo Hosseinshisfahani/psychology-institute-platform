@@ -4,12 +4,18 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate, login, logout
-from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.utils.decorators import method_decorator
-from .models import User, Notification
+from django.utils import timezone
+from datetime import timedelta
+import logging
+from .models import User, Notification, OTPCode
 from .serializers import UserSerializer, UserProfileSerializer
+from .sms_service import send_otp_sms, verify_otp_sms, generate_otp_code
 from app.courses.models import CoursePurchase
 from app.payment.models import Order
+
+logger = logging.getLogger(__name__)
 
 
 @api_view(['GET'])
@@ -315,12 +321,15 @@ def financial_report_api(request):
 
 
 class LoginAPIView(APIView):
-    """API endpoint for user login"""
+    """API endpoint for user login with optional OTP verification"""
     permission_classes = [permissions.AllowAny]
     
     def post(self, request):
         email = request.data.get('email')
         password = request.data.get('password')
+        otp_code = request.data.get('otp_code')
+        phone_number = request.data.get('phone_number')
+        require_otp = request.data.get('require_otp', False)  # Optional flag to require OTP
         
         if not email or not password:
             return Response({
@@ -330,22 +339,73 @@ class LoginAPIView(APIView):
         
         user = authenticate(request, username=email, password=password)
         
-        if user is not None:
-            login(request, user)
-            return Response({
-                'success': True,
-                'message': 'Login successful',
-                'user': UserSerializer(user, context={'request': request}).data
-            })
-        else:
+        if user is None:
             return Response({
                 'success': False,
                 'message': 'Invalid email or password'
             }, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # If OTP is required or provided, verify it
+        if require_otp or otp_code:
+            if not phone_number:
+                # Try to get phone number from user
+                phone_number = user.phone_number
+                if not phone_number:
+                    return Response({
+                        'success': False,
+                        'message': 'Phone number is required for OTP verification'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not otp_code:
+                return Response({
+                    'success': False,
+                    'message': 'OTP code is required',
+                    'requires_otp': True
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Normalize phone number
+            phone_number = phone_number.replace('+98', '').replace('0098', '').replace('-', '').replace(' ', '').strip()
+            if not phone_number.startswith('0'):
+                phone_number = '0' + phone_number
+            
+            # Verify OTP
+            otp_obj = OTPCode.objects.filter(
+                phone_number=phone_number,
+                code=otp_code,
+                purpose='login',
+                is_verified=True,
+                is_used=False
+            ).order_by('-created_at').first()
+            
+            if not otp_obj:
+                return Response({
+                    'success': False,
+                    'message': 'Invalid or unverified OTP code. Please verify your phone number first.',
+                    'requires_otp': True
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if otp_obj.is_expired():
+                return Response({
+                    'success': False,
+                    'message': 'OTP code has expired. Please request a new one.',
+                    'requires_otp': True
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Mark OTP as used
+            otp_obj.is_used = True
+            otp_obj.save()
+        
+        # Login successful
+        login(request, user)
+        return Response({
+            'success': True,
+            'message': 'Login successful',
+            'user': UserSerializer(user, context={'request': request}).data
+        })
 
 
 class SignupAPIView(APIView):
-    """API endpoint for user signup"""
+    """API endpoint for user signup with OTP verification"""
     permission_classes = [permissions.AllowAny]
     
     def post(self, request):
@@ -354,12 +414,14 @@ class SignupAPIView(APIView):
         password2 = request.data.get('password2')
         first_name = request.data.get('first_name')
         last_name = request.data.get('last_name')
+        phone_number = request.data.get('phone_number')
+        otp_code = request.data.get('otp_code')
         
         # Validate required fields
-        if not all([email, password1, password2, first_name, last_name]):
+        if not all([email, password1, password2, first_name, last_name, phone_number]):
             return Response({
                 'success': False,
-                'message': 'All fields are required'
+                'message': 'All fields including phone number are required'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Check if passwords match
@@ -376,14 +438,61 @@ class SignupAPIView(APIView):
                 'message': 'User with this email already exists'
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Normalize phone number
+        phone_number = phone_number.replace('+98', '').replace('0098', '').replace('-', '').replace(' ', '').strip()
+        if not phone_number.startswith('0'):
+            phone_number = '0' + phone_number
+        
+        # Check if phone number is already registered
+        if User.objects.filter(phone_number=phone_number).exists():
+            return Response({
+                'success': False,
+                'message': 'User with this phone number already exists'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Verify OTP code
+        if not otp_code:
+            return Response({
+                'success': False,
+                'message': 'OTP code is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Find and verify OTP
+        otp_obj = OTPCode.objects.filter(
+            phone_number=phone_number,
+            code=otp_code,
+            purpose='signup',
+            is_verified=True,
+            is_used=False
+        ).order_by('-created_at').first()
+        
+        if not otp_obj:
+            return Response({
+                'success': False,
+                'message': 'Invalid or unverified OTP code. Please verify your phone number first.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if OTP is expired
+        if otp_obj.is_expired():
+            return Response({
+                'success': False,
+                'message': 'OTP code has expired. Please request a new one.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         # Create user
         try:
             user = User.objects.create_user(
                 email=email,
                 password=password1,
                 first_name=first_name,
-                last_name=last_name
+                last_name=last_name,
+                phone_number=phone_number
             )
+            
+            # Mark OTP as used
+            otp_obj.is_used = True
+            otp_obj.save()
+            
             login(request, user, backend='django.contrib.auth.backends.ModelBackend')
             
             return Response({
@@ -446,3 +555,180 @@ class ProfileAPIView(APIView):
             return Response(serializer.data)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class SendOTPAPIView(APIView):
+    """API endpoint to send OTP code via SMS"""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []  # No authentication required
+    
+    def post(self, request):
+        phone_number = request.data.get('phone_number')
+        purpose = request.data.get('purpose', 'signup')  # signup, login, password_reset
+        
+        if not phone_number:
+            return Response({
+                'success': False,
+                'message': 'Phone number is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate phone number format (Iranian mobile numbers)
+        phone_number = phone_number.replace('+98', '').replace('0098', '').replace('-', '').replace(' ', '').strip()
+        if not phone_number.startswith('0'):
+            phone_number = '0' + phone_number
+        
+        if not phone_number.startswith('09') or len(phone_number) != 11:
+            return Response({
+                'success': False,
+                'message': 'Invalid phone number format. Please use format: 09123456789'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check for recent OTP requests (rate limiting)
+        recent_otp = OTPCode.objects.filter(
+            phone_number=phone_number,
+            purpose=purpose,
+            created_at__gte=timezone.now() - timedelta(minutes=1)
+        ).first()
+        
+        if recent_otp:
+            return Response({
+                'success': False,
+                'message': 'Please wait before requesting a new OTP code'
+            }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        
+        # Generate OTP code
+        otp_code = generate_otp_code(6)
+        
+        # Send OTP via SMS
+        logger.info(f"Attempting to send OTP to {phone_number}")
+        try:
+            sms_result = send_otp_sms(phone_number, otp_code)
+            logger.info(f"send_otp_sms returned: {sms_result}")
+        except Exception as e:
+            logger.error(f"Exception in send_otp_sms: {str(e)}", exc_info=True)
+            return Response({
+                'success': False,
+                'message': f'Error sending OTP: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # Ensure sms_result is not None
+        if sms_result is None:
+            logger.error("send_otp_sms returned None - this should not happen!")
+            logger.error(f"Function type: {type(send_otp_sms)}")
+            return Response({
+                'success': False,
+                'message': 'SMS service returned no response. Please check server logs.'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        if not sms_result.get('success', False):
+            error_message = sms_result.get('message', 'Unknown error occurred')
+            logger.error(f"SMS service returned error: {error_message}")
+            return Response({
+                'success': False,
+                'message': error_message
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # Save OTP code to database
+        otp_obj = OTPCode.objects.create(
+            phone_number=phone_number,
+            code=otp_code,
+            purpose=purpose,
+            expires_at=timezone.now() + timedelta(minutes=5)
+        )
+        
+        # In development, you might want to return the OTP code for testing
+        # Remove this in production!
+        if getattr(request, 'DEBUG', False):
+            return Response({
+                'success': True,
+                'message': 'OTP sent successfully',
+                'otp_code': otp_code,  # Remove in production!
+                'expires_at': otp_obj.expires_at
+            })
+        
+        return Response({
+            'success': True,
+            'message': 'OTP sent successfully',
+            'expires_at': otp_obj.expires_at
+        })
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class VerifyOTPAPIView(APIView):
+    """API endpoint to verify OTP code"""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []  # No authentication required
+    
+    def post(self, request):
+        phone_number = request.data.get('phone_number')
+        otp_code = request.data.get('otp_code')
+        purpose = request.data.get('purpose', 'signup')
+        
+        if not phone_number or not otp_code:
+            return Response({
+                'success': False,
+                'message': 'Phone number and OTP code are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Normalize phone number
+        phone_number = phone_number.replace('+98', '').replace('0098', '').replace('-', '').replace(' ', '').strip()
+        if not phone_number.startswith('0'):
+            phone_number = '0' + phone_number
+        
+        # Find the OTP code
+        otp_obj = OTPCode.objects.filter(
+            phone_number=phone_number,
+            code=otp_code,
+            purpose=purpose,
+            is_verified=False,
+            is_used=False
+        ).order_by('-created_at').first()
+        
+        if not otp_obj:
+            return Response({
+                'success': False,
+                'message': 'Invalid OTP code'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if OTP is expired
+        if otp_obj.is_expired():
+            return Response({
+                'success': False,
+                'message': 'OTP code has expired. Please request a new one.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Verify with SMS service (optional - can skip if you trust your database)
+        # sms_verify_result = verify_otp_sms(phone_number, otp_code)
+        # if not sms_verify_result['success']:
+        #     return Response({
+        #         'success': False,
+        #         'message': sms_verify_result['message']
+        #     }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Mark OTP as verified
+        otp_obj.is_verified = True
+        otp_obj.verified_at = timezone.now()
+        otp_obj.save()
+        
+        return Response({
+            'success': True,
+            'message': 'OTP verified successfully'
+        })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def sms_config_check(request):
+    """Diagnostic endpoint to check if SMS credentials are loaded"""
+    from django.conf import settings
+    from .sms_service import SMS_USERNAME, SMS_PASSWORD, SMS_SENDER_NUMBER
+    
+    return Response({
+        'sms_username': SMS_USERNAME if SMS_USERNAME else 'NOT SET',
+        'sms_password_set': bool(SMS_PASSWORD),
+        'sms_sender_number': SMS_SENDER_NUMBER if SMS_SENDER_NUMBER else 'NOT SET',
+        'settings_sms_username': getattr(settings, 'SMS_USERNAME', 'NOT FOUND'),
+        'settings_sms_password_set': bool(getattr(settings, 'SMS_PASSWORD', '')),
+        'settings_sms_sender': getattr(settings, 'SMS_SENDER_NUMBER', 'NOT FOUND'),
+    })

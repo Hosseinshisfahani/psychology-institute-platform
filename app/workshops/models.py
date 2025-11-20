@@ -364,3 +364,140 @@ class WorkshopReview(models.Model):
     
     def __str__(self):
         return f"Review for {self.registration.workshop.title} by {self.registration.user.full_name}"
+
+
+class WorkshopCertificate(models.Model):
+    """Certificates issued to users who complete workshops"""
+    
+    STATUS_CHOICES = [
+        ('pending', _('Pending')),
+        ('issued', _('Issued')),
+        ('revoked', _('Revoked')),
+    ]
+    
+    registration = models.OneToOneField(
+        WorkshopRegistration,
+        on_delete=models.CASCADE,
+        related_name='certificate',
+        verbose_name='ثبت‌نام'
+    )
+    certificate_number = models.CharField(
+        max_length=50,
+        unique=True,
+        verbose_name='شماره گواهینامه'
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending',
+        verbose_name='وضعیت'
+    )
+    
+    # Certificate file
+    certificate_file = models.FileField(
+        upload_to='workshops/certificates/',
+        blank=True,
+        null=True,
+        verbose_name='فایل گواهینامه'
+    )
+    
+    # Issue details
+    issued_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name='تاریخ صدور'
+    )
+    issued_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='issued_certificates',
+        verbose_name='صادرکننده'
+    )
+    
+    # Revocation details
+    revoked_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name='تاریخ لغو'
+    )
+    revocation_reason = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='دلیل لغو'
+    )
+    
+    # Verification
+    verification_code = models.CharField(
+        max_length=32,
+        unique=True,
+        verbose_name='کد تأیید'
+    )
+    
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='تاریخ ایجاد'
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name='تاریخ بروزرسانی'
+    )
+    
+    class Meta:
+        verbose_name = _('گواهینامه کارگاه')
+        verbose_name_plural = _('گواهینامه‌های کارگاه')
+        ordering = ['-issued_at', '-created_at']
+    
+    def __str__(self):
+        return f"Certificate {self.certificate_number} - {self.registration.user.full_name}"
+    
+    def save(self, *args, **kwargs):
+        if not self.certificate_number:
+            # Generate unique certificate number
+            from django.utils import timezone
+            import random
+            import string
+            
+            # Format: WS-YYYYMMDD-XXXXXX (6 random alphanumeric)
+            date_str = timezone.now().strftime('%Y%m%d')
+            random_suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            self.certificate_number = f"WS-{date_str}-{random_suffix}"
+            
+            # Ensure uniqueness
+            while WorkshopCertificate.objects.filter(certificate_number=self.certificate_number).exists():
+                random_suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                self.certificate_number = f"WS-{date_str}-{random_suffix}"
+        
+        if not self.verification_code:
+            import secrets
+            self.verification_code = secrets.token_urlsafe(16)
+            
+            # Ensure uniqueness
+            while WorkshopCertificate.objects.filter(verification_code=self.verification_code).exists():
+                self.verification_code = secrets.token_urlsafe(16)
+        
+        if self.status == 'issued' and not self.issued_at:
+            from django.utils import timezone
+            self.issued_at = timezone.now()
+        
+        if self.status == 'revoked' and not self.revoked_at:
+            from django.utils import timezone
+            self.revoked_at = timezone.now()
+        
+        super().save(*args, **kwargs)
+    
+    @property
+    def is_valid(self):
+        """Check if certificate is valid (issued and not revoked)"""
+        return self.status == 'issued'
+    
+    @property
+    def user(self):
+        """Get the user who owns this certificate"""
+        return self.registration.user
+    
+    @property
+    def workshop(self):
+        """Get the workshop this certificate is for"""
+        return self.registration.workshop

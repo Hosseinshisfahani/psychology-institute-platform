@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
-from .models import User, UserProfile, Notification
+from .models import User, UserProfile, Notification, OTPCode
 
 
 @admin.register(User)
@@ -62,3 +62,17 @@ class NotificationAdmin(admin.ModelAdmin):
     
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('user')
+
+
+@admin.register(OTPCode)
+class OTPCodeAdmin(admin.ModelAdmin):
+    """Admin configuration for OTPCode model"""
+    
+    list_display = ('phone_number', 'code', 'purpose', 'is_verified', 'is_used', 'created_at', 'expires_at')
+    list_filter = ('purpose', 'is_verified', 'is_used', 'created_at')
+    search_fields = ('phone_number', 'code')
+    readonly_fields = ('created_at', 'verified_at')
+    ordering = ('-created_at',)
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request)

@@ -8,14 +8,17 @@ from datetime import timedelta, datetime
 from decimal import Decimal
 from .models import (
     Workshop, WorkshopCategory, WorkshopSession, WorkshopRegistration,
-    WorkshopSessionAttendance, InstallmentPlan, InstallmentPayment, WorkshopReview
+    WorkshopSessionAttendance, InstallmentPlan, InstallmentPayment, WorkshopReview,
+    WorkshopCertificate
 )
 from .serializers import (
     WorkshopListSerializer, WorkshopDetailSerializer, WorkshopCategorySerializer,
     WorkshopRegistrationSerializer, WorkshopSessionSerializer,
-    WorkshopSessionAttendanceSerializer, InstallmentPaymentSerializer, WorkshopReviewSerializer
+    WorkshopSessionAttendanceSerializer, InstallmentPaymentSerializer, WorkshopReviewSerializer,
+    WorkshopCertificateSerializer
 )
 from .services.croom_service import croom_service
+from .services.certificate_service import certificate_service
 from app.payment.models import Cart, CartItem, Order, OrderItem, Payment, PaymentMethod
 from app.payment.zarinpal import ZarinpalPayment
 from dateutil.relativedelta import relativedelta
@@ -720,4 +723,146 @@ def workshop_reviews(request, workshop_slug):
     
     serializer = WorkshopReviewSerializer(reviews, many=True)
     return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def generate_certificate(request, workshop_slug):
+    """Generate a certificate for a completed workshop"""
+    workshop = get_object_or_404(Workshop, slug=workshop_slug)
+    
+    try:
+        registration = WorkshopRegistration.objects.get(
+            user=request.user,
+            workshop=workshop
+        )
+    except WorkshopRegistration.DoesNotExist:
+        return Response(
+            {'error': 'شما در این کارگاه ثبت‌نام نکرده‌اید'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Check if certificate can be issued
+    can_issue, reason = certificate_service.can_issue_certificate(registration)
+    if not can_issue:
+        return Response(
+            {'error': reason},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Get or create certificate
+    certificate, created = WorkshopCertificate.objects.get_or_create(
+        registration=registration,
+        defaults={
+            'status': 'pending',
+            'issued_by': request.user if request.user.is_staff else None
+        }
+    )
+    
+    # Generate and save certificate PDF
+    if certificate_service.generate_and_save_certificate(certificate):
+        serializer = WorkshopCertificateSerializer(certificate, context={'request': request})
+        return Response({
+            'message': 'گواهینامه با موفقیت صادر شد',
+            'certificate': serializer.data
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+    else:
+        return Response(
+            {'error': 'خطا در تولید گواهینامه'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_certificate(request, workshop_slug):
+    """Get certificate for a workshop"""
+    workshop = get_object_or_404(Workshop, slug=workshop_slug)
+    
+    try:
+        registration = WorkshopRegistration.objects.get(
+            user=request.user,
+            workshop=workshop
+        )
+    except WorkshopRegistration.DoesNotExist:
+        return Response(
+            {'error': 'شما در این کارگاه ثبت‌نام نکرده‌اید'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    try:
+        certificate = registration.certificate
+        serializer = WorkshopCertificateSerializer(certificate, context={'request': request})
+        return Response(serializer.data)
+    except WorkshopCertificate.DoesNotExist:
+        return Response(
+            {'error': 'گواهینامه برای این کارگاه صادر نشده است'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def download_certificate(request, certificate_id):
+    """Download certificate PDF file"""
+    certificate = get_object_or_404(WorkshopCertificate, id=certificate_id)
+    
+    # Check if user owns this certificate or is staff
+    if certificate.registration.user != request.user and not request.user.is_staff:
+        return Response(
+            {'error': 'شما اجازه دسترسی به این گواهینامه را ندارید'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    if not certificate.certificate_file:
+        # Try to generate if not exists
+        if certificate_service.generate_and_save_certificate(certificate):
+            certificate.refresh_from_db()
+        else:
+            return Response(
+                {'error': 'فایل گواهینامه موجود نیست و امکان تولید آن وجود ندارد'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    from django.http import FileResponse
+    return FileResponse(
+        certificate.certificate_file.open('rb'),
+        content_type='application/pdf',
+        filename=f"certificate_{certificate.certificate_number}.pdf"
+    )
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def user_certificates(request):
+    """Get all certificates for the authenticated user"""
+    certificates = WorkshopCertificate.objects.filter(
+        registration__user=request.user,
+        status='issued'
+    ).select_related(
+        'registration__workshop',
+        'registration__workshop__instructor'
+    ).order_by('-issued_at', '-created_at')
+    
+    serializer = WorkshopCertificateSerializer(certificates, many=True, context={'request': request})
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def verify_certificate(request, verification_code):
+    """Verify a certificate by verification code (public endpoint)"""
+    try:
+        certificate = WorkshopCertificate.objects.get(verification_code=verification_code)
+    except WorkshopCertificate.DoesNotExist:
+        return Response(
+            {'error': 'گواهینامه یافت نشد'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    serializer = WorkshopCertificateSerializer(certificate, context={'request': request})
+    return Response({
+        'valid': certificate.is_valid,
+        'certificate': serializer.data
+    })
 

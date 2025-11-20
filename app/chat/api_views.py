@@ -32,7 +32,7 @@ def _get_or_create_thread(user):
 @permission_classes([IsAuthenticated])
 def thread_detail(request):
     thread = _get_or_create_thread(request.user)
-    serializer = ChatThreadSerializer(thread)
+    serializer = ChatThreadSerializer(thread, context={'request': request})
     return Response(serializer.data)
 
 
@@ -43,21 +43,37 @@ def send_message(request):
     serializer.is_valid(raise_exception=True)
 
     thread = _get_or_create_thread(request.user)
-    message_text = serializer.validated_data['message'].strip()
-    if not message_text:
-        return Response({'detail': 'پیام نمی‌تواند خالی باشد.'}, status=status.HTTP_400_BAD_REQUEST)
+    message_text = serializer.validated_data.get('message', '').strip()
+    attachment = serializer.validated_data.get('attachment')
+    
+    if not message_text and not attachment:
+        return Response({'detail': 'پیام یا فایل پیوست الزامی است.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Validate file if provided
+    if attachment:
+        # Check file size (5MB limit)
+        if attachment.size > 5 * 1024 * 1024:
+            return Response({'detail': 'حجم فایل نباید بیشتر از ۵ مگابایت باشد.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check file type
+        allowed_types = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf', 
+                        'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+        if attachment.content_type not in allowed_types:
+            return Response({'detail': 'نوع فایل پشتیبانی نمی‌شود. لطفاً از تصویر، PDF یا Word استفاده کنید.'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
 
     message = ChatMessage.objects.create(
         thread=thread,
         sender=request.user,
-        message=message_text,
+        message=message_text or '',
+        attachment=attachment,
         is_from_admin=request.user.user_type in default_admin_types,
     )
 
     thread.updated_at = timezone.now()
     thread.save(update_fields=['updated_at'])
 
-    return Response(ChatMessageSerializer(message).data, status=status.HTTP_201_CREATED)
+    return Response(ChatMessageSerializer(message, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
 
 @api_view(['GET'])
@@ -111,7 +127,7 @@ def admin_thread_detail(request, thread_id):
     ).update(read_at=timezone.now())
 
     messages = thread.messages.order_by('created_at')
-    serialized_messages = ChatMessageSerializer(messages, many=True).data
+    serialized_messages = ChatMessageSerializer(messages, many=True, context={'request': request}).data
 
     data = {
         'id': thread.id,
@@ -142,18 +158,34 @@ def admin_send_message(request):
         thread.assigned_admin = request.user
         thread.save(update_fields=['assigned_admin'])
 
-    message_text = serializer.validated_data['message'].strip()
-    if not message_text:
-        return Response({'detail': 'پیام نمی‌تواند خالی باشد.'}, status=status.HTTP_400_BAD_REQUEST)
+    message_text = serializer.validated_data.get('message', '').strip()
+    attachment = serializer.validated_data.get('attachment')
+    
+    if not message_text and not attachment:
+        return Response({'detail': 'پیام یا فایل پیوست الزامی است.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Validate file if provided
+    if attachment:
+        # Check file size (5MB limit)
+        if attachment.size > 5 * 1024 * 1024:
+            return Response({'detail': 'حجم فایل نباید بیشتر از ۵ مگابایت باشد.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check file type
+        allowed_types = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf', 
+                        'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+        if attachment.content_type not in allowed_types:
+            return Response({'detail': 'نوع فایل پشتیبانی نمی‌شود. لطفاً از تصویر، PDF یا Word استفاده کنید.'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
 
     message = ChatMessage.objects.create(
         thread=thread,
         sender=request.user,
-        message=message_text,
+        message=message_text or '',
+        attachment=attachment,
         is_from_admin=True,
     )
 
     thread.updated_at = timezone.now()
     thread.save(update_fields=['updated_at'])
 
-    return Response(ChatMessageSerializer(message).data, status=status.HTTP_201_CREATED)
+    return Response(ChatMessageSerializer(message, context={'request': request}).data, status=status.HTTP_201_CREATED)

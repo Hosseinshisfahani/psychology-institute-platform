@@ -899,12 +899,13 @@ class AdminPackageSerializer(serializers.ModelSerializer):
 class AdminNotificationSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.get_full_name', read_only=True)
     created_at_persian = serializers.SerializerMethodField()
+    type = serializers.CharField(source='notification_type', read_only=True)
     
     class Meta:
         model = Notification
         fields = [
             'id', 'user', 'user_name', 'title', 'message', 'type',
-            'is_read', 'action_url', 'created_at', 'created_at_persian'
+            'is_read', 'created_at', 'created_at_persian'
         ]
     
     def get_created_at_persian(self, obj):

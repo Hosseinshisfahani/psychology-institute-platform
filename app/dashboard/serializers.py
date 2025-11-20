@@ -25,7 +25,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'email', 'first_name', 'last_name', 'full_name',
+            'id', 'email', 'first_name', 'last_name', 'first_name_en', 'last_name_en', 'full_name',
             'user_type', 'phone_number', 'national_id', 'birth_date', 'gender',
             'address', 'city', 'postal_code', 'profile_image', 'bio',
             'is_active', 'is_verified', 'is_staff', 'date_joined', 'last_login', 'profile'
@@ -33,12 +33,29 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'date_joined', 'last_login', 'is_verified', 'is_staff']
     
     def validate_national_id(self, value):
-        """Validate national_id uniqueness, excluding current user instance"""
+        """Validate national_id uniqueness and Persian digits only"""
         # Convert empty string to None to match model's blank=True, null=True
         if value == '':
             return None
             
         if value:
+            # Check if national_id contains only Persian digits (۰-۹) or ASCII digits (0-9)
+            # Persian digits: ۰۱۲۳۴۵۶۷۸۹
+            persian_digits = '۰۱۲۳۴۵۶۷۸۹'
+            ascii_digits = '0123456789'
+            
+            # Check if all characters are either Persian or ASCII digits
+            if not all(char in persian_digits or char in ascii_digits for char in value):
+                raise serializers.ValidationError("کد ملی باید فقط شامل اعداد فارسی یا لاتین باشد")
+            
+            # Convert Persian digits to ASCII digits for storage
+            persian_to_ascii = str.maketrans('۰۱۲۳۴۵۶۷۸۹', '0123456789')
+            value = value.translate(persian_to_ascii)
+            
+            # Validate length
+            if len(value) != 10:
+                raise serializers.ValidationError("کد ملی باید ۱۰ رقم باشد")
+            
             # Get the current instance if updating, or None if creating
             instance = self.instance
             

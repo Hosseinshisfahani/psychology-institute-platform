@@ -12,10 +12,25 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 import os
 from pathlib import Path
-from decouple import config
+from decouple import Csv, AutoConfig
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Configure decouple to look for .env in project root or pedendencies directory
+# python-decouple searches from current directory up to project root
+# We'll explicitly set the search path to ensure .env is found
+ENV_FILE_ROOT = BASE_DIR / '.env'
+ENV_FILE_PED = BASE_DIR / 'pedendencies' / '.env'
+
+# Determine which .env file exists and set search path accordingly
+if ENV_FILE_ROOT.exists():
+    config = AutoConfig(search_path=str(BASE_DIR))
+elif ENV_FILE_PED.exists():
+    config = AutoConfig(search_path=str(BASE_DIR / 'pedendencies'))
+else:
+    # Default: search from BASE_DIR (project root)
+    config = AutoConfig(search_path=str(BASE_DIR))
 
 
 # Quick-start development settings - unsuitable for production
@@ -264,6 +279,11 @@ EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@sarmadclinic.ir')
+
+# SMS settings (insms.ir)
+SMS_USERNAME = config('SMS_USERNAME', default='utpsy')
+SMS_PASSWORD = config('SMS_PASSWORD', default='Sarmad@123')
+SMS_SENDER_NUMBER = config('SMS_SENDER_NUMBER', default='')  # Sender number (سرشماره) - get from insms.ir panel
 
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True

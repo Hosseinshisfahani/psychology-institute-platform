@@ -1,9 +1,11 @@
 from rest_framework import serializers
 from .models import (
     Workshop, WorkshopCategory, WorkshopSession, WorkshopRegistration,
-    WorkshopSessionAttendance, InstallmentPlan, InstallmentPayment, WorkshopReview
+    WorkshopSessionAttendance, InstallmentPlan, InstallmentPayment, WorkshopReview,
+    WorkshopCertificate
 )
 from django.contrib.auth import get_user_model
+from datetime import datetime
 import jdatetime
 
 User = get_user_model()
@@ -284,4 +286,43 @@ class WorkshopReviewSerializer(serializers.ModelSerializer):
             'workshop_title', 'created_at'
         ]
         read_only_fields = ['created_at']
+
+
+class WorkshopCertificateSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='registration.user.full_name', read_only=True)
+    workshop_title = serializers.CharField(source='registration.workshop.title', read_only=True)
+    workshop_slug = serializers.CharField(source='registration.workshop.slug', read_only=True)
+    instructor_name = serializers.CharField(source='registration.workshop.instructor.full_name', read_only=True)
+    issued_at_persian = serializers.SerializerMethodField()
+    certificate_file_url = serializers.SerializerMethodField()
+    is_valid = serializers.BooleanField(read_only=True)
+    
+    class Meta:
+        model = WorkshopCertificate
+        fields = [
+            'id', 'certificate_number', 'status', 'user_name', 'workshop_title',
+            'workshop_slug', 'instructor_name', 'certificate_file', 'certificate_file_url',
+            'issued_at', 'issued_at_persian', 'verification_code', 'is_valid',
+            'created_at'
+        ]
+        read_only_fields = [
+            'certificate_number', 'verification_code', 'issued_at', 'created_at'
+        ]
+    
+    def get_issued_at_persian(self, obj):
+        if obj.issued_at:
+            try:
+                jdatetime_obj = jdatetime.datetime.fromgregorian(datetime=obj.issued_at)
+                return jdatetime_obj.strftime('%Y/%m/%d')
+            except Exception:
+                return obj.issued_at.strftime('%Y/%m/%d')
+        return None
+    
+    def get_certificate_file_url(self, obj):
+        if obj.certificate_file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.certificate_file.url)
+            return obj.certificate_file.url
+        return None
 
