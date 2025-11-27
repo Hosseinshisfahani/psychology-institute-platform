@@ -1,0 +1,70 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Persian Date Picker RTL Support */
+.rmdp-container {
+  direction: rtl;
+}
+
+.rmdp-input {
+  text-align: right;
+}
+
+.rmdp-calendar {
+  direction: rtl;
+}
+
+.rmdp-day {
+  text-align: center;
+}
+
+/* Ensure proper RTL layout for the date picker */
+.rmdp-wrapper {
+  direction: rtl;
+}
+
+/* TimeSlotPicker styles */
+.time-slot-picker {
+  direction: rtl;
+}
+
+.time-slot-picker .grid {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.time-slot-picker .grid-cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (min-width: 640px) {
+  .time-slot-picker .sm\:grid-cols-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .time-slot-picker .md\:grid-cols-6 {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+.time-slot-picker button {
+  transition: all 0.2s ease;
+}
+
+.time-slot-picker button:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}

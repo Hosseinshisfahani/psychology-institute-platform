@@ -1,0 +1,737 @@
+.coach-page {
+  background-color: #f8fafc;
+  color: #1f2a44;
+  direction: rtl;
+  text-align: right;
+  min-height: 100vh;
+}
+
+.coach-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 5.5rem 0 4.5rem;
+  background: linear-gradient(130deg, #eef3ff 0%, #dce7ff 45%, #f3fbff 100%);
+}
+
+.coach-hero::before,
+.coach-hero::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.5;
+  filter: blur(0);
+  pointer-events: none;
+}
+
+.coach-hero::before {
+  width: 420px;
+  height: 420px;
+  top: -180px;
+  left: -120px;
+  background: radial-gradient(circle at center, rgba(70, 131, 225, 0.18), transparent 65%);
+}
+
+.coach-hero::after {
+  width: 480px;
+  height: 480px;
+  bottom: -220px;
+  right: -160px;
+  background: radial-gradient(circle at center, rgba(104, 178, 255, 0.2), transparent 60%);
+}
+
+.coach-hero-content {
+  position: relative;
+  z-index: 1;
+}
+
+.coach-hero-badge {
+  display: inline-block;
+  padding: 0.35rem 1rem;
+  border-radius: 999px;
+  background-color: rgba(44, 90, 160, 0.12);
+  color: #2c5aa0;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.coach-hero-title {
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1.5;
+  margin-top: 1.5rem;
+}
+
+.coach-hero-subtitle {
+  font-size: 1.05rem;
+  color: #516078;
+  margin-top: 1rem;
+}
+
+
+.coach-hero-card {
+  border: none;
+  border-radius: 20px;
+  background-color: #ffffff;
+}
+
+.coach-hero-list .list-group-item {
+  border: none;
+  border-bottom: 1px solid #edf2f8;
+  padding: 1rem 0;
+}
+
+.coach-hero-list .list-group-item:last-child {
+  border-bottom: none;
+}
+
+.coach-hero-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background-color: rgba(44, 90, 160, 0.12);
+  color: #2c5aa0;
+  font-size: 1.1rem;
+}
+
+.coach-highlights {
+  padding: 3rem 0;
+}
+
+.coach-link-card {
+  border: none;
+  border-radius: 18px;
+  background-color: #ffffff;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.coach-link-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 14px 35px rgba(31, 61, 117, 0.08);
+}
+
+.coach-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background-color: rgba(44, 90, 160, 0.12);
+  color: #2c5aa0;
+  font-size: 1.2rem;
+}
+
+.coach-link-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  color: #2c5aa0;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.coach-link-action:hover {
+  color: #1d4f91;
+}
+
+.coach-contact {
+  padding: 3rem 0;
+}
+
+.coach-contact-card,
+.coach-form-card {
+  border: none;
+  border-radius: 20px;
+  background-color: #ffffff;
+}
+
+.coach-contact-card.coach-contact-enhanced {
+  padding: 0;
+  overflow: hidden;
+}
+
+.coach-contact-header {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-start;
+  padding: 1.75rem 1.75rem 1.5rem;
+  background: linear-gradient(135deg, #2f7f7f 0%, #46a7a7 100%);
+  color: #ffffff;
+}
+
+.coach-contact-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  background-color: rgba(255, 255, 255, 0.18);
+  font-size: 1.5rem;
+}
+
+.coach-contact-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.75rem;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.18);
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.coach-contact-title {
+  font-weight: 700;
+}
+
+.coach-contact-subtitle {
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.8;
+}
+
+.coach-contact-enhanced .card-body {
+  padding: 1.75rem;
+}
+
+.coach-contact-list .list-group-item {
+  border: none;
+  border-bottom: 1px solid #edf3f3;
+  padding: 1.25rem 0;
+  color: #3d4c59;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.coach-contact-list .list-group-item:last-child {
+  border-bottom: none;
+}
+
+.coach-contact-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background-color: rgba(47, 127, 127, 0.12);
+  color: #2f7f7f;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.coach-contact-item-label {
+  font-weight: 700;
+  color: #234951;
+  margin-bottom: 0.3rem;
+}
+
+.coach-contact-item-text {
+  color: #5f6f7c;
+  line-height: 1.8;
+  font-size: 0.92rem;
+}
+
+.coach-contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.coach-contact-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.65rem 1.2rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2f7f7f, #46a7a7);
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.coach-contact-action:hover {
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(47, 127, 127, 0.18);
+}
+
+.coach-contact-action-outline {
+  background: #ffffff;
+  border: 1px solid rgba(47, 127, 127, 0.35);
+  color: #2f7f7f;
+}
+
+.coach-contact-action-outline:hover {
+  color: #225f5f;
+  box-shadow: 0 10px 20px rgba(47, 127, 127, 0.15);
+}
+
+.coach-contact-note {
+  padding: 1rem 1.25rem;
+  border-radius: 16px;
+  background-color: rgba(47, 127, 127, 0.08);
+  color: #26545c;
+  font-size: 0.95rem;
+}
+
+.coach-contact-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  border: 1px solid rgba(47, 127, 127, 0.22);
+  background-color: rgba(47, 127, 127, 0.05);
+}
+
+.coach-contact-tip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background-color: rgba(47, 127, 127, 0.12);
+  color: #2f7f7f;
+  flex-shrink: 0;
+}
+
+.coach-form .form-control {
+  border-radius: 12px;
+  border: 1px solid #d9e2f2;
+  padding: 0.75rem 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.coach-form .form-control:focus {
+  border-color: #2c5aa0;
+  box-shadow: 0 0 0 0.2rem rgba(44, 90, 160, 0.15);
+}
+
+.coach-chat {
+  padding: 3rem 0;
+}
+
+.coach-chat-card {
+  border: none;
+  border-radius: 20px;
+  background-color: #ffffff;
+  min-height: 460px;
+  overflow: hidden;
+}
+
+.coach-chat-card .card-body {
+  padding: 1.75rem;
+}
+
+.coach-chat-header {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding: 1.75rem;
+  min-height: 200px;
+  background: linear-gradient(135deg, #3058aa 0%, #4f84d0 100%);
+  color: #ffffff;
+  border-radius: 20px 20px 0 0;
+}
+
+.coach-chat-header-main {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+.coach-chat-header-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  background-color: rgba(255, 255, 255, 0.18);
+  font-size: 1.6rem;
+}
+
+.coach-chat-header-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.75rem;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.2);
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.6rem;
+}
+
+.coach-chat-header-title {
+  font-weight: 700;
+}
+
+.coach-chat-header-text {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.8;
+}
+
+.coach-chat-header-tags,
+.coach-expectation-header-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.coach-chat-header-tag,
+.coach-expectation-header-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.18);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.coach-chat-meta-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: 16px;
+  background-color: #f1f5ff;
+  border: 1px solid rgba(44, 90, 160, 0.12);
+}
+
+.coach-chat-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 160px;
+}
+
+.coach-chat-meta-label {
+  font-size: 0.8rem;
+  color: #6a7a95;
+  font-weight: 600;
+}
+
+.coach-chat-meta-value {
+  font-weight: 700;
+  color: #1f2f4d;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.95rem;
+}
+
+.coach-chat-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #198754;
+  font-weight: 600;
+}
+
+.coach-online-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #28a745;
+  display: inline-block;
+  box-shadow: 0 0 0 6px rgba(40, 167, 69, 0.15);
+  margin-left: 0.3rem;
+}
+
+.coach-chat-window {
+  background-color: #f7f9fd;
+  border-radius: 16px;
+  padding: 1.25rem;
+  overflow-y: auto;
+  max-height: 320px;
+}
+
+.coach-chat-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #2c5aa0;
+}
+
+.coach-chat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+}
+
+.coach-chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.coach-chat-message {
+  border-radius: 16px;
+  padding: 0.9rem 1rem;
+  line-height: 1.8;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f8;
+}
+
+.coach-chat-message-user {
+  align-self: flex-end;
+  background: linear-gradient(135deg, #2c5aa0, #3f87ce);
+  color: #ffffff;
+  border: none;
+}
+
+.coach-chat-message-admin {
+  background-color: #ffffff;
+}
+
+.coach-chat-form textarea {
+  border-radius: 14px;
+  border: 1px solid #d9e2f2;
+  padding: 0.9rem 1rem;
+  resize: none;
+}
+
+.coach-chat-form textarea:focus {
+  border-color: #2c5aa0;
+  box-shadow: 0 0 0 0.2rem rgba(44, 90, 160, 0.12);
+}
+
+.coach-chat-placeholder {
+  background-color: #f7f9fd;
+  border-radius: 20px;
+  padding: 2rem;
+}
+
+.coach-chat-sidecard {
+  border: none;
+  border-radius: 20px;
+  background-color: #ffffff;
+  padding: 1.5rem;
+}
+
+.coach-chat-sidecard.coach-expectation-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.coach-expectation-header {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding: 1.75rem;
+  min-height: 200px;
+  background: linear-gradient(135deg, #315da9 0%, #4a8ed8 100%);
+  color: #ffffff;
+}
+
+.coach-expectation-header-main {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+.coach-expectation-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background-color: rgba(255, 255, 255, 0.18);
+  font-size: 1.4rem;
+}
+
+.coach-expectation-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.75rem;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.2);
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.coach-expectation-title {
+  font-weight: 700;
+}
+
+.coach-expectation-subtitle {
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.8;
+}
+
+.coach-expectation-card .card-body {
+  padding: 1.75rem;
+}
+
+.coach-chat-side-list .list-group-item {
+  border: none;
+  border-bottom: 1px solid #edf2f8;
+  padding: 1rem 0;
+  color: #53617c;
+  display: flex;
+  align-items: center;
+}
+
+.coach-chat-side-list .list-group-item:last-child {
+  border-bottom: none;
+}
+
+.coach-expectation-list .list-group-item {
+  padding: 1.25rem 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.coach-expectation-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.coach-expectation-step-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background-color: rgba(44, 90, 160, 0.12);
+  color: #2c5aa0;
+  font-size: 1rem;
+}
+
+.coach-expectation-item-title {
+  font-weight: 700;
+  color: #203555;
+  margin-bottom: 0.3rem;
+}
+
+.coach-expectation-item-text {
+  color: #667591;
+  line-height: 1.8;
+  font-size: 0.92rem;
+}
+
+.coach-expectation-meta {
+  display: inline-flex;
+  align-items: center;
+  height: fit-content;
+  padding: 0.25rem 0.8rem;
+  border-radius: 999px;
+  background-color: rgba(44, 90, 160, 0.12);
+  color: #2c5aa0;
+  font-weight: 600;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.coach-expectation-progress {
+  border-radius: 16px;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, rgba(49, 93, 169, 0.08), rgba(74, 142, 216, 0.12));
+}
+
+.coach-expectation-progress-track {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 0.4rem;
+  margin-bottom: 0.85rem;
+}
+
+.coach-expectation-progress-track::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(49, 93, 169, 0.35), rgba(74, 142, 216, 0.45));
+  transform: translateY(-50%);
+}
+
+.coach-expectation-progress-node {
+  position: relative;
+  z-index: 1;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  background-color: #ffffff;
+  box-shadow: 0 6px 18px rgba(41, 68, 111, 0.08);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #2c476d;
+}
+
+.coach-expectation-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  background: none;
+  border-radius: 16px;
+  padding: 1rem 1.15rem;
+  border: 1px solid rgba(44, 90, 160, 0.2);
+  color: #2c476d;
+  font-size: 0.95rem;
+}
+
+.coach-expectation-tip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background-color: rgba(44, 90, 160, 0.12);
+  color: #2c5aa0;
+}
+
+.coach-chat-tip {
+  background-color: rgba(44, 90, 160, 0.08);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  color: #2c476d;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 992px) {
+  .coach-hero {
+    padding: 3.5rem 0;
+  }
+
+  .coach-hero-title {
+    font-size: 1.9rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .coach-link-card,
+  .coach-contact-card,
+  .coach-form-card,
+  .coach-hero-card {
+    border-radius: 16px;
+  }
+}

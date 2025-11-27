@@ -1,0 +1,266 @@
+import React, { useState } from 'react';
+import { Container, Row, Col, Card, Button, Spinner, Alert } from 'react-bootstrap';
+import { useParams, Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Helmet } from 'react-helmet-async';
+import { useI18n } from '../../contexts/I18nContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { blogApi } from '../../services/blogApi';
+
+interface Post {
+  id: number;
+  title: string;
+  content: string;
+  featured_image?: string;
+  category: {
+    name: string;
+  };
+  tags: Array<{
+    name: string;
+    slug: string;
+  }>;
+  author_name: string;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  created_at_persian: string;
+}
+
+const PostDetail: React.FC = () => {
+  const { slug } = useParams<{ slug: string }>();
+  const { t } = useI18n();
+  const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
+  const [likeError, setLikeError] = useState<string>('');
+  const [isLiked, setIsLiked] = useState<boolean>(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState<boolean>(false);
+  const [likeAnimation, setLikeAnimation] = useState<boolean>(false);
+
+  const { data: post, isLoading } = useQuery({
+    queryKey: ['post', slug],
+    queryFn: async () => {
+      return await blogApi.getPost(slug!);
+    },
+    enabled: !!slug,
+  });
+
+  // Check if user has already liked this post (this would need backend support)
+  // For now, we'll track it locally after the first like action
+
+  // Like mutation
+  const likeMutation = useMutation({
+    mutationFn: () => blogApi.toggleLike(slug!),
+    onSuccess: (data) => {
+      // Update the post data with new like count
+      queryClient.setQueryData(['post', slug], (oldData: Post | undefined) => {
+        if (oldData) {
+          return {
+            ...oldData,
+            like_count: data.like_count,
+          };
+        }
+        return oldData;
+      });
+      
+      // Update like status and show success message
+      setIsLiked(data.liked);
+      setLikeError('');
+      setShowSuccessMessage(true);
+      
+      // Trigger animation
+      setLikeAnimation(true);
+      setTimeout(() => setLikeAnimation(false), 600);
+      
+      // Hide success message after 3 seconds
+      setTimeout(() => {
+        setShowSuccessMessage(false);
+      }, 3000);
+    },
+    onError: (error: any) => {
+      if (error.response?.status === 401) {
+        setLikeError('لطفاً ابتدا وارد شوید');
+      } else {
+        setLikeError('خطا در ثبت لایک. لطفاً دوباره تلاش کنید.');
+      }
+    },
+  });
+
+  const handleLike = () => {
+    if (!isAuthenticated) {
+      setLikeError('لطفاً ابتدا وارد شوید');
+      return;
+    }
+    likeMutation.mutate();
+  };
+
+  if (isLoading) {
+    return (
+      <Container className="py-5">
+        <div className="text-center">
+          <Spinner animation="border" role="status">
+            <span className="visually-hidden">{t('common.loading')}</span>
+          </Spinner>
+        </div>
+      </Container>
+    );
+  }
+
+  if (!post) {
+    return (
+      <Container className="py-5">
+        <Card>
+          <Card.Body className="text-center py-5">
+            <h5>مقاله یافت نشد</h5>
+            <Link to="/blog" className="btn btn-primary">
+              بازگشت به وبلاگ
+            </Link>
+          </Card.Body>
+        </Card>
+      </Container>
+    );
+  }
+
+  return (
+    <>
+      <Helmet>
+        <title>{post.title} - {t('nav.blog')}</title>
+        <meta name="description" content={post.content.substring(0, 160)} />
+      </Helmet>
+
+      <Container className="py-5">
+        <Row>
+          <Col lg={8}>
+            <article>
+              <div className="mb-4">
+                <div className="d-flex align-items-center mb-3">
+                  <span className="badge bg-primary me-2">{post.category.name}</span>
+                  <small className="text-muted">{post.created_at_persian}</small>
+                </div>
+                
+                <h1 className="mb-3">{post.title}</h1>
+                
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                  <div className="d-flex align-items-center">
+                    <i className="fas fa-user me-2"></i>
+                    <span>{post.author_name}</span>
+                  </div>
+                  <div className="d-flex gap-3">
+                    <small className="text-muted">
+                      <i className="fas fa-eye me-1"></i>
+                      {post.view_count}
+                    </small>
+                    <small className="text-muted">
+                      <i className="fas fa-heart me-1"></i>
+                      {post.like_count}
+                    </small>
+                    <small className="text-muted">
+                      <i className="fas fa-comment me-1"></i>
+                      {post.comment_count}
+                    </small>
+                  </div>
+                </div>
+
+                {post.featured_image && (
+                  <img 
+                    src={post.featured_image} 
+                    alt={post.title}
+                    className="img-fluid rounded mb-4"
+                    style={{ width: '100%', height: '400px', objectFit: 'cover' }}
+                  />
+                )}
+              </div>
+
+              <div 
+                className="post-content"
+                dangerouslySetInnerHTML={{ __html: post.content }}
+              />
+
+              {post.tags && post.tags.length > 0 && (
+                <div className="mt-4">
+                  <h6>برچسب‌ها:</h6>
+                  <div className="d-flex flex-wrap gap-2">
+                    {post.tags.map((tag: { name: string; slug: string; }) => (
+                      <span key={tag.slug} className="badge bg-secondary">
+                        {tag.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-4 d-flex justify-content-between">
+                <Link to="/blog" className="btn btn-outline-primary">
+                  <i className="fas fa-arrow-right me-2"></i>
+                  بازگشت به وبلاگ
+                </Link>
+                <div className="d-flex flex-column align-items-end">
+                  <Button 
+                    variant={
+                      likeMutation.isPending 
+                        ? "secondary" 
+                        : isLiked 
+                          ? "danger" 
+                          : "outline-danger"
+                    }
+                    onClick={handleLike}
+                    disabled={likeMutation.isPending}
+                    className="mb-2"
+                    style={{
+                      transform: likeAnimation ? 'scale(1.2)' : isLiked ? 'scale(1.05)' : 'scale(1)',
+                      transition: 'all 0.3s ease-in-out',
+                      boxShadow: isLiked ? '0 4px 8px rgba(220, 53, 69, 0.3)' : 'none'
+                    }}
+                  >
+                    {likeMutation.isPending ? (
+                      <>
+                        <Spinner size="sm" className="me-2" />
+                        در حال پردازش...
+                      </>
+                    ) : (
+                      <>
+                        <i 
+                          className={`fas fa-heart me-2 ${isLiked ? 'text-white' : ''} ${likeAnimation ? 'fa-beat' : ''}`}
+                          style={{ 
+                            color: likeAnimation ? '#ff6b6b' : undefined,
+                            transition: 'color 0.3s ease-in-out'
+                          }}
+                        ></i>
+                        {isLiked ? 'لایک شده' : 'لایک'}
+                      </>
+                    )}
+                  </Button>
+                  
+                  {showSuccessMessage && (
+                    <Alert variant="success" className="mb-2" style={{ fontSize: '0.875rem' }}>
+                      <i className="fas fa-check-circle me-2"></i>
+                      {isLiked ? 'لایک شد!' : 'لایک برداشته شد!'}
+                    </Alert>
+                  )}
+                  
+                  {likeError && (
+                    <Alert variant="danger" className="mb-0" style={{ fontSize: '0.875rem' }}>
+                      {likeError}
+                    </Alert>
+                  )}
+                </div>
+              </div>
+            </article>
+          </Col>
+
+          <Col lg={4}>
+            <Card>
+              <Card.Header>
+                <h6>دسته‌بندی‌های مرتبط</h6>
+              </Card.Header>
+              <Card.Body>
+                <p className="text-muted">به زودی...</p>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </Container>
+    </>
+  );
+};
+
+export default PostDetail;
