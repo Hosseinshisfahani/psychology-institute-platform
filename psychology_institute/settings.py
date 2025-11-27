@@ -42,7 +42,7 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-+i0aq$o*pxs%amp0!wf8j
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,testserver', cast=lambda v: [s.strip() for s in v.split(',')])
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,testserver,185.8.175.241', cast=lambda v: [s.strip() for s in v.split(',')])
 
 
 # Application definition
@@ -245,6 +245,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:3001",
     "http://127.0.0.1:3001",
+    "http://185.8.175.241:3000",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -257,6 +258,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:3000',
     'http://localhost:3001',
     'http://127.0.0.1:3001',
+    'http://185.8.175.241:3000',
 ]
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = 'Lax'

@@ -130,21 +130,8 @@ const queryClient = new QueryClient({
 });
 
 function App() {
-  // Fetch CSRF token on app load - run once only
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const response = await fetch('/api/csrf/', {
-          credentials: 'include',
-        });
-        if (response.ok) {
-          console.log('CSRF token fetched successfully');
-        }
-      } catch (error) {
-        console.error('Failed to fetch CSRF token:', error);
-      }
-    })();
-  }, []); // Empty dependency array ensures this runs only once
+  // CSRF token is fetched by AuthContext, no need to fetch here
+  // This prevents duplicate requests
 
   return (
     <HelmetProvider>

@@ -59,36 +59,56 @@ axios.defaults.withCredentials = true;
 axios.defaults.xsrfCookieName = 'csrftoken';
 axios.defaults.xsrfHeaderName = 'X-CSRFToken';
 
+// Cache for CSRF token fetch to prevent multiple simultaneous requests
+let csrfFetchPromise: Promise<void> | null = null;
+
+// Helper to get CSRF token from cookie
+const getCsrfToken = () => {
+  const name = 'csrftoken';
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+};
+
 // Add request interceptor to ensure CSRF token is included
 axios.interceptors.request.use(
   async (config) => {
     try {
-      // Get CSRF token from cookie
-      const getCsrfToken = () => {
-        const name = 'csrftoken';
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-          const cookies = document.cookie.split(';');
-          for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-              cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-              break;
-            }
-          }
-        }
-        return cookieValue;
-      };
+      // Skip CSRF for the CSRF endpoint itself
+      if (config.url?.includes('/csrf/')) {
+        return config;
+      }
 
       let csrfToken = getCsrfToken();
       
-      // If no CSRF token, fetch it first
+      // If no CSRF token, fetch it (with caching to prevent duplicate requests)
       if (!csrfToken) {
-        try {
-          await axios.get('/csrf/');
+        // If a fetch is already in progress, wait for it
+        if (csrfFetchPromise) {
+          await csrfFetchPromise;
           csrfToken = getCsrfToken();
-        } catch (error) {
-          console.warn('Failed to fetch CSRF token:', error);
+        } else {
+          // Start a new fetch and cache the promise
+          csrfFetchPromise = (async () => {
+            try {
+              await axios.get('/csrf/');
+            } catch (error) {
+              console.warn('Failed to fetch CSRF token:', error);
+            } finally {
+              csrfFetchPromise = null; // Clear cache after fetch completes
+            }
+          })();
+          await csrfFetchPromise;
+          csrfToken = getCsrfToken();
         }
       }
       
@@ -131,27 +151,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const getCsrfToken = () => {
-    const name = 'csrftoken';
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-      const cookies = document.cookie.split(';');
-      for (let i = 0; i < cookies.length; i++) {
-        const cookie = cookies[i].trim();
-        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-          break;
-        }
-      }
-    }
-    return cookieValue;
-  };
-
   const getCsrf = async () => {
-    try {
-      await axios.get('/csrf/');
-    } catch (_) {
-      // no-op: endpoint sets cookie via middleware
+    // Only fetch if we don't already have a token
+    if (!getCsrfToken()) {
+      try {
+        await axios.get('/csrf/');
+      } catch (_) {
+        // no-op: endpoint sets cookie via middleware
+      }
     }
   };
 

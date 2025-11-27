@@ -3,48 +3,12 @@ import axios from 'axios';
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 // Reuse an axios instance configured for admin endpoints
+// Note: CSRF token is handled by the global axios interceptor in AuthContext
 const adminApi = axios.create({
   baseURL: `${API_BASE_URL}/api/admin`,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 });
-
-adminApi.interceptors.request.use(
-  async (config) => {
-    try {
-      const getCsrfToken = () => {
-        const name = 'csrftoken';
-        let cookieValue: string | null = null;
-        if (document.cookie && document.cookie !== '') {
-          const cookies = document.cookie.split(';');
-          for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === name + '=') {
-              cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-              break;
-            }
-          }
-        }
-        return cookieValue;
-      };
-
-      let csrfToken = getCsrfToken();
-      if (!csrfToken) {
-        try {
-          await axios.get(`${API_BASE_URL}/csrf/`);
-          csrfToken = getCsrfToken();
-        } catch (error) {
-          // ignore
-        }
-      }
-      if (csrfToken) {
-        (config.headers as any)['X-CSRFToken'] = csrfToken;
-      }
-    } catch {}
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
 
 export interface AdminPaymentsOverview {
   totalRevenue: number;
