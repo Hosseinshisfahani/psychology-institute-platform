@@ -77,7 +77,7 @@ const menuItems: MenuItem[] = [
   { title: 'تنظیمات', path: '/admin-panel/settings', icon: <SettingsIcon /> },
 ];
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
 
 const AdminLayout: React.FC = () => {
   const theme = useTheme();

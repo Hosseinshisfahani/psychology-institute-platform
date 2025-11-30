@@ -1,0 +1,288 @@
+/* Persian Font Configuration for Psychology Institute */
+
+/* Import Persian Fonts */
+@import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css');
+@import url('https://cdn.jsdelivr.net/gh/rastikerdar/samim-font@v4.0.2/dist/font-face.css');
+@import url('https://cdn.jsdelivr.net/gh/rastikerdar/shabnam-font@v5.0.1/dist/font-face.css');
+
+/* Font Family Definitions */
+:root {
+    --font-primary: 'Vazir', 'Samim', 'Shabnam', 'Tahoma', 'Arial', sans-serif;
+    --font-secondary: 'Samim', 'Vazir', 'Shabnam', 'Tahoma', 'Arial', sans-serif;
+    --font-display: 'Vazir', 'Samim', 'Shabnam', 'Tahoma', 'Arial', sans-serif;
+}
+
+/* Base Typography */
+body {
+    font-family: var(--font-primary);
+    font-size: 16px;
+    line-height: 1.8;
+    font-weight: 400;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    line-height: 1.4;
+    margin-bottom: 1rem;
+}
+
+h1 { font-size: 2.5rem; }
+h2 { font-size: 2rem; }
+h3 { font-size: 1.75rem; }
+h4 { font-size: 1.5rem; }
+h5 { font-size: 1.25rem; }
+h6 { font-size: 1rem; }
+
+/* Display Headings */
+.display-1, .display-2, .display-3, .display-4, .display-5, .display-6 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+/* Navigation */
+.navbar-brand {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.5rem;
+}
+
+.nav-link {
+    font-family: var(--font-primary);
+    font-weight: 500;
+    font-size: 1rem;
+}
+
+/* Buttons */
+.btn {
+    font-family: var(--font-primary);
+    font-weight: 500;
+    font-size: 1rem;
+}
+
+.btn-lg {
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+.btn-sm {
+    font-size: 0.875rem;
+}
+
+/* Cards */
+.card-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.25rem;
+}
+
+.card-text {
+    font-family: var(--font-primary);
+    font-weight: 400;
+    line-height: 1.7;
+}
+
+/* Forms */
+.form-control, .form-select {
+    font-family: var(--font-primary);
+    font-size: 1rem;
+    font-weight: 400;
+}
+
+.form-label {
+    font-family: var(--font-primary);
+    font-weight: 500;
+}
+
+/* Lead Text */
+.lead {
+    font-family: var(--font-primary);
+    font-weight: 400;
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+/* Small Text */
+.small {
+    font-size: 0.875rem;
+    font-weight: 400;
+}
+
+/* Text Utilities */
+.text-muted {
+    color: #6c757d !important;
+    font-weight: 400;
+}
+
+/* Lists */
+.list-unstyled {
+    font-family: var(--font-primary);
+}
+
+/* Badges */
+.badge {
+    font-family: var(--font-primary);
+    font-weight: 500;
+    font-size: 0.75rem;
+}
+
+/* Alerts */
+.alert {
+    font-family: var(--font-primary);
+    font-weight: 400;
+}
+
+/* Tables */
+.table {
+    font-family: var(--font-primary);
+    font-size: 0.95rem;
+}
+
+/* Pagination */
+.pagination {
+    font-family: var(--font-primary);
+    font-weight: 500;
+}
+
+/* Dropdown */
+.dropdown-menu {
+    font-family: var(--font-primary);
+    font-weight: 400;
+}
+
+.dropdown-item {
+    font-size: 0.95rem;
+}
+
+/* Modal */
+.modal-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+}
+
+.modal-body {
+    font-family: var(--font-primary);
+    line-height: 1.7;
+}
+
+/* Footer */
+.footer {
+    font-family: var(--font-primary);
+}
+
+.footer h5, .footer h6 {
+    font-family: var(--font-display);
+    font-weight: 600;
+}
+
+/* Test Specific Styles */
+.test-question {
+    font-family: var(--font-primary);
+    font-size: 1.1rem;
+    font-weight: 500;
+    line-height: 1.6;
+}
+
+.test-choice {
+    font-family: var(--font-primary);
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+}
+
+.test-result-score {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 3rem;
+}
+
+.test-result-text {
+    font-family: var(--font-primary);
+    font-size: 1.1rem;
+    line-height: 1.8;
+}
+
+/* Course Specific Styles */
+.course-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.5rem;
+}
+
+.course-description {
+    font-family: var(--font-primary);
+    font-size: 1rem;
+    line-height: 1.7;
+}
+
+/* Blog Specific Styles */
+.blog-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.75rem;
+}
+
+.blog-content {
+    font-family: var(--font-primary);
+    font-size: 1.1rem;
+    line-height: 1.8;
+}
+
+.blog-meta {
+    font-family: var(--font-primary);
+    font-size: 0.9rem;
+    font-weight: 400;
+}
+
+/* Responsive Typography */
+@media (max-width: 768px) {
+    body {
+        font-size: 15px;
+    }
+    
+    h1 { font-size: 2rem; }
+    h2 { font-size: 1.75rem; }
+    h3 { font-size: 1.5rem; }
+    h4 { font-size: 1.25rem; }
+    
+    .navbar-brand {
+        font-size: 1.25rem;
+    }
+    
+    .btn-lg {
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    body {
+        font-size: 14px;
+    }
+    
+    h1 { font-size: 1.75rem; }
+    h2 { font-size: 1.5rem; }
+    h3 { font-size: 1.25rem; }
+    
+    .lead {
+        font-size: 1rem;
+    }
+}
+
+/* Print Styles */
+@media print {
+    body {
+        font-family: var(--font-primary);
+        font-size: 12pt;
+        line-height: 1.6;
+    }
+    
+    h1, h2, h3, h4, h5, h6 {
+        font-family: var(--font-display);
+        font-weight: 700;
+    }
+}

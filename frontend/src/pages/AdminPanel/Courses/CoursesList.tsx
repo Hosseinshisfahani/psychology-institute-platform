@@ -174,7 +174,8 @@ const CoursesList: React.FC = () => {
           startIcon={<AddIcon />} 
           size="large"
           onClick={() => {
-            window.location.href = 'http://localhost:8000/admin/courses/course/add/';
+            const apiUrl = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
+            window.location.href = `${apiUrl}/admin/courses/course/add/`;
           }}
         >
           افزودن دوره جدید

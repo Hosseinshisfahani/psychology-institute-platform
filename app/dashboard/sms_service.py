@@ -4,6 +4,7 @@ SMS Service for insms.ir OTP verification
 import requests
 import random
 import logging
+import re
 from django.conf import settings
 from requests.structures import CaseInsensitiveDict
 
@@ -48,30 +49,17 @@ def send_otp_sms(phone_number, otp_code):
     if phone.startswith("0"):
         phone = phone[1:]  # 0912 → 912
 
-    # Normalize sender number - try multiple formats
-    sender_raw = SMS_SENDER_NUMBER.replace("+", "").strip()
+    # Normalize sender number - keep country code format (9810000101)
+    sender = SMS_SENDER_NUMBER.replace("+", "").strip()
     
-    # Try format 1: Remove country code (9810000101 -> 10000101)
-    sender1 = sender_raw.replace("98", "", 1) if sender_raw.startswith("98") else sender_raw
-    if sender1.startswith("0"):
-        sender1 = sender1[1:]
-    
-    # Try format 2: Keep country code (9810000101)
-    sender2 = sender_raw
-    
-    # Try format 3: Just the number part (10000101)
-    sender3 = sender1
-    
-    logger.info(f"[OTP] Original sender: {SMS_SENDER_NUMBER}, Formats: {sender1}, {sender2}, {sender3}")
+    logger.info(f"[OTP] Sending from: {sender} to: {phone}")
 
     payload = {
         "uname": SMS_USERNAME,
         "pass": SMS_PASSWORD,
         "to": phone,        # 912xxxxxxx
         "text": f"کد تایید شما: {otp_code}",
-        "number": sender2,  # Sender number (سرشماره) - format with country code (9810000101)
-        "sender": sender2,   # Also try "sender" as fallback
-        "from": sender2,     # Also try "from" as fallback
+        "from": sender,     # Sender number (must use 'from' field, not 'number' or 'sender')
     }
     
     logger.info(f"[OTP] Payload (without password): { {k: v for k, v in payload.items() if k != 'pass'} }")
@@ -88,34 +76,91 @@ def send_otp_sms(phone_number, otp_code):
         return {'success': False, 'message': f"Request failed: {e}"}
 
     logger.info(f"[OTP] Status {r.status_code} Body: {r.text}")
+    logger.info(f"[OTP] Response type: {type(r.text)}, length: {len(r.text)}, repr: {repr(r.text[:50])}")
 
+    # Normalize response text
+    response_text = r.text.strip() if r.text else ""
+    
     # --- ALWAYS handle return ---
-    # 1) Pure number → success
-    if r.text.strip().isdigit():
-        return {'success': True, 'message': 'OTP sent', 'transaction_id': r.text.strip()}
-
-    # 2) Try JSON
+    # 1) Try JSON first (some APIs return JSON even for numeric IDs)
     try:
         data = r.json()
-        if isinstance(data, dict):
-            if str(data).lower().find("success") != -1:
+        # If JSON parsing succeeds and it's a number, treat as transaction ID
+        if isinstance(data, (int, float)):
+            transaction_id = str(int(data))
+            logger.info(f"[OTP] Detected numeric transaction ID from JSON: {transaction_id}")
+            return {'success': True, 'message': 'OTP sent', 'transaction_id': transaction_id}
+        elif isinstance(data, dict):
+            data_str = str(data)
+            if data_str.lower().find("success") != -1:
                 return {'success': True, 'message': 'OTP sent'}
-            else:
-                # Extract error message
-                msg = (
-                    data.get("message") or data.get("error") or data.get("result")
-                    or str(data)
-                )
-                return {'success': False, 'message': msg}
-    except:
+            # Some providers return numeric codes inside message/result fields
+            possible_code = data.get("message") or data.get("result") or data.get("otp") or data.get("code")
+            if isinstance(possible_code, (int, float)):
+                transaction_id = str(int(possible_code))
+                logger.info(f"[OTP] Detected numeric transaction ID in JSON dict: {transaction_id}")
+                return {'success': True, 'message': 'OTP sent', 'transaction_id': transaction_id}
+            if isinstance(possible_code, str):
+                cleaned_code = possible_code.strip()
+                if cleaned_code.isdigit() and len(cleaned_code) >= 4:
+                    logger.info(f"[OTP] Detected numeric transaction ID in JSON dict string: {cleaned_code}")
+                    return {'success': True, 'message': 'OTP sent', 'transaction_id': cleaned_code}
+            # Extract error message
+            msg = (
+                data.get("message") or data.get("error") or data.get("result")
+                or data_str
+            )
+            return {'success': False, 'message': msg}
+        elif isinstance(data, str):
+            # If JSON returns a string that's a number, treat as transaction ID
+            cleaned_data = data.strip()
+            if cleaned_data.isdigit() and len(cleaned_data) >= 6:
+                logger.info(f"[OTP] Detected transaction ID from JSON string: {cleaned_data}")
+                return {'success': True, 'message': 'OTP sent', 'transaction_id': cleaned_data}
+    except (ValueError, TypeError):
+        # Not JSON, continue with text parsing
         pass
+    
+    # 2) Pure number → success (transaction ID)
+    # Check if response is a number (with or without whitespace/newlines)
+    cleaned_text = response_text.replace('\n', '').replace('\r', '').replace('\t', '').strip()
+    if cleaned_text.isdigit() and len(cleaned_text) >= 6:
+        logger.info(f"[OTP] Detected transaction ID: {cleaned_text}")
+        return {'success': True, 'message': 'OTP sent', 'transaction_id': cleaned_text}
+    
+    # 3) Also check if it's a number with some prefix/suffix (e.g., "ID:869928146" or "869928146\n")
+    number_match = re.search(r'\d{6,}', response_text)  # Match 6+ digit numbers
+    if number_match and len(number_match.group()) >= 6:
+        # If the response is mostly just a number, treat it as success
+        if len(cleaned_text) <= 20 and cleaned_text.replace(number_match.group(), '').strip() == '':
+            transaction_id = number_match.group()
+            logger.info(f"[OTP] Detected transaction ID in response: {transaction_id}")
+            return {'success': True, 'message': 'OTP sent', 'transaction_id': transaction_id}
 
-    # 3) Text success
-    if "success" in r.text.lower() or "ok" in r.text.lower():
+    # 4) Text success indicators
+    response_lower = response_text.lower()
+    if "success" in response_lower or "ok" in response_lower or "sent" in response_lower:
         return {'success': True, 'message': 'OTP sent'}
 
-    # 4) Otherwise error
-    return {'success': False, 'message': r.text[:200]}
+    # 5) Check for known error patterns
+    error_patterns = [
+        'کد قبلا ارسال شده',
+        'already sent',
+        'error',
+        'fail',
+        'invalid',
+    ]
+    if any(pattern in response_lower for pattern in error_patterns):
+        return {'success': False, 'message': response_text[:200]}
+    
+    # 6) If response is short and looks like a number, treat as success
+    if len(cleaned_text) <= 20 and cleaned_text.replace(' ', '').isdigit():
+        logger.info(f"[OTP] Treating short numeric response as transaction ID: {cleaned_text}")
+        return {'success': True, 'message': 'OTP sent', 'transaction_id': cleaned_text.replace(' ', '')}
+
+    # 7) Otherwise error
+    logger.warning(f"[OTP] Unrecognized response format, treating as error: {response_text[:200]}")
+    return {'success': False, 'message': response_text[:200]}
 
 
 def verify_otp_sms(phone_number, otp_code):

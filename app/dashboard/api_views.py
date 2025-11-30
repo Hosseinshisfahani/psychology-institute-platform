@@ -7,6 +7,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 from django.utils import timezone
+from django.conf import settings
 from datetime import timedelta
 import logging
 from .models import User, Notification, OTPCode
@@ -564,94 +565,168 @@ class SendOTPAPIView(APIView):
     authentication_classes = []  # No authentication required
     
     def post(self, request):
-        phone_number = request.data.get('phone_number')
-        purpose = request.data.get('purpose', 'signup')  # signup, login, password_reset
-        
-        if not phone_number:
-            return Response({
-                'success': False,
-                'message': 'Phone number is required'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Validate phone number format (Iranian mobile numbers)
-        phone_number = phone_number.replace('+98', '').replace('0098', '').replace('-', '').replace(' ', '').strip()
-        if not phone_number.startswith('0'):
-            phone_number = '0' + phone_number
-        
-        if not phone_number.startswith('09') or len(phone_number) != 11:
-            return Response({
-                'success': False,
-                'message': 'Invalid phone number format. Please use format: 09123456789'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Check for recent OTP requests (rate limiting)
-        recent_otp = OTPCode.objects.filter(
-            phone_number=phone_number,
-            purpose=purpose,
-            created_at__gte=timezone.now() - timedelta(minutes=1)
-        ).first()
-        
-        if recent_otp:
-            return Response({
-                'success': False,
-                'message': 'Please wait before requesting a new OTP code'
-            }, status=status.HTTP_429_TOO_MANY_REQUESTS)
-        
-        # Generate OTP code
-        otp_code = generate_otp_code(6)
-        
-        # Send OTP via SMS
-        logger.info(f"Attempting to send OTP to {phone_number}")
         try:
-            sms_result = send_otp_sms(phone_number, otp_code)
-            logger.info(f"send_otp_sms returned: {sms_result}")
-        except Exception as e:
-            logger.error(f"Exception in send_otp_sms: {str(e)}", exc_info=True)
-            return Response({
-                'success': False,
-                'message': f'Error sending OTP: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        # Ensure sms_result is not None
-        if sms_result is None:
-            logger.error("send_otp_sms returned None - this should not happen!")
-            logger.error(f"Function type: {type(send_otp_sms)}")
-            return Response({
-                'success': False,
-                'message': 'SMS service returned no response. Please check server logs.'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        if not sms_result.get('success', False):
-            error_message = sms_result.get('message', 'Unknown error occurred')
-            logger.error(f"SMS service returned error: {error_message}")
-            return Response({
-                'success': False,
-                'message': error_message
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        # Save OTP code to database
-        otp_obj = OTPCode.objects.create(
-            phone_number=phone_number,
-            code=otp_code,
-            purpose=purpose,
-            expires_at=timezone.now() + timedelta(minutes=5)
-        )
-        
-        # In development, you might want to return the OTP code for testing
-        # Remove this in production!
-        if getattr(request, 'DEBUG', False):
+            phone_number = request.data.get('phone_number')
+            purpose = request.data.get('purpose', 'signup')  # signup, login, password_reset
+            
+            if not phone_number:
+                return Response({
+                    'success': False,
+                    'message': 'Phone number is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate phone number format (Iranian mobile numbers)
+            phone_number = phone_number.replace('+98', '').replace('0098', '').replace('-', '').replace(' ', '').strip()
+            if not phone_number.startswith('0'):
+                phone_number = '0' + phone_number
+            
+            if not phone_number.startswith('09') or len(phone_number) != 11:
+                return Response({
+                    'success': False,
+                    'message': 'Invalid phone number format. Please use format: 09123456789'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check for recent OTP requests (rate limiting - 2 minutes cooldown)
+            try:
+                recent_otp = OTPCode.objects.filter(
+                    phone_number=phone_number,
+                    purpose=purpose,
+                    created_at__gte=timezone.now() - timedelta(minutes=2)
+                ).order_by('-created_at').first()
+                
+                if recent_otp and not recent_otp.is_expired() and not recent_otp.is_used:
+                    # If there's a valid recent OTP, check if SMS was actually sent
+                    # If SMS provider is rate-limiting, we can still return success with existing code
+                    logger.info(f"Found recent valid OTP for {phone_number}, checking if we should reuse it")
+                    
+                    # Check if the error is rate limiting (کد قبلا ارسال شده)
+                    # In this case, the SMS was likely already sent, so we return the existing code
+                    return Response({
+                        'success': True,
+                        'message': 'OTP code already sent. Please check your phone. If you did not receive it, please wait 2 minutes and try again.',
+                        'expires_at': recent_otp.expires_at,
+                        'already_sent': True
+                    })
+            except Exception as e:
+                logger.error(f"Database error checking recent OTP: {str(e)}", exc_info=True)
+                # Continue with sending new OTP if database query fails
+            
+            # Generate OTP code
+            otp_code = generate_otp_code(6)
+            
+            # Send OTP via SMS
+            logger.info(f"Attempting to send OTP to {phone_number}")
+            try:
+                sms_result = send_otp_sms(phone_number, otp_code)
+                logger.info(f"send_otp_sms returned: {sms_result}")
+            except Exception as e:
+                logger.error(f"Exception in send_otp_sms: {str(e)}", exc_info=True)
+                return Response({
+                    'success': False,
+                    'message': f'Error sending OTP: {str(e)}'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # Ensure sms_result is not None
+            if sms_result is None:
+                logger.error("send_otp_sms returned None - this should not happen!")
+                logger.error(f"Function type: {type(send_otp_sms)}")
+                return Response({
+                    'success': False,
+                    'message': 'SMS service returned no response. Please check server logs.'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # Handle SMS provider rate limiting more gracefully
+            if not sms_result.get('success', False):
+                error_message = sms_result.get('message', 'Unknown error occurred')
+                logger.error(f"SMS service returned error: {error_message}")
+                
+                # Normalize error message for comparison (remove extra characters, normalize whitespace)
+                normalized_error = error_message.strip()
+                
+                # Check if it's a rate limiting error (handle variations like "کد قبلا ارسال شده!:677")
+                is_rate_limit_error = (
+                    'کد قبلا ارسال شده' in normalized_error or 
+                    'already sent' in normalized_error.lower() or
+                    'rate limit' in normalized_error.lower() or
+                    'too many' in normalized_error.lower()
+                )
+                
+                if is_rate_limit_error:
+                    # Check if there's a recent valid OTP we can use
+                    try:
+                        valid_otp = OTPCode.objects.filter(
+                            phone_number=phone_number,
+                            purpose=purpose,
+                            created_at__gte=timezone.now() - timedelta(minutes=5)
+                        ).filter(
+                            expires_at__gt=timezone.now()
+                        ).exclude(
+                            is_used=True
+                        ).order_by('-created_at').first()
+                        
+                        if valid_otp:
+                            logger.info(f"Rate limited but found valid OTP, returning it")
+                            return Response({
+                                'success': True,
+                                'message': 'OTP code was already sent. Please check your phone. If you did not receive it, please wait a few minutes and try again.',
+                                'expires_at': valid_otp.expires_at,
+                                'already_sent': True
+                            })
+                    except Exception as e:
+                        logger.error(f"Database error checking valid OTP: {str(e)}", exc_info=True)
+                    
+                    # Rate limited but no valid OTP - return 429 (not 500)
+                    logger.warning(f"Rate limited for {phone_number} but no valid OTP found")
+                    return Response({
+                        'success': False,
+                        'message': 'SMS service is temporarily unavailable due to rate limiting. Please wait 5 minutes and try again.'
+                    }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+                else:
+                    # Other SMS service errors - return 500
+                    return Response({
+                        'success': False,
+                        'message': error_message
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # Save OTP code to database
+            try:
+                otp_obj = OTPCode.objects.create(
+                    phone_number=phone_number,
+                    code=otp_code,
+                    purpose=purpose,
+                    expires_at=timezone.now() + timedelta(minutes=5)
+                )
+            except Exception as e:
+                logger.error(f"Database error saving OTP: {str(e)}", exc_info=True)
+                return Response({
+                    'success': False,
+                    'message': 'Failed to save OTP code. Please try again.'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # In development mode, return OTP code for testing
+            # This helps when SMS delivery is unreliable
+            from django.conf import settings
+            if settings.DEBUG:
+                logger.warning(f"[DEBUG MODE] OTP code for {phone_number}: {otp_code} - This should be removed in production!")
+                return Response({
+                    'success': True,
+                    'message': 'OTP sent successfully',
+                    'otp_code': otp_code,  # DEBUG ONLY - Remove in production!
+                    'expires_at': otp_obj.expires_at,
+                    'debug_mode': True
+                })
+            
             return Response({
                 'success': True,
                 'message': 'OTP sent successfully',
-                'otp_code': otp_code,  # Remove in production!
                 'expires_at': otp_obj.expires_at
             })
-        
-        return Response({
-            'success': True,
-            'message': 'OTP sent successfully',
-            'expires_at': otp_obj.expires_at
-        })
+        except Exception as e:
+            logger.error(f"Unexpected error in SendOTPAPIView: {str(e)}", exc_info=True)
+            return Response({
+                'success': False,
+                'message': 'An unexpected error occurred. Please try again later.'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -662,7 +737,7 @@ class VerifyOTPAPIView(APIView):
     
     def post(self, request):
         phone_number = request.data.get('phone_number')
-        otp_code = request.data.get('otp_code')
+        otp_code = request.data.get('otp_code') or request.data.get('code')
         purpose = request.data.get('purpose', 'signup')
         
         if not phone_number or not otp_code:
@@ -676,40 +751,155 @@ class VerifyOTPAPIView(APIView):
         if not phone_number.startswith('0'):
             phone_number = '0' + phone_number
         
-        # Find the OTP code
-        otp_obj = OTPCode.objects.filter(
-            phone_number=phone_number,
-            code=otp_code,
-            purpose=purpose,
-            is_verified=False,
-            is_used=False
-        ).order_by('-created_at').first()
+        # Normalize OTP code (remove spaces, ensure it's a string)
+        otp_code = str(otp_code).replace(' ', '').replace('-', '').strip()
         
+        logger.info(f"[VerifyOTP] Attempting to verify OTP for {phone_number}, code: {otp_code}, purpose: {purpose}")
+        
+        otp_queryset = OTPCode.objects.filter(
+            phone_number=phone_number,
+            purpose=purpose,
+            is_used=False
+        ).order_by('-created_at')
+        
+        otp_obj = otp_queryset.filter(code=otp_code, is_verified=False).first()
+        latest_otp = otp_queryset.filter(is_verified=False).first()
+        
+        sms_verified = False
+        sms_error_message = None
+        sms_configured = all([
+            getattr(settings, 'SMS_USERNAME', ''),
+            getattr(settings, 'SMS_PASSWORD', ''),
+            getattr(settings, 'SMS_SENDER_NUMBER', '')
+        ])
+        
+        # First check if OTP exists in local database
+        if otp_obj:
+            logger.info(f"[VerifyOTP] Found matching OTP in database for {phone_number}")
+            
+            # Check if expired
+            if otp_obj.is_expired():
+                logger.warning(f"[VerifyOTP] OTP expired for {phone_number}")
+                return Response({
+                    'success': False,
+                    'message': 'OTP code has expired. Please request a new one.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # In DEBUG mode, skip SMS provider verification
+            if settings.DEBUG:
+                logger.info(f"[VerifyOTP] DEBUG MODE: Skipping SMS provider verification, using local database")
+                otp_obj.is_verified = True
+                otp_obj.verified_at = timezone.now()
+                otp_obj.save()
+                logger.info(f"[VerifyOTP] OTP verified successfully via DEBUG local verification for {phone_number}")
+                return Response({
+                    'success': True,
+                    'message': 'OTP verified successfully'
+                })
+            
+            # In production, try SMS provider verification first
+            if sms_configured:
+                try:
+                    sms_result = verify_otp_sms(phone_number, otp_code)
+                    logger.info(f"[VerifyOTP] SMS provider response: {sms_result}")
+                    sms_verified = sms_result.get('success', False)
+                    if sms_verified:
+                        otp_obj.is_verified = True
+                        otp_obj.verified_at = timezone.now()
+                        otp_obj.save()
+                        logger.info(f"[VerifyOTP] OTP verified successfully via SMS provider for {phone_number}")
+                        return Response({
+                            'success': True,
+                            'message': 'OTP verified successfully'
+                        })
+                    else:
+                        sms_error_message = sms_result.get('message')
+                        logger.warning(f"[VerifyOTP] SMS provider verification failed: {sms_error_message}")
+                except Exception as e:
+                    sms_error_message = str(e)
+                    logger.error(f"[VerifyOTP] SMS provider verification exception: {sms_error_message}", exc_info=True)
+            
+            # Fallback: Use local database verification if SMS fails or not configured
+            # This is important for reliability when SMS provider is down
+            logger.info(f"[VerifyOTP] Using local database verification fallback for {phone_number}")
+            otp_obj.is_verified = True
+            otp_obj.verified_at = timezone.now()
+            otp_obj.save()
+            logger.info(f"[VerifyOTP] OTP verified successfully via local fallback for {phone_number}")
+            return Response({
+                'success': True,
+                'message': 'OTP verified successfully'
+            })
+        
+        # Legacy code for SMS-only verification (kept for backwards compatibility)
+        if sms_configured:
+            try:
+                sms_result = verify_otp_sms(phone_number, otp_code)
+                logger.info(f"[VerifyOTP] SMS provider response: {sms_result}")
+                sms_verified = sms_result.get('success', False)
+                if not sms_verified:
+                    sms_error_message = sms_result.get('message')
+            except Exception as e:
+                sms_error_message = str(e)
+                logger.error(f"[VerifyOTP] SMS provider verification failed: {sms_error_message}", exc_info=True)
+        
+        if sms_verified:
+            otp_to_mark = otp_obj or latest_otp
+            if not otp_to_mark:
+                logger.warning(f"[VerifyOTP] SMS verification succeeded but no OTP record found for {phone_number}")
+                otp_to_mark = OTPCode.objects.create(
+                    phone_number=phone_number,
+                    code=otp_code,
+                    purpose=purpose,
+                    expires_at=timezone.now() + timedelta(minutes=5),
+                    is_verified=True,
+                    verified_at=timezone.now()
+                )
+                return Response({
+                    'success': True,
+                    'message': 'OTP verified successfully'
+                })
+            
+            if otp_to_mark.is_expired():
+                logger.warning(f"[VerifyOTP] Latest OTP expired for {phone_number}")
+                return Response({
+                    'success': False,
+                    'message': 'OTP code has expired. Please request a new one.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            otp_to_mark.is_verified = True
+            otp_to_mark.verified_at = timezone.now()
+            otp_to_mark.save()
+            
+            logger.info(f"[VerifyOTP] OTP verified successfully via SMS provider for {phone_number}")
+            
+            return Response({
+                'success': True,
+                'message': 'OTP verified successfully'
+            })
+        
+        # Fallback to local database verification when SMS verification fails/unavailable
         if not otp_obj:
+            recent_otps = otp_queryset[:3]
+            logger.warning(f"[VerifyOTP] No matching OTP found for {phone_number}. Provider error: {sms_error_message}. Recent OTPs: {[(o.code, o.is_verified, o.is_used, o.is_expired()) for o in recent_otps]}")
+            message = sms_error_message or 'Invalid OTP code. Please check the code and try again.'
             return Response({
                 'success': False,
-                'message': 'Invalid OTP code'
+                'message': message
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Check if OTP is expired
         if otp_obj.is_expired():
+            logger.warning(f"[VerifyOTP] OTP expired for {phone_number}")
             return Response({
                 'success': False,
                 'message': 'OTP code has expired. Please request a new one.'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Verify with SMS service (optional - can skip if you trust your database)
-        # sms_verify_result = verify_otp_sms(phone_number, otp_code)
-        # if not sms_verify_result['success']:
-        #     return Response({
-        #         'success': False,
-        #         'message': sms_verify_result['message']
-        #     }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Mark OTP as verified
         otp_obj.is_verified = True
         otp_obj.verified_at = timezone.now()
         otp_obj.save()
+        
+        logger.info(f"[VerifyOTP] OTP verified successfully via local fallback for {phone_number}")
         
         return Response({
             'success': True,

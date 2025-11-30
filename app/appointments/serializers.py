@@ -219,6 +219,8 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
 
 
 class AppointmentCancellationSerializer(serializers.ModelSerializer):
+    reason = serializers.CharField(required=False, allow_blank=True, default='')
+    
     class Meta:
         model = AppointmentCancellation
         fields = ['reason']
@@ -227,7 +229,7 @@ class AppointmentCancellationSerializer(serializers.ModelSerializer):
         # Get appointment and cancelled_by from the context passed by the view
         appointment = self.context.get('appointment')
         cancelled_by = self.context.get('cancelled_by')
-        reason = validated_data['reason']
+        reason = validated_data.get('reason', '') or 'بدون دلیل'
         
         # Create cancellation record without fees
         cancellation = AppointmentCancellation.objects.create(

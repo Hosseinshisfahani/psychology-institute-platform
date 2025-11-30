@@ -429,7 +429,10 @@ const WorkshopsList: React.FC = () => {
                             <Button
                               variant="outlined"
                               size="small"
-                              onClick={() => window.open(`http://localhost:8000/admin/workshops/workshop/${workshop.id}/change/`, '_blank')}
+                              onClick={() => {
+                                const apiUrl = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
+                                window.open(`${apiUrl}/admin/workshops/workshop/${workshop.id}/change/`, '_blank');
+                              }}
                               sx={{ alignSelf: 'flex-start' }}
                             >
                               ویرایش

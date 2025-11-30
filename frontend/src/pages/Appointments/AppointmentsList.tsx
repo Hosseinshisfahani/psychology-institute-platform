@@ -21,7 +21,7 @@ interface Appointment {
 }
 
 const AppointmentsList: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -42,7 +42,7 @@ const AppointmentsList: React.FC = () => {
       const response = await axios.get('/api/appointments/');
       return response.data.results || response.data;
     },
-    enabled: !!user,
+    enabled: isAuthenticated && !!user,
   });
 
   const getStatusVariant = (status: string) => {
@@ -125,7 +125,22 @@ const AppointmentsList: React.FC = () => {
     }
   };
 
-  if (!user) {
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <Container className="py-5">
+        <div className="text-center py-5">
+          <div className="spinner-border text-primary" role="status" style={{ width: '3rem', height: '3rem' }}>
+            <span className="visually-hidden">در حال بارگذاری...</span>
+          </div>
+          <p className="text-muted mt-3">در حال بررسی وضعیت ورود...</p>
+        </div>
+      </Container>
+    );
+  }
+
+  // Show login required if not authenticated
+  if (!isAuthenticated || !user) {
     return (
       <Container className="py-5">
         <Alert variant="warning" className="text-center">

@@ -92,7 +92,7 @@ class AppointmentListAPIView(generics.ListCreateAPIView):
             deposit_payload = None
 
             if appointment.deposit_required and appointment.deposit_amount > Decimal('0'):
-                deposit_payload = self._initiate_deposit_payment(request.user, appointment)
+                deposit_payload = self._initiate_deposit_payment(request.user, appointment, request=request)
 
         output_serializer = AppointmentSerializer(
             appointment,
@@ -106,7 +106,9 @@ class AppointmentListAPIView(generics.ListCreateAPIView):
         headers = self.get_success_headers(output_serializer.data)
         return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
 
-    def _initiate_deposit_payment(self, user, appointment):
+    def _initiate_deposit_payment(self, user, appointment, request=None):
+        from app.payment.api_views import get_frontend_url
+        
         deposit_amount = appointment.deposit_amount
 
         if deposit_amount <= Decimal('0'):
@@ -142,10 +144,14 @@ class AppointmentListAPIView(generics.ListCreateAPIView):
         order.payment_method = payment_method
         order.save(update_fields=['payment_method'])
 
+        # Get frontend URL from request
+        frontend_url = get_frontend_url(request=request) if request else None
+
         zarinpal = ZarinpalPayment()
         payment_result = zarinpal.create_payment_request(
             order,
-            description=f"پرداخت ودیعه نوبت {appointment.id}"
+            description=f"پرداخت ودیعه نوبت {appointment.id}",
+            frontend_url=frontend_url
         )
 
         if not payment_result.get('success'):

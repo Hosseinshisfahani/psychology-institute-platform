@@ -132,7 +132,7 @@ class ZarinpalPayment:
         )
         return payment_method
     
-    def create_payment_request(self, order, description="پرداخت سفارش"):
+    def create_payment_request(self, order, description="پرداخت سفارش", frontend_url=None):
         """Create payment request with Zarinpal"""
         import logging
         logger = logging.getLogger(__name__)
@@ -265,6 +265,15 @@ class ZarinpalPayment:
             # Get or create payment method
             payment_method = self._get_payment_method()
             
+            # Store frontend URL in result if provided
+            if frontend_url:
+                if isinstance(result, dict):
+                    if 'data' not in result:
+                        result['data'] = {}
+                    result['data']['frontend_url'] = frontend_url
+                else:
+                    result = {'data': {'frontend_url': frontend_url}, **result}
+            
             # Create payment record
             payment = Payment.objects.create(
                 order=order,
@@ -286,6 +295,8 @@ class ZarinpalPayment:
                 data_section['issued_at'] = issued_at.isoformat()
                 data_section['expires_at'] = expires_at.isoformat()
                 data_section['payment_url'] = payment_url
+                if frontend_url:
+                    data_section['frontend_url'] = frontend_url
                 result['data'] = data_section
                 payment.gateway_response = result
                 payment.save(update_fields=['gateway_response'])

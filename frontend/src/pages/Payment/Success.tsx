@@ -1,10 +1,18 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Alert, ListGroup } from 'react-bootstrap';
 import { Link, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { useAuth } from '../../contexts/AuthContext';
 
 const PaymentSuccess: React.FC = () => {
   const location = useLocation();
+  const { checkAuthStatus } = useAuth();
+
+  // Refresh auth state on mount to ensure user is authenticated after payment redirect
+  useEffect(() => {
+    // Refresh auth status to ensure user state is up to date after payment redirect
+    checkAuthStatus();
+  }, [checkAuthStatus]);
 
   const { orderId, refId, appointmentId } = useMemo(() => {
     const params = new URLSearchParams(location.search);

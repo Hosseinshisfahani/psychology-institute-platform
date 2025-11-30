@@ -38,10 +38,12 @@ const Signup: React.FC = () => {
 
   const handleSendOTP = async () => {
     setError('');
+    console.log('[Signup] handleSendOTP called', { phone_number: formData.phone_number });
     
     // Validate phone number
     if (!formData.phone_number) {
       setError('لطفاً شماره تلفن خود را وارد کنید');
+      console.log('[Signup] Validation failed: phone number missing');
       return;
     }
     
@@ -50,17 +52,21 @@ const Signup: React.FC = () => {
     const normalizedPhone = formData.phone_number.replace(/\s/g, '');
     if (!phoneRegex.test(normalizedPhone)) {
       setError('فرمت شماره تلفن صحیح نیست. مثال: 09123456789');
+      console.log('[Signup] Validation failed: invalid phone format', normalizedPhone);
       return;
     }
     
     setSendingOTP(true);
+    console.log('[Signup] Calling sendOTP API', { phone: normalizedPhone, purpose: 'signup' });
     try {
       await sendOTP(normalizedPhone, 'signup');
+      console.log('[Signup] OTP sent successfully');
       // Success - show OTP input field
       setOtpSent(true);
       setStep('otp');
       setError(''); // Clear any previous errors
     } catch (err: any) {
+      console.error('[Signup] Error sending OTP:', err);
       // Better error message handling
       let errorMsg = 'خطا در ارسال کد تایید';
       
@@ -173,21 +179,31 @@ const Signup: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[Signup] Form submitted', { step, formData, agreeToTerms });
     
     if (step === 'form') {
       // Validate form fields first
       if (!formData.first_name || !formData.last_name || !formData.email || !formData.password1 || !formData.password2) {
+        console.log('[Signup] Validation failed: missing fields', {
+          first_name: !!formData.first_name,
+          last_name: !!formData.last_name,
+          email: !!formData.email,
+          password1: !!formData.password1,
+          password2: !!formData.password2,
+        });
         setError('لطفاً تمام فیلدها را پر کنید');
         return;
       }
       
       // Check terms acceptance
       if (!agreeToTerms) {
+        console.log('[Signup] Validation failed: terms not accepted');
         setError('لطفاً شرایط و قوانین را بپذیرید');
         return;
       }
       
       // Then send OTP
+      console.log('[Signup] All validations passed, calling handleSendOTP');
       await handleSendOTP();
     } else if (step === 'otp') {
       // Verify OTP and signup
@@ -300,6 +316,7 @@ const Signup: React.FC = () => {
                           placeholder="09123456789"
                           disabled={sendingOTP}
                           maxLength={11}
+                          autoComplete="tel"
                         />
                         <Form.Text className="text-muted">
                           شماره تلفن همراه خود را وارد کنید
@@ -317,6 +334,7 @@ const Signup: React.FC = () => {
                           placeholder="••••••••"
                           minLength={8}
                           disabled={sendingOTP}
+                          autoComplete="new-password"
                         />
                         <Form.Text className="text-muted">
                           حداقل 8 کاراکتر
@@ -333,6 +351,7 @@ const Signup: React.FC = () => {
                           required
                           placeholder="••••••••"
                           disabled={sendingOTP}
+                          autoComplete="new-password"
                         />
                       </Form.Group>
 

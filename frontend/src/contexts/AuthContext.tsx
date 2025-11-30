@@ -49,12 +49,13 @@ interface AuthContextType {
   sendOTP: (phoneNumber: string, purpose?: string) => Promise<void>;
   verifyOTP: (phoneNumber: string, otpCode: string, purpose?: string) => Promise<void>;
   updateProfile: (data: Partial<User['profile']>) => Promise<void>;
+  checkAuthStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Configure axios defaults (Django-compatible CSRF names)
-axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
 axios.defaults.withCredentials = true;
 axios.defaults.xsrfCookieName = 'csrftoken';
 axios.defaults.xsrfHeaderName = 'X-CSRFToken';
@@ -95,19 +96,31 @@ axios.interceptors.request.use(
         // If a fetch is already in progress, wait for it
         if (csrfFetchPromise) {
           await csrfFetchPromise;
+          // Re-check token after waiting
           csrfToken = getCsrfToken();
         } else {
-          // Start a new fetch and cache the promise
-          csrfFetchPromise = (async () => {
+          // Atomically create and assign the promise to prevent race conditions
+          // Multiple requests checking simultaneously will all see the same promise
+          const fetchPromise = (async () => {
             try {
               await axios.get('/csrf/');
+              // Give browser a moment to set the cookie
+              await new Promise(resolve => setTimeout(resolve, 10));
             } catch (error) {
               console.warn('Failed to fetch CSRF token:', error);
             } finally {
-              csrfFetchPromise = null; // Clear cache after fetch completes
+              // Clear cache after a delay to allow cookie to be set
+              setTimeout(() => {
+                csrfFetchPromise = null;
+              }, 500);
             }
           })();
-          await csrfFetchPromise;
+          
+          // Set the promise BEFORE awaiting to prevent race conditions
+          csrfFetchPromise = fetchPromise;
+          await fetchPromise;
+          
+          // Re-check token after fetch
           csrfToken = getCsrfToken();
         }
       }
@@ -131,8 +144,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Check if user is authenticated on mount
   useEffect(() => {
-    // Ensure CSRF token is available before any requests
-    getCsrf();
+    // CSRF token will be fetched automatically by the interceptor when needed
+    // No need to fetch it explicitly here to avoid duplicate requests
     checkAuthStatus();
   }, []);
 
@@ -153,11 +166,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const getCsrf = async () => {
     // Only fetch if we don't already have a token
-    if (!getCsrfToken()) {
-      try {
-        await axios.get('/csrf/');
-      } catch (_) {
-        // no-op: endpoint sets cookie via middleware
+    const existingToken = getCsrfToken();
+    if (!existingToken) {
+      // Use the same caching mechanism as the interceptor
+      if (csrfFetchPromise) {
+        await csrfFetchPromise;
+      } else {
+        const fetchPromise = (async () => {
+          try {
+            await axios.get('/csrf/');
+            await new Promise(resolve => setTimeout(resolve, 10));
+          } catch (_) {
+            // no-op: endpoint sets cookie via middleware
+          } finally {
+            setTimeout(() => {
+              csrfFetchPromise = null;
+            }, 500);
+          }
+        })();
+        csrfFetchPromise = fetchPromise;
+        await fetchPromise;
       }
     }
   };
@@ -182,7 +210,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
       
       if (response.data.success) {
-        await checkAuthStatus();
+        // Set user directly from login response to avoid extra API call
+        // and ensure state updates immediately
+        if (response.data.user) {
+          setUser(response.data.user);
+        } else {
+          // Fallback to checkAuthStatus if user data not in response
+          await checkAuthStatus();
+        }
       } else {
         throw new Error(response.data.message || 'Login failed');
       }
@@ -235,7 +270,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
       
       if (response.data.success) {
-        await checkAuthStatus();
+        // Set user directly from signup response to avoid extra API call
+        // and ensure state updates immediately
+        if (response.data.user) {
+          setUser(response.data.user);
+        } else {
+          // Fallback to checkAuthStatus if user data not in response
+          await checkAuthStatus();
+        }
       } else {
         throw new Error(response.data.message || 'Signup failed');
       }
@@ -245,40 +287,65 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const sendOTP = async (phoneNumber: string, purpose: string = 'signup') => {
+    console.log('[AuthContext] sendOTP called', { phoneNumber, purpose });
     try {
+      console.log('[AuthContext] Fetching CSRF token...');
       await getCsrf();
       const csrfToken = getCsrfToken();
-      const response = await axios.post('/api/dashboard/otp/send/', {
+      console.log('[AuthContext] CSRF token obtained', { hasToken: !!csrfToken });
+      
+      const requestData = {
         phone_number: phoneNumber,
         purpose,
-      }, {
+      };
+      console.log('[AuthContext] Making POST request to /api/dashboard/otp/send/', requestData);
+      
+      const response = await axios.post('/api/dashboard/otp/send/', requestData, {
         headers: {
           'X-CSRFToken': csrfToken || '',
         },
       });
       
+      console.log('[AuthContext] OTP send response', { status: response.status, data: response.data });
+      
       if (!response.data.success) {
         const errorMsg = response.data.message || 'Failed to send OTP';
+        console.error('[AuthContext] OTP send failed', errorMsg);
         throw new Error(typeof errorMsg === 'string' ? errorMsg : 'Failed to send OTP');
       }
+      
+      console.log('[AuthContext] OTP sent successfully');
     } catch (error: any) {
+      console.error('[AuthContext] Error in sendOTP', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        stack: error.stack,
+      });
+      
       // Better error message handling
       let errorMessage = 'Failed to send OTP';
       
       if (error.response?.data?.message) {
         const msg = error.response.data.message;
-        errorMessage = typeof msg === 'string' ? msg : errorMessage;
+        // Filter out numeric-only messages (likely transaction IDs incorrectly treated as errors)
+        if (typeof msg === 'string' && !/^\d+$/.test(msg.trim())) {
+          errorMessage = msg;
+        } else if (typeof msg === 'string' && msg.trim().length > 0) {
+          // If it's a number, it might be a transaction ID - use generic message
+          errorMessage = 'خطا در ارسال کد تایید. لطفاً دوباره تلاش کنید.';
+        }
       } else if (error.response?.data) {
         // If response.data exists but no message, try to extract meaningful error
         const data = error.response.data;
-        if (typeof data === 'string') {
+        if (typeof data === 'string' && !/^\d+$/.test(data.trim())) {
           errorMessage = data;
         } else if (Array.isArray(data)) {
           errorMessage = data.join(', ');
-        } else if (data.detail) {
-          errorMessage = typeof data.detail === 'string' ? data.detail : errorMessage;
+        } else if (data.detail && typeof data.detail === 'string' && !/^\d+$/.test(data.detail.trim())) {
+          errorMessage = data.detail;
         }
-      } else if (error.message) {
+      } else if (error.message && !/^\d+$/.test(error.message.trim())) {
         errorMessage = error.message;
       }
       
@@ -292,7 +359,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const csrfToken = getCsrfToken();
       const response = await axios.post('/api/dashboard/otp/verify/', {
         phone_number: phoneNumber,
-        otp_code: otpCode,
+        code: otpCode,
         purpose,
       }, {
         headers: {
@@ -327,6 +394,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     sendOTP,
     verifyOTP,
     updateProfile,
+    checkAuthStatus,
   };
 
   return (

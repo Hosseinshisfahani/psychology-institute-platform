@@ -131,8 +131,8 @@ const Profile: React.FC = () => {
     setMessage({ type: '', text: '' });
 
     try {
-      // Get CSRF token first
-      await axios.get('/csrf/');
+      // CSRF token is handled automatically by axios interceptor
+      // No need to fetch it manually here
       
       const formDataToSend = new FormData();
       

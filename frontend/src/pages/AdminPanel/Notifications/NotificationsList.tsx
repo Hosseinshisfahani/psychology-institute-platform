@@ -42,7 +42,7 @@ import { useSnackbar } from 'notistack';
 import { Helmet } from 'react-helmet-async';
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
 
 interface Notification {
   id: number;

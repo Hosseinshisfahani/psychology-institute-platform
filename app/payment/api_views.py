@@ -19,6 +19,51 @@ from .serializers import (
 from .zarinpal import ZarinpalPayment
 
 
+def get_frontend_url(request=None, payment=None):
+    """
+    Get frontend URL from various sources in priority order:
+    1. Stored in payment's gateway_response (if payment provided)
+    2. HTTP_REFERER header (if request provided)
+    3. Request origin (if request provided and from same domain)
+    4. Settings FRONTEND_URL
+    5. Default localhost:3000
+    """
+    # Try to get from payment metadata first
+    if payment and payment.gateway_response:
+        if isinstance(payment.gateway_response, dict):
+            # Check in data section first (where we store it)
+            data_section = payment.gateway_response.get('data', {})
+            if isinstance(data_section, dict):
+                stored_url = data_section.get('frontend_url')
+                if stored_url:
+                    return stored_url
+            # Also check at root level (backwards compatibility)
+            stored_url = payment.gateway_response.get('frontend_url')
+            if stored_url:
+                return stored_url
+    
+    # Try to get from request referer
+    if request:
+        referer = request.META.get('HTTP_REFERER', '')
+        if referer:
+            # Extract origin from referer
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(referer)
+                if parsed.scheme and parsed.netloc:
+                    return f"{parsed.scheme}://{parsed.netloc}"
+            except Exception:
+                pass
+        
+        # Try to get from request origin header
+        origin = request.META.get('HTTP_ORIGIN', '')
+        if origin:
+            return origin
+    
+    # Fall back to settings
+    return getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+
+
 class CartAPIView(APIView):
     """API view for managing shopping cart"""
     permission_classes = [permissions.IsAuthenticated]
@@ -281,9 +326,13 @@ def process_payment(request):
                     else:
                         zarinpal.mark_payment_expired(existing_payment)
                 
+                # Get frontend URL from request
+                frontend_url = get_frontend_url(request=request)
+                
                 payment_result = zarinpal.create_payment_request(
                     order, 
-                    f"پرداخت سفارش {order.order_number}"
+                    f"پرداخت سفارش {order.order_number}",
+                    frontend_url=frontend_url
                 )
                 
                 if payment_result['success']:
@@ -367,7 +416,7 @@ def payment_verify(request):
             )
         else:
             # Redirect to frontend with error
-            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+            frontend_url = get_frontend_url(request=request)
             return redirect(f'{frontend_url}/payment/cancel?error=payment_cancelled')
     
     try:
@@ -383,7 +432,7 @@ def payment_verify(request):
                     status=status.HTTP_404_NOT_FOUND
                 )
             else:
-                frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+                frontend_url = get_frontend_url(request=request, payment=payment)
                 return redirect(f'{frontend_url}/payment/cancel?error=payment_not_found')
         
         # Verify payment with Zarinpal
@@ -492,7 +541,7 @@ def payment_verify(request):
                 return Response(response_payload)
             else:
                 # Redirect to frontend success page - redirect to My Workshops for workshop payments
-                frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+                frontend_url = get_frontend_url(request=request, payment=payment)
                 if registration_id:
                     # Redirect to My Workshops page for workshop payments
                     return redirect(f'{frontend_url}/dashboard/my-workshops?payment=success')
@@ -514,7 +563,7 @@ def payment_verify(request):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             else:
-                frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+                frontend_url = get_frontend_url(request=request, payment=payment)
                 return redirect(f'{frontend_url}/payment/cancel?error={error_msg}')
             
     except Exception as e:
@@ -524,7 +573,7 @@ def payment_verify(request):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         else:
-            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+            frontend_url = get_frontend_url(request=request)
             return redirect(f'{frontend_url}/payment/cancel?error=server_error')
 
 
