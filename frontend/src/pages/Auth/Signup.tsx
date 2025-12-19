@@ -100,8 +100,8 @@ const Signup: React.FC = () => {
       const normalizedPhone = formData.phone_number.replace(/\s/g, '');
       await verifyOTP(normalizedPhone, formData.otp_code, 'signup');
       setOtpVerified(true);
-      // After OTP verification, proceed with signup
-      await handleSignup();
+      // After OTP verification, proceed with signup (skip OTP check)
+      await handleSignup(true);
     } catch (err: any) {
       // Better error message handling
       let errorMsg = 'کد تایید نامعتبر است';
@@ -122,7 +122,7 @@ const Signup: React.FC = () => {
     }
   };
 
-  const handleSignup = async () => {
+  const handleSignup = async (skipOtpCheck = false) => {
     setError('');
     setIsLoading(true);
 
@@ -139,7 +139,8 @@ const Signup: React.FC = () => {
       return;
     }
 
-    if (!otpVerified) {
+    // Skip OTP check if we just verified it (to avoid React state timing issues)
+    if (!skipOtpCheck && !otpVerified) {
       setError('لطفاً ابتدا شماره تلفن خود را تایید کنید');
       setIsLoading(false);
       return;
@@ -228,6 +229,7 @@ const Signup: React.FC = () => {
                     alt={t('home.title')} 
                     height="60" 
                     className="mb-3"
+                    loading="lazy"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
                     }}

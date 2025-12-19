@@ -9,6 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.conf import settings
 from decimal import Decimal
+from urllib.parse import urlencode
 
 from .models import Cart, CartItem, Order, OrderItem, Payment, PaymentMethod
 from .serializers import (
@@ -19,15 +20,36 @@ from .serializers import (
 from .zarinpal import ZarinpalPayment
 
 
+def _is_ip_address(hostname):
+    """Check if a hostname is an IP address (IPv4 or IPv6)"""
+    import ipaddress
+    try:
+        # Remove port if present
+        if ':' in hostname and not hostname.startswith('['):
+            # IPv4 with port
+            hostname = hostname.split(':')[0]
+        elif hostname.startswith('[') and ']' in hostname:
+            # IPv6 with port [::1]:8000
+            hostname = hostname.split(']')[0][1:]
+        
+        ipaddress.ip_address(hostname)
+        return True
+    except (ValueError, AttributeError):
+        return False
+
+
 def get_frontend_url(request=None, payment=None):
     """
     Get frontend URL from various sources in priority order:
-    1. Stored in payment's gateway_response (if payment provided)
-    2. HTTP_REFERER header (if request provided)
-    3. Request origin (if request provided and from same domain)
-    4. Settings FRONTEND_URL
+    1. Settings FRONTEND_URL (always prefer domain over IP)
+    2. Stored in payment's gateway_response (if payment provided and not IP)
+    3. HTTP_REFERER header (if request provided and not IP)
+    4. Request origin (if request provided and not IP)
     5. Default localhost:3000
     """
+    # Get settings FRONTEND_URL first to use as fallback/preferred value
+    settings_frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+    
     # Try to get from payment metadata first
     if payment and payment.gateway_response:
         if isinstance(payment.gateway_response, dict):
@@ -36,13 +58,26 @@ def get_frontend_url(request=None, payment=None):
             if isinstance(data_section, dict):
                 stored_url = data_section.get('frontend_url')
                 if stored_url:
-                    return stored_url
+                    # Validate it's not an IP address
+                    try:
+                        from urllib.parse import urlparse
+                        parsed = urlparse(stored_url)
+                        if parsed.netloc and not _is_ip_address(parsed.netloc):
+                            return stored_url
+                    except Exception:
+                        pass
             # Also check at root level (backwards compatibility)
             stored_url = payment.gateway_response.get('frontend_url')
             if stored_url:
-                return stored_url
+                try:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(stored_url)
+                    if parsed.netloc and not _is_ip_address(parsed.netloc):
+                        return stored_url
+                except Exception:
+                    pass
     
-    # Try to get from request referer
+    # Try to get from request referer (but only if it's a domain, not IP)
     if request:
         referer = request.META.get('HTTP_REFERER', '')
         if referer:
@@ -51,17 +86,25 @@ def get_frontend_url(request=None, payment=None):
                 from urllib.parse import urlparse
                 parsed = urlparse(referer)
                 if parsed.scheme and parsed.netloc:
-                    return f"{parsed.scheme}://{parsed.netloc}"
+                    # Only use if it's not an IP address
+                    if not _is_ip_address(parsed.netloc):
+                        return f"{parsed.scheme}://{parsed.netloc}"
             except Exception:
                 pass
         
-        # Try to get from request origin header
+        # Try to get from request origin header (but only if it's a domain, not IP)
         origin = request.META.get('HTTP_ORIGIN', '')
         if origin:
-            return origin
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(origin)
+                if parsed.netloc and not _is_ip_address(parsed.netloc):
+                    return origin
+            except Exception:
+                pass
     
-    # Fall back to settings
-    return getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+    # Fall back to settings (which should be the domain)
+    return settings_frontend_url
 
 
 class CartAPIView(APIView):
@@ -122,6 +165,28 @@ class CartAPIView(APIView):
                     item_data['item_title'] = package.title
                 except Package.DoesNotExist:
                     item_data['package'] = None
+                    item_data['item_title'] = f"{item.get_item_type_display()} #{item.item_id}"
+            elif item.item_type == 'workshop':
+                try:
+                    from app.workshops.models import Workshop
+                    workshop = Workshop.objects.select_related('category').get(id=item.item_id)
+                    item_data['workshop'] = {
+                        'id': workshop.id,
+                        'title': workshop.title,
+                        'slug': workshop.slug,
+                        'thumbnail': request.build_absolute_uri(workshop.thumbnail.url) if workshop.thumbnail else None,
+                        'price': float(workshop.price) if workshop.price else 0,
+                        'current_price': float(workshop.current_price),
+                        'instructor_name': workshop.instructor_name,
+                        'category_name': workshop.category.name if workshop.category else None,
+                    }
+                    item_data['item_title'] = workshop.title
+                    # Include payment type from metadata
+                    if item.metadata:
+                        item_data['payment_type'] = item.metadata.get('payment_type')
+                        item_data['installment_months'] = item.metadata.get('installment_months')
+                except Exception as e:
+                    item_data['workshop'] = None
                     item_data['item_title'] = f"{item.get_item_type_display()} #{item.item_id}"
             else:
                 # For other item types, just add the title
@@ -270,8 +335,35 @@ def process_payment(request):
                 
                 # Create order items from cart
                 for cart_item in cart.items.all():
-                    # Fetch actual item title
+                    # Fetch actual item title based on item type
                     item_title = f"{cart_item.get_item_type_display()} #{cart_item.item_id}"
+                    
+                    # Get proper title for workshops
+                    if cart_item.item_type == 'workshop':
+                        try:
+                            from app.workshops.models import Workshop
+                            workshop = Workshop.objects.get(id=cart_item.item_id)
+                            item_title = workshop.title
+                        except Exception:
+                            pass
+                    elif cart_item.item_type == 'course':
+                        try:
+                            from app.courses.models import Course
+                            course = Course.objects.get(id=cart_item.item_id)
+                            item_title = course.title
+                        except Exception:
+                            pass
+                    elif cart_item.item_type == 'package':
+                        try:
+                            from app.packages.models import Package
+                            package = Package.objects.get(id=cart_item.item_id)
+                            item_title = package.title
+                        except Exception:
+                            pass
+                    
+                    # Copy metadata from cart item to order item
+                    metadata = cart_item.metadata.copy() if cart_item.metadata else {}
+                    
                     OrderItem.objects.create(
                         order=order,
                         item_type=cart_item.item_type,
@@ -279,7 +371,8 @@ def process_payment(request):
                         item_title=item_title,
                         quantity=cart_item.quantity,
                         unit_price=cart_item.unit_price,
-                        total_price=cart_item.total_price
+                        total_price=cart_item.total_price,
+                        metadata=metadata
                     )
             
             # Get payment method
@@ -472,61 +565,167 @@ def payment_verify(request):
                 logger = logging.getLogger(__name__)
                 logger.error(f'Error marking appointment deposit as paid: {e}')
             
-            # Activate workshop registration if this order is for a workshop
-            registration_id = None
+            # Create package purchase after successful payment
             try:
-                from app.workshops.models import WorkshopRegistration, InstallmentPayment
+                from app.packages.models import PackagePurchase, PackageProgress
                 from decimal import Decimal
+                
+                # Check if order has package items
+                package_order_items = payment.order.items.filter(item_type='package')
+                if package_order_items.exists():
+                    for package_item in package_order_items:
+                        package_id = package_item.item_id
+                        
+                        try:
+                            from app.packages.models import Package
+                            package = Package.objects.get(id=package_id)
+                        except Exception:
+                            logger.error(f'Package {package_id} not found')
+                            continue
+                        
+                        # Check if purchase already exists
+                        purchase = PackagePurchase.objects.filter(
+                            user=payment.order.user,
+                            package=package
+                        ).first()
+                        
+                        if not purchase:
+                            # Create new purchase after successful payment
+                            purchase = PackagePurchase.objects.create(
+                                user=payment.order.user,
+                                package=package,
+                                amount_paid=Decimal(str(package_item.total_price)),
+                                original_price=Decimal(str(package.price)),
+                                discount_amount=Decimal(str(package.price)) - Decimal(str(package.current_price)) if package.discount_price else Decimal('0'),
+                                payment_method='zarinpal',
+                                transaction_id=verify_result.get('ref_id', ''),
+                                order=payment.order
+                            )
+                            
+                            # Create course enrollments
+                            purchase.create_course_enrollments()
+                            
+                            # Create progress tracker
+                            PackageProgress.objects.create(purchase=purchase)
+                            
+                            # Increment purchase count
+                            package.purchase_count += 1
+                            package.save(update_fields=['purchase_count'])
+                        else:
+                            # Update existing purchase if needed
+                            if not purchase.order or purchase.order.payment_status != 'completed':
+                                purchase.order = payment.order
+                                purchase.transaction_id = verify_result.get('ref_id', '')
+                                purchase.payment_method = 'zarinpal'
+                                purchase.save()
+            except Exception as e:
+                logger.error(f'Error creating package purchase: {str(e)}', exc_info=True)
+            
+            # Create or activate workshop registration after successful payment
+            registration_id = None
+            registration_slug = None
+            try:
+                from app.workshops.models import WorkshopRegistration, InstallmentPayment, InstallmentPlan, Workshop
+                from decimal import Decimal
+                from dateutil.relativedelta import relativedelta
                 
                 # Check if order has workshop items
                 workshop_order_items = payment.order.items.filter(item_type='workshop')
                 if workshop_order_items.exists():
-                    # Find registration by order
-                    # Registration ID might be stored in payment gateway_response
-                    registration_id = payment.gateway_response.get('registration_id')
+                    workshop_item = workshop_order_items.first()
+                    workshop_id = workshop_item.item_id
+                    payment_type = workshop_item.metadata.get('payment_type', 'full_payment')
                     
-                    if registration_id:
-                        registration = WorkshopRegistration.objects.get(id=registration_id)
-                    else:
-                        # Fallback: find by workshop ID from order item
-                        workshop_id = workshop_order_items.first().item_id
+                    # Get workshop
+                    try:
+                        workshop = Workshop.objects.get(id=workshop_id)
+                        registration_slug = workshop.slug
+                    except Workshop.DoesNotExist:
+                        logger.error(f'Workshop {workshop_id} not found')
+                        workshop = None
+                    
+                    if workshop:
+                        # Check if registration already exists
                         registration = WorkshopRegistration.objects.filter(
                             user=payment.order.user,
-                            workshop_id=workshop_id,
-                            status='pending_payment'
+                            workshop=workshop
                         ).first()
-                    
-                    if registration:
-                        registration_id = registration.id  # Update for redirect check
-                        # Update registration amount_paid
-                        registration.amount_paid += Decimal(str(payment.amount))
                         
-                        # Handle installment payment if applicable
-                        if registration.payment_type == 'installment' and hasattr(registration, 'installment_plan'):
-                            # Find and mark first unpaid installment as paid
-                            first_installment = registration.installment_plan.payments.filter(
-                                status='pending'
-                            ).order_by('installment_number').first()
+                        if not registration:
+                            # Create new registration after successful payment
+                            total_amount = Decimal(str(workshop_item.metadata.get('workshop_price', workshop.current_price)))
                             
-                            if first_installment:
-                                first_installment.status = 'paid'
-                                first_installment.paid_at = timezone.now()
-                                first_installment.transaction_id = verify_result.get('ref_id', '')
-                                first_installment.order = payment.order
-                                first_installment.save()
+                            registration = WorkshopRegistration.objects.create(
+                                user=payment.order.user,
+                                workshop=workshop,
+                                payment_type=payment_type,
+                                total_amount=total_amount,
+                                amount_paid=Decimal(str(payment.amount)),
+                                status='active' if payment_type == 'full_payment' else 'active'  # Activate after first payment
+                            )
+                            
+                            # Create installment plan if needed
+                            if payment_type == 'installment':
+                                installment_amt = Decimal(str(workshop_item.metadata.get('installment_amount', workshop.installment_amount)))
+                                installment_months = workshop_item.metadata.get('installment_months', workshop.installment_months)
+                                
+                                plan = InstallmentPlan.objects.create(
+                                    registration=registration,
+                                    total_amount=total_amount,
+                                    number_of_installments=installment_months,
+                                    installment_amount=installment_amt
+                                )
+                                
+                                due_date = timezone.now().date()
+                                for i in range(1, installment_months + 1):
+                                    InstallmentPayment.objects.create(
+                                        plan=plan,
+                                        installment_number=i,
+                                        amount=installment_amt,
+                                        due_date=due_date + relativedelta(months=i-1),
+                                        status='paid' if i == 1 else 'pending'  # Mark first installment as paid
+                                    )
+                                
+                                # Mark first installment as paid
+                                first_installment = plan.payments.filter(installment_number=1).first()
+                                if first_installment:
+                                    first_installment.status = 'paid'
+                                    first_installment.paid_at = timezone.now()
+                                    first_installment.transaction_id = verify_result.get('ref_id', '')
+                                    first_installment.order = payment.order
+                                    first_installment.save()
+                        else:
+                            # Update existing registration
+                            registration.amount_paid += Decimal(str(payment.amount))
+                            
+                            # Handle installment payment if applicable
+                            if registration.payment_type == 'installment' and hasattr(registration, 'installment_plan'):
+                                # Find and mark first unpaid installment as paid
+                                first_unpaid = registration.installment_plan.payments.filter(
+                                    status='pending'
+                                ).order_by('installment_number').first()
+                                
+                                if first_unpaid:
+                                    first_unpaid.status = 'paid'
+                                    first_unpaid.paid_at = timezone.now()
+                                    first_unpaid.transaction_id = verify_result.get('ref_id', '')
+                                    first_unpaid.order = payment.order
+                                    first_unpaid.save()
+                            
+                            # Activate registration if full payment is made
+                            if registration.payment_type == 'full_payment' and registration.amount_paid >= registration.total_amount:
+                                registration.status = 'active'
+                            elif registration.payment_type == 'installment' and registration.amount_paid > 0:
+                                # Activate registration after first installment payment
+                                registration.status = 'active'
+                            
+                            registration.save()
                         
-                        # Activate registration if full payment is made
-                        if registration.payment_type == 'full_payment' and registration.amount_paid >= registration.total_amount:
-                            registration.status = 'active'
-                        elif registration.payment_type == 'installment' and registration.amount_paid > 0:
-                            # Activate registration after first installment payment
-                            registration.status = 'active'
-                        
-                        registration.save()
+                        registration_id = registration.id
             except Exception as e:
                 # Log error but don't fail the payment verification
                 logger = logging.getLogger(__name__)
-                logger.error(f'Error activating workshop registration: {str(e)}')
+                logger.error(f'Error creating/activating workshop registration: {str(e)}', exc_info=True)
             
             if is_api_call:
                 response_payload = {
@@ -538,19 +737,32 @@ def payment_verify(request):
                 }
                 if appointment_ids:
                     response_payload['appointment_ids'] = appointment_ids
+                if registration_id:
+                    response_payload['registration_id'] = registration_id
+                if registration_slug:
+                    response_payload['workshop_slug'] = registration_slug
                 return Response(response_payload)
             else:
-                # Redirect to frontend success page - redirect to My Workshops for workshop payments
+                # Redirect to frontend success page (supports workshops & appointments)
                 frontend_url = get_frontend_url(request=request, payment=payment)
+                success_params = {
+                    'order_id': payment.order.id,
+                    'order_number': payment.order.order_number,
+                    'ref_id': verify_result.get('ref_id', '')
+                }
+                if appointment_ids:
+                    # Use the first appointment ID for backwards compatibility
+                    success_params['appointment_id'] = appointment_ids[0]
                 if registration_id:
-                    # Redirect to My Workshops page for workshop payments
-                    return redirect(f'{frontend_url}/dashboard/my-workshops?payment=success')
-                else:
-                    query = f'order_id={payment.order.id}&ref_id={verify_result.get("ref_id", "")}'
-                    if appointment_ids:
-                        # Use the first appointment ID for backwards compatibility
-                        query += f'&appointment_id={appointment_ids[0]}'
-                    return redirect(f'{frontend_url}/payment/success?{query}')
+                    success_params['registration_id'] = registration_id
+                    success_params['item_type'] = 'workshop'
+                elif payment.order.items.filter(item_type='workshop').exists():
+                    success_params['item_type'] = 'workshop'
+                if registration_slug:
+                    success_params['workshop_slug'] = registration_slug
+                # Remove empty values before encoding
+                query = urlencode({k: str(v) for k, v in success_params.items() if v not in [None, '']})
+                return redirect(f'{frontend_url}/payment/success?{query}')
         else:
             payment.status = 'failed'
             payment.gateway_response = verify_result

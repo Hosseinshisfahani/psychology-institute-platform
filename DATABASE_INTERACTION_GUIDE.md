@@ -1,9 +1,6 @@
 
 
-## 4. Query Patterns
 
-#### Query Optimization (select_related / prefetch_related)
-```python
 # Optimize foreign key lookups (JOIN)
 courses = Course.objects.select_related('category', 'instructor')
 

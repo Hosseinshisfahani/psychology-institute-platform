@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import User, UserProfile, Notification
 from app.courses.models import Enrollment
-from app.tests.models import TestResult
+# from app.tests.models import TestResult  # Tests app removed
 # from app.therapy_sessions.models import Session  # Commented out - therapy_sessions app doesn't exist
 
 
@@ -134,23 +134,23 @@ class EnrollmentSerializer(serializers.ModelSerializer):
         return obj.status == 'completed'
 
 
-class TestResultSerializer(serializers.ModelSerializer):
-    test_title = serializers.CharField(source='session.test.title', read_only=True)
-    user_name = serializers.CharField(source='session.user.full_name', read_only=True)
-    generated_at_persian = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = TestResult
-        fields = [
-            'id', 'session', 'test_title', 'user_name', 'total_score', 'max_score',
-            'percentage', 'interpretation', 'recommendations', 'generated_at', 'generated_at_persian'
-        ]
-    
-    def get_generated_at_persian(self, obj):
-        import jdatetime
-        if obj.generated_at:
-            jalali_date = jdatetime.datetime.fromgregorian(datetime=obj.generated_at)
-            return jalali_date.strftime('%Y/%m/%d')
-        return None
+# class TestResultSerializer(serializers.ModelSerializer):  # Tests app removed
+#     test_title = serializers.CharField(source='session.test.title', read_only=True)
+#     user_name = serializers.CharField(source='session.user.full_name', read_only=True)
+#     generated_at_persian = serializers.SerializerMethodField()
+#     
+#     class Meta:
+#         model = TestResult
+#         fields = [
+#             'id', 'session', 'test_title', 'user_name', 'total_score', 'max_score',
+#             'percentage', 'interpretation', 'recommendations', 'generated_at', 'generated_at_persian'
+#         ]
+#     
+#     def get_generated_at_persian(self, obj):
+#         import jdatetime
+#         if obj.generated_at:
+#             jalali_date = jdatetime.datetime.fromgregorian(datetime=obj.generated_at)
+#             return jalali_date.strftime('%Y/%m/%d')
+#         return None
 
 

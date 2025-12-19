@@ -97,15 +97,16 @@ function FormFileUpload<T extends FieldValues>({
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 {previewUrl && (
-                  <Box
-                    component="img"
-                    src={previewUrl}
-                    alt="Preview"
-                    sx={{
-                      width: 80,
-                      height: 80,
-                      objectFit: 'cover',
-                      borderRadius: 1,
+                    <Box
+                      component="img"
+                      src={previewUrl}
+                      alt="Preview"
+                      loading="lazy"
+                      sx={{
+                        width: 80,
+                        height: 80,
+                        objectFit: 'cover',
+                        borderRadius: 1,
                     }}
                   />
                 )}

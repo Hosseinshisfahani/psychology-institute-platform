@@ -14,15 +14,22 @@ const PaymentSuccess: React.FC = () => {
     checkAuthStatus();
   }, [checkAuthStatus]);
 
-  const { orderId, refId, appointmentId } = useMemo(() => {
+  const { orderId, orderNumber, refId, appointmentId, registrationId, workshopSlug, itemType } = useMemo(() => {
     const params = new URLSearchParams(location.search);
 
     return {
       orderId: params.get('order_id'),
+      orderNumber: params.get('order_number'),
       refId: params.get('ref_id'),
       appointmentId: params.get('appointment_id'),
+      registrationId: params.get('registration_id'),
+      workshopSlug: params.get('workshop_slug'),
+      itemType: params.get('item_type'),
     };
   }, [location.search]);
+
+  const isWorkshopPayment = Boolean(registrationId || itemType === 'workshop');
+  const isAppointmentPayment = Boolean(appointmentId);
 
   return (
     <>
@@ -49,6 +56,17 @@ const PaymentSuccess: React.FC = () => {
                   </p>
                 </div>
 
+                {isWorkshopPayment && (
+                  <Alert variant="success" className="mb-4">
+                    <div className="d-flex align-items-center">
+                      <i className="fas fa-chalkboard-teacher fa-lg me-3"></i>
+                      <div className="text-start">
+                        ثبت‌نام شما در کارگاه فعال شد. می‌توانید از طریق بخش «کارگاه‌های من» به جلسات و محتوای کارگاه دسترسی داشته باشید.
+                      </div>
+                    </div>
+                  </Alert>
+                )}
+
                 <Alert variant="info" className="mb-4">
                   <div className="d-flex align-items-center">
                     <i className="fas fa-info-circle fa-lg me-3"></i>
@@ -58,7 +76,7 @@ const PaymentSuccess: React.FC = () => {
                   </div>
                 </Alert>
 
-                {appointmentId && (
+                {isAppointmentPayment && (
                   <Alert variant="success" className="mb-4">
                     <div className="d-flex align-items-center">
                       <i className="fas fa-calendar-check fa-lg me-3"></i>
@@ -69,14 +87,20 @@ const PaymentSuccess: React.FC = () => {
                   </Alert>
                 )}
 
-                {(orderId || refId) && (
+                {(orderId || refId || orderNumber || registrationId) && (
                   <Card className="border-0 bg-light mb-4">
                     <Card.Body className="p-3 p-lg-4">
                       <h5 className="fw-semibold mb-3">جزئیات تراکنش</h5>
                       <ListGroup variant="flush" className="small">
-                        {orderId && (
+                        {orderNumber && (
                           <ListGroup.Item className="d-flex justify-content-between px-0">
                             <span className="text-muted">شماره سفارش:</span>
+                            <span className="fw-semibold">{orderNumber}</span>
+                          </ListGroup.Item>
+                        )}
+                        {orderId && (
+                          <ListGroup.Item className="d-flex justify-content-between px-0">
+                            <span className="text-muted">شناسه سفارش (داخلی):</span>
                             <span className="fw-semibold">{orderId}</span>
                           </ListGroup.Item>
                         )}
@@ -92,13 +116,37 @@ const PaymentSuccess: React.FC = () => {
                             <span className="fw-semibold">{appointmentId}</span>
                           </ListGroup.Item>
                         )}
+                        {registrationId && (
+                          <ListGroup.Item className="d-flex justify-content-between px-0">
+                            <span className="text-muted">شناسه ثبت‌نام کارگاه:</span>
+                            <span className="fw-semibold">{registrationId}</span>
+                          </ListGroup.Item>
+                        )}
                       </ListGroup>
                     </Card.Body>
                   </Card>
                 )}
 
                 <div className="d-grid gap-3">
-                  {appointmentId && (
+                  {isWorkshopPayment && (
+                    <Link to="/dashboard/my-workshops" className="text-decoration-none">
+                      <Button variant="success" size="lg" className="w-100">
+                        <i className="fas fa-graduation-cap me-2"></i>
+                        مشاهده کارگاه‌های من
+                      </Button>
+                    </Link>
+                  )}
+
+                  {workshopSlug && (
+                    <Link to={`/workshops/${workshopSlug}`} className="text-decoration-none">
+                      <Button variant="outline-success" size="lg" className="w-100">
+                        <i className="fas fa-eye me-2"></i>
+                        رفتن به صفحه کارگاه
+                      </Button>
+                    </Link>
+                  )}
+
+                  {isAppointmentPayment && (
                     <Link to="/appointments" className="text-decoration-none">
                       <Button variant="success" size="lg" className="w-100">
                         <i className="fas fa-calendar-day me-2"></i>

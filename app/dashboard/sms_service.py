@@ -34,8 +34,22 @@ def generate_otp_code(length=6):
     return ''.join([str(random.randint(0, 9)) for _ in range(length)])
 
 
-def send_otp_sms(phone_number, otp_code):
-    logger.info(f"[OTP] Sending to {phone_number} code={otp_code}")
+def send_otp_sms(phone_number, otp_code=None):
+    """
+    Send OTP using SMS provider's OTP system.
+    The provider generates and sends the OTP code automatically.
+    
+    Args:
+        phone_number: Phone number to send OTP to
+        otp_code: DEPRECATED - Ignored. Provider generates its own code.
+    
+    Returns:
+        dict with 'success', 'message', and 'transaction_id' (if successful)
+    """
+    if otp_code is not None:
+        logger.warning(f"[OTP] otp_code parameter is deprecated and ignored. Provider generates its own code.")
+    
+    logger.info(f"[OTP] Requesting provider to send OTP to {phone_number}")
 
     if not SMS_USERNAME or not SMS_PASSWORD:
         return {'success': False, 'message': 'SMS credentials missing'}
@@ -44,7 +58,7 @@ def send_otp_sms(phone_number, otp_code):
         logger.error("[OTP] SMS_SENDER_NUMBER is not configured")
         return {'success': False, 'message': 'SMS sender number is not configured. Please set SMS_SENDER_NUMBER in your environment variables.'}
 
-    # Normalize phone
+    # Normalize phone - remove country code and leading zero
     phone = phone_number.replace("+98", "").replace("0098", "").strip()
     if phone.startswith("0"):
         phone = phone[1:]  # 0912 → 912
@@ -52,14 +66,15 @@ def send_otp_sms(phone_number, otp_code):
     # Normalize sender number - keep country code format (9810000101)
     sender = SMS_SENDER_NUMBER.replace("+", "").strip()
     
-    logger.info(f"[OTP] Sending from: {sender} to: {phone}")
+    logger.info(f"[OTP] Requesting OTP from: {sender} to: {phone}")
 
+    # For OTP endpoint, let the provider generate and send the code
+    # We only specify sender and recipient
     payload = {
         "uname": SMS_USERNAME,
         "pass": SMS_PASSWORD,
         "to": phone,        # 912xxxxxxx
-        "text": f"کد تایید شما: {otp_code}",
-        "from": sender,     # Sender number (must use 'from' field, not 'number' or 'sender')
+        "from": sender,     # Sender number
     }
     
     logger.info(f"[OTP] Payload (without password): { {k: v for k, v in payload.items() if k != 'pass'} }")
@@ -175,27 +190,24 @@ def verify_otp_sms(phone_number, otp_code):
         dict: Response with success status and message
     """
     try:
-        # Ensure phone number is in correct format
+        # Ensure phone number is in correct format (same as send_otp_sms)
         phone_number = phone_number.replace('+98', '').replace('0098', '').strip()
         if phone_number.startswith('0'):
-            phone_number = phone_number[1:]
-        phone_number = f"98{phone_number}"  # Add country code
+            phone_number = phone_number[1:]  # Remove leading zero: 09940959065 -> 9940959065
         
-        headers = CaseInsensitiveDict()
-        headers["Content-Type"] = "application/x-www-form-urlencoded"
-        
-        data = {
+        # Use JSON format like send_otp_sms (not form data)
+        payload = {
             "uname": SMS_USERNAME,
             "pass": SMS_PASSWORD,
-            "to": phone_number,
+            "to": phone_number,  # Send without country code: 9940959065
             "otp": otp_code
         }
         
         response = requests.post(
             SMS_CHECK_OTP_URL,
-            headers=headers,
-            data=data,  # Use data instead of json
-            timeout=30
+            json=payload,  # Use JSON like send_otp_sms
+            timeout=30,
+            headers={"Content-Type": "application/json"}
         )
         
         logger.info(f"SMS Verify API Response Status: {response.status_code}")

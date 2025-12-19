@@ -80,12 +80,27 @@ class PackageDetailSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             try:
-                purchase = PackagePurchase.objects.get(user=request.user, package=obj)
-                return {
-                    'is_purchased': True,
-                    'purchased_at': purchase.purchased_at,
-                    'is_expired': purchase.is_expired,
-                }
+                purchase = PackagePurchase.objects.select_related('order').get(user=request.user, package=obj)
+                # Only show as purchased if payment is completed
+                # Check if purchase has a completed order or payment_method is not 'pending'
+                is_paid = (
+                    purchase.order and 
+                    purchase.order.payment_status == 'completed'
+                ) or (
+                    purchase.payment_method and 
+                    purchase.payment_method != 'pending' and
+                    purchase.transaction_id
+                )
+                
+                if is_paid:
+                    return {
+                        'is_purchased': True,
+                        'purchased_at': purchase.purchased_at,
+                        'is_expired': purchase.is_expired,
+                    }
+                else:
+                    # Purchase exists but not paid yet
+                    return {'is_purchased': False}
             except PackagePurchase.DoesNotExist:
                 return {'is_purchased': False}
         return {'is_purchased': False}

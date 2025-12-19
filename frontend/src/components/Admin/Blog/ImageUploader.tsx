@@ -122,15 +122,16 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       >
         {value ? (
           <Box>
-            <Box
-              component="img"
-              src={value}
-              alt="Preview"
-              sx={{
-                maxWidth: '100%',
-                maxHeight: 200,
-                borderRadius: 1,
-                mb: 2,
+              <Box
+                component="img"
+                src={value}
+                alt="Preview"
+                loading="lazy"
+                sx={{
+                  maxWidth: '100%',
+                  maxHeight: 200,
+                  borderRadius: 1,
+                  mb: 2,
               }}
             />
             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>

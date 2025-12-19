@@ -30,13 +30,27 @@ interface CartPackageItem {
   category_name?: string | null;
 }
 
+interface CartWorkshopItem {
+  id: number;
+  title: string;
+  slug: string;
+  thumbnail?: string | null;
+  price: number;
+  current_price: number;
+  instructor_name: string;
+  category_name?: string | null;
+}
+
 interface CartItem {
   id: number;
-  item_type: 'course' | 'package' | string;
+  item_type: 'course' | 'package' | 'workshop' | string;
   item_id: number;
   item_title?: string;
   course?: CartCourseItem | null;
   package?: CartPackageItem | null;
+  workshop?: CartWorkshopItem | null;
+  payment_type?: string;
+  installment_months?: number;
   quantity: number;
   unit_price: number;
   total_price: number;
@@ -191,8 +205,9 @@ const Cart: React.FC = () => {
                 {cart.items.map((item) => {
                   const isCourseItem = item.item_type === 'course' && item.course;
                   const isPackageItem = item.item_type === 'package' && item.package;
+                  const isWorkshopItem = item.item_type === 'workshop' && item.workshop;
 
-                  if (!isCourseItem && !isPackageItem) {
+                  if (!isCourseItem && !isPackageItem && !isWorkshopItem) {
                     return (
                       <ListGroup.Item key={item.id} className="py-3">
                         <Alert variant="warning" className="mb-0">
@@ -205,29 +220,41 @@ const Cart: React.FC = () => {
 
                   const imageSource = isCourseItem
                     ? item.course!.thumbnail || item.course!.featured_image || '/images/course-placeholder.jpg'
-                    : item.package!.thumbnail || '/images/course-placeholder.jpg';
+                    : isPackageItem
+                    ? item.package!.thumbnail || '/images/course-placeholder.jpg'
+                    : item.workshop!.thumbnail || '/images/workshop-placeholder.jpg';
 
                   const itemLink = isCourseItem
                     ? `/courses/course/${item.course!.slug}`
-                    : `/packages/${item.package!.slug}`;
+                    : isPackageItem
+                    ? `/packages/${item.package!.slug}`
+                    : `/workshops/${item.workshop!.slug}`;
 
                   const itemTitle = isCourseItem
                     ? item.course!.title
-                    : item.package!.title;
+                    : isPackageItem
+                    ? item.package!.title
+                    : item.workshop!.title;
 
                   const subtitle = isCourseItem
                     ? `مدرس: ${item.course!.instructor_name || 'نامشخص'}`
-                    : `${item.package!.total_courses} دوره${item.package!.category_name ? ` | ${item.package!.category_name}` : ''}`;
+                    : isPackageItem
+                    ? `${item.package!.total_courses} دوره${item.package!.category_name ? ` | ${item.package!.category_name}` : ''}`
+                    : `مدرس: ${item.workshop!.instructor_name || 'نامشخص'}${item.payment_type ? ` | ${item.payment_type === 'full_payment' ? 'پرداخت کامل' : `قسطی (${item.installment_months || 0} قسط)`}` : ''}`;
 
                   const originalPrice = isCourseItem
                     ? item.course!.price
-                    : item.package!.price;
+                    : isPackageItem
+                    ? item.package!.price
+                    : item.workshop!.price;
 
                   const discountPrice = isCourseItem
                     ? item.course!.discount_price ?? null
-                    : item.package!.discount_price ?? null;
+                    : isPackageItem
+                    ? item.package!.discount_price ?? null
+                    : null;
 
-                  const currentPrice = discountPrice ?? (isPackageItem ? item.package!.current_price : item.unit_price);
+                  const currentPrice = discountPrice ?? (isPackageItem ? item.package!.current_price : isWorkshopItem ? item.workshop!.current_price : item.unit_price);
 
                   const canAdjustQuantity = isCourseItem;
 
@@ -240,6 +267,7 @@ const Cart: React.FC = () => {
                             alt={itemTitle}
                             className="img-fluid rounded"
                             style={{ width: '100%', height: '80px', objectFit: 'cover' }}
+                            loading="lazy"
                             onError={(e) => {
                               e.currentTarget.src = '/images/course-placeholder.jpg';
                             }}

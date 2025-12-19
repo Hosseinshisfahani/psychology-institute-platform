@@ -39,6 +39,7 @@ import Workshops from './pages/Workshops/Workshops';
 import WorkshopDetail from './pages/Workshops/WorkshopDetail';
 import WorkshopSession from './pages/Workshops/WorkshopSession';
 import WorkshopVideos from './pages/Workshops/WorkshopVideos';
+import WorkshopCheckout from './pages/Workshops/WorkshopCheckout';
 import Packages from './pages/Packages/Packages';
 import PackageDetail from './pages/Packages/PackageDetail';
 import FinancialReport from './pages/Dashboard/FinancialReport';
@@ -196,6 +197,7 @@ function App() {
                             <Route path="/courses" element={<Courses />} />
                             <Route path="/courses/course/:slug" element={<CourseDetail />} />
                             <Route path="/workshops" element={<Workshops />} />
+                            <Route path="/workshops/checkout/:orderNumber" element={<WorkshopCheckout />} />
                             <Route path="/workshops/:slug" element={<WorkshopDetail />} />
                             <Route path="/workshops/:slug/videos" element={<WorkshopVideos />} />
                             <Route path="/packages" element={<Packages />} />

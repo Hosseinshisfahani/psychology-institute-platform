@@ -1,9 +1,12 @@
+import logging
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 from .models import (
     Package, PackageCategory, PackagePurchase, PackageEnrollment,
     PackageProgress, PackageReview, PackageCoupon
@@ -21,21 +24,59 @@ class PackageListAPIView(generics.ListAPIView):
     """List all published packages"""
     serializer_class = PackageListSerializer
     permission_classes = [permissions.AllowAny]
+    pagination_class = None
     
     def get_queryset(self):
-        queryset = Package.objects.filter(status='published')
-        
-        # Filter by category
-        category = self.request.query_params.get('category')
-        if category:
-            queryset = queryset.filter(category__slug=category)
-        
-        # Filter by featured
-        featured = self.request.query_params.get('featured')
-        if featured == 'true':
-            queryset = queryset.filter(is_featured=True)
-        
-        return queryset.select_related('category').prefetch_related('courses').order_by('-created_at')
+        try:
+            queryset = Package.objects.filter(status='published')
+            
+            # Filter by category
+            category = self.request.query_params.get('category')
+            if category:
+                queryset = queryset.filter(category__slug=category)
+            
+            # Filter by featured
+            featured = self.request.query_params.get('featured')
+            if featured == 'true':
+                queryset = queryset.filter(is_featured=True)
+            
+            return queryset.select_related('category').prefetch_related('courses').order_by('-created_at')
+        except Exception as e:
+            logger.error(f"Error in PackageListAPIView.get_queryset: {str(e)}", exc_info=True)
+            # Return empty queryset on error
+            return Package.objects.none()
+    
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.get_queryset()
+            
+            # Handle limit parameter
+            limit = request.query_params.get('limit')
+            if limit:
+                try:
+                    limit = int(limit)
+                    packages = queryset[:limit]
+                    serializer = self.get_serializer(packages, many=True)
+                    return Response({
+                        'results': serializer.data,
+                        'count': len(serializer.data)
+                    })
+                except ValueError:
+                    pass
+            
+            # Return all results if no limit
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({
+                'results': serializer.data,
+                'count': len(serializer.data)
+            })
+        except Exception as e:
+            logger.error(f"Error in PackageListAPIView: {str(e)}", exc_info=True)
+            return Response({
+                'error': 'An error occurred while fetching packages',
+                'results': [],
+                'count': 0
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class PackageDetailAPIView(generics.RetrieveAPIView):
@@ -80,12 +121,28 @@ def purchase_package(request, package_slug):
     """Purchase a package"""
     package = get_object_or_404(Package, slug=package_slug, status='published')
     
-    # Check if already purchased
-    if PackagePurchase.objects.filter(user=request.user, package=package).exists():
-        return Response(
-            {'error': 'شما قبلاً این بسته را خریداری کرده‌اید'},
-            status=status.HTTP_400_BAD_REQUEST
+    # Check if already purchased (only completed purchases)
+    existing_purchase = PackagePurchase.objects.filter(
+        user=request.user, 
+        package=package
+    ).select_related('order').first()
+    
+    if existing_purchase:
+        # Check if purchase is actually paid
+        is_paid = (
+            existing_purchase.order and 
+            existing_purchase.order.payment_status == 'completed'
+        ) or (
+            existing_purchase.payment_method and 
+            existing_purchase.payment_method != 'pending' and
+            existing_purchase.transaction_id
         )
+        
+        if is_paid:
+            return Response(
+                {'error': 'شما قبلاً این بسته را خریداری کرده‌اید'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
     
     with transaction.atomic():
         # Create purchase
@@ -121,15 +178,31 @@ def add_package_to_cart(request, package_slug):
     """Add package to cart"""
     package = get_object_or_404(Package, slug=package_slug, status='published')
     
-    # Check if already purchased
-    if PackagePurchase.objects.filter(user=request.user, package=package).exists():
-        return Response(
-            {
-                'error': 'شما قبلاً این بسته را خریداری کرده‌اید',
-                'cart_url': '/payment/cart/'
-            },
-            status=status.HTTP_400_BAD_REQUEST
+    # Check if already purchased (only completed purchases)
+    existing_purchase = PackagePurchase.objects.filter(
+        user=request.user, 
+        package=package
+    ).select_related('order').first()
+    
+    if existing_purchase:
+        # Check if purchase is actually paid
+        is_paid = (
+            existing_purchase.order and 
+            existing_purchase.order.payment_status == 'completed'
+        ) or (
+            existing_purchase.payment_method and 
+            existing_purchase.payment_method != 'pending' and
+            existing_purchase.transaction_id
         )
+        
+        if is_paid:
+            return Response(
+                {
+                    'error': 'شما قبلاً این بسته را خریداری کرده‌اید',
+                    'cart_url': '/payment/cart/'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
     
     cart, created = Cart.objects.get_or_create(user=request.user)
     

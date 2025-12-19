@@ -166,6 +166,7 @@ const PostDetail: React.FC = () => {
                     alt={post.title}
                     className="img-fluid rounded mb-4"
                     style={{ width: '100%', height: '400px', objectFit: 'cover' }}
+                    loading="lazy"
                   />
                 )}
               </div>

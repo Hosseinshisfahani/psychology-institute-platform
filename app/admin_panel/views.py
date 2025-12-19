@@ -8,7 +8,7 @@ from datetime import timedelta
 
 from .models import AdminNotification
 from app.blog.models import Post, Comment
-from app.tests.models import PsychologicalTest, TestSession
+# from app.tests.models import PsychologicalTest, TestSession  # Tests app removed
 from app.courses.models import Course, Enrollment
 # from app.therapy_sessions.models import Session  # Removed - therapy_sessions app deleted
 from app.payment.models import Order
@@ -45,8 +45,8 @@ class AdminDashboardView(LoginRequiredMixin, AdminRequiredMixin, TemplateView):
         context['total_comments'] = Comment.objects.count()
         
         # Test Statistics
-        context['total_tests'] = PsychologicalTest.objects.count()
-        context['total_test_sessions'] = TestSession.objects.count()
+        context['total_tests'] = 0  # PsychologicalTest.objects.count()  # Tests app removed
+        context['total_test_sessions'] = 0  # TestSession.objects.count()  # Tests app removed
         
         # Course Statistics
         context['total_courses'] = Course.objects.count()

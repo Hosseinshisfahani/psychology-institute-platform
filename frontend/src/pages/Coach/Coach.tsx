@@ -344,6 +344,7 @@ const Coach: React.FC = () => {
                               alt="Preview" 
                               className="img-thumbnail"
                               style={{ maxHeight: '100px', width: 'auto' }}
+                              loading="lazy"
                             />
                             <button
                               type="button"

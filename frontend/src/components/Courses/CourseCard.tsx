@@ -55,6 +55,8 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onAddToCart }) => {
             <Card.Img
               variant="top"
               src={course.thumbnail}
+              alt={course.title}
+              loading="lazy"
               style={{ 
                 height: '220px', 
                 objectFit: 'cover',

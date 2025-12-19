@@ -55,10 +55,51 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Configure axios defaults (Django-compatible CSRF names)
-axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
+axios.defaults.baseURL = API_BASE_URL;
 axios.defaults.withCredentials = true;
 axios.defaults.xsrfCookieName = 'csrftoken';
 axios.defaults.xsrfHeaderName = 'X-CSRFToken';
+
+// Add request interceptor for debugging (only in development)
+if (process.env.NODE_ENV === 'development') {
+  axios.interceptors.request.use(
+    (config) => {
+      console.log('🚀 API Request:', {
+        method: config.method?.toUpperCase(),
+        url: config.url,
+        baseURL: config.baseURL,
+        fullURL: `${config.baseURL}${config.url}`,
+        headers: config.headers,
+      });
+      return config;
+    },
+    (error) => {
+      console.error('❌ Request Error:', error);
+      return Promise.reject(error);
+    }
+  );
+
+  axios.interceptors.response.use(
+    (response) => {
+      console.log('✅ API Response:', {
+        status: response.status,
+        url: response.config.url,
+        data: response.data,
+      });
+      return response;
+    },
+    (error) => {
+      console.error('❌ Response Error:', {
+        status: error.response?.status,
+        url: error.config?.url,
+        message: error.message,
+        data: error.response?.data,
+      });
+      return Promise.reject(error);
+    }
+  );
+}
 
 // Cache for CSRF token fetch to prevent multiple simultaneous requests
 let csrfFetchPromise: Promise<void> | null = null;
@@ -198,12 +239,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Get CSRF token from cookie
       const csrfToken = getCsrfToken();
       
-      const response = await axios.post('/api/dashboard/login/', {
-        email,
+      // Build request data - email and phone_number are optional (at least one required)
+      const requestData: any = {
         password,
-        otp_code: otpCode,
-        phone_number: phoneNumber,
-      }, {
+      };
+      
+      // Add email if provided (non-empty)
+      if (email && email.trim()) {
+        requestData.email = email.trim();
+      }
+      
+      // Add phone_number if provided (non-empty)
+      if (phoneNumber && phoneNumber.trim()) {
+        requestData.phone_number = phoneNumber.trim();
+      }
+      
+      // Add OTP code if provided
+      if (otpCode) {
+        requestData.otp_code = otpCode;
+      }
+      
+      const response = await axios.post('/api/dashboard/login/', requestData, {
         headers: {
           'X-CSRFToken': csrfToken || '',
         },
@@ -219,10 +275,76 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           await checkAuthStatus();
         }
       } else {
-        throw new Error(response.data.message || 'Login failed');
+        throw new Error(response.data.message || 'ورود ناموفق بود');
       }
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Login failed');
+      // Enhanced error handling with better Persian messages
+      let errorMessage = 'خطا در ورود. لطفاً دوباره تلاش کنید.';
+      
+      if (error.response) {
+        // Server responded with error status
+        const status = error.response.status;
+        const data = error.response.data;
+        
+        // Extract error message from response
+        if (data?.message) {
+          const msg = data.message;
+          // Filter out numeric-only messages (likely transaction IDs)
+          if (typeof msg === 'string' && !/^\d+$/.test(msg.trim())) {
+            errorMessage = msg;
+          } else if (typeof msg === 'string' && msg.trim().length > 0) {
+            // If it's a number, use generic message
+            errorMessage = 'خطا در ورود. لطفاً دوباره تلاش کنید.';
+          }
+        } else if (data?.detail) {
+          // DRF default error format
+          errorMessage = typeof data.detail === 'string' && !/^\d+$/.test(data.detail.trim()) 
+            ? data.detail 
+            : 'خطا در ورود. لطفاً دوباره تلاش کنید.';
+        } else if (data && typeof data === 'string' && !/^\d+$/.test(data.trim())) {
+          errorMessage = data;
+        } else if (Array.isArray(data)) {
+          // Array of errors
+          errorMessage = data.filter(msg => typeof msg === 'string' && !/^\d+$/.test(msg.trim())).join(', ') || errorMessage;
+        }
+        
+        // Map HTTP status codes to Persian messages if no specific message
+        if (errorMessage === 'خطا در ورود. لطفاً دوباره تلاش کنید.' || !data?.message) {
+          switch (status) {
+            case 400:
+              errorMessage = 'اطلاعات وارد شده صحیح نیست. لطفاً فیلدها را بررسی کنید.';
+              break;
+            case 401:
+              errorMessage = 'ایمیل یا رمز عبور اشتباه است.';
+              break;
+            case 403:
+              errorMessage = 'دسترسی شما محدود است. لطفاً با پشتیبانی تماس بگیرید.';
+              break;
+            case 404:
+              errorMessage = 'درخواست شما یافت نشد.';
+              break;
+            case 500:
+              errorMessage = 'خطای سرور. لطفاً لحظاتی بعد دوباره تلاش کنید.';
+              break;
+            default:
+              errorMessage = 'خطا در ارتباط با سرور. لطفاً دوباره تلاش کنید.';
+          }
+        }
+      } else if (error.request) {
+        // Request was made but no response received
+        errorMessage = 'خطا در ارتباط با سرور. لطفاً اتصال اینترنت خود را بررسی کنید.';
+      } else if (error.message && !/^\d+$/.test(error.message.trim())) {
+        // Error in setting up the request
+        errorMessage = error.message;
+      }
+      
+      console.error('[AuthContext] Login error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      
+      throw new Error(errorMessage);
     }
   };
 

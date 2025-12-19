@@ -184,6 +184,7 @@ const Home: React.FC = () => {
                     src="/images/1744027219152.png" 
                     alt={t('home.title')} 
                     className="hero-logo-image"
+                    loading="eager"
                   />
                 </div>
               </Link>
@@ -855,6 +856,8 @@ const Home: React.FC = () => {
                           <Card.Img
                             variant="top"
                             src={workshop.thumbnail}
+                            alt={workshop.title}
+                            loading="lazy"
                             style={{ 
                               height: '100%', 
                               width: '100%',
@@ -1231,6 +1234,8 @@ const Home: React.FC = () => {
                               <Card.Img
                                 variant="top"
                                 src={pkg.thumbnail}
+                                alt={pkg.title}
+                                loading="lazy"
                                 style={{ 
                                   height: '100%', 
                                   width: '100%',
@@ -2158,6 +2163,7 @@ const Home: React.FC = () => {
                                 variant="top" 
                                 src={post.featured_image} 
                                 alt={post.title}
+                                loading="lazy"
                                 style={{ 
                                   height: '100%', 
                                   width: '100%',

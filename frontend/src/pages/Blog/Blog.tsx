@@ -147,6 +147,7 @@ const Blog: React.FC = () => {
                           variant="top" 
                           src={post.featured_image} 
                           alt={post.title}
+                          loading="lazy"
                           style={{ height: '200px', objectFit: 'cover' }}
                         />
                       )}

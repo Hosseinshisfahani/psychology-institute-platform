@@ -13,7 +13,12 @@ SECRET_KEY = config('SECRET_KEY')
 
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [
+    'sarmadclinic.ir',
+    'www.sarmadclinic.ir',
+    'localhost',
+    '127.0.0.1',
+]
 
 
 # Application definition
@@ -41,7 +46,6 @@ INSTALLED_APPS = [
     
     # Local apps
     'app.blog',
-    'app.tests',
     'app.courses',
     'app.dashboard',
     'app.payment',
@@ -52,6 +56,7 @@ INSTALLED_APPS = [
     'app.packages',
     'app.appointments',
     'app.chat',
+    'app.mmpi',
 ]
 
 # Middleware
@@ -215,10 +220,10 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3001",
     "http://127.0.0.1:3001",
     "http://185.8.175.241:3000",
-    "http://sarmad.ir",
-    "https://sarmad.ir",
-    "http://www.sarmad.ir",
-    "https://www.sarmad.ir",
+    "http://sarmadclinic.ir",
+    "https://sarmadclinic.ir",
+    "http://www.sarmadclinic.ir",
+    "https://www.sarmadclinic.ir",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -235,10 +240,10 @@ CSRF_TRUSTED_ORIGINS = [
     'http://185.8.175.241',
     'http://185.8.175.241:3000',
     'http://185.8.175.241:8000',
-    'http://sarmad.ir',
-    'https://sarmad.ir',
-    'http://www.sarmad.ir',
-    'https://www.sarmad.ir',
+    'http://sarmadclinic.ir',
+    'https://sarmadclinic.ir',
+    'http://www.sarmadclinic.ir',
+    'https://www.sarmadclinic.ir',
 ]
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = 'Lax'
@@ -247,8 +252,17 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 
 # USE_X_FORWARDED_HOST and SECURE_PROXY_SSL_HEADER and FORCE_SCRIPT_NAME
 USE_X_FORWARDED_HOST = True
-SECURE_PROXY_SSL_HEADER = None  # Set to ('HTTP_X_FORWARDED_PROTO', 'https') if using HTTPS
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # For HTTPS behind reverse proxy
 FORCE_SCRIPT_NAME = ''  # Empty string means use relative URLs
+
+# Security settings for production
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 # CELERY_BROKER_URL and CELERY_RESULT_BACKEND and CELERY_ACCEPT_CONTENT and CELERY_TASK_SERIALIZER and CELERY_RESULT_SERIALIZER and CELERY_TIMEZONE
 CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
@@ -319,8 +333,8 @@ ZARINPAL_MERCHANT_ID = config('ZARINPAL_MERCHANT_ID', default='512a778d-3908-429
 ZARINPAL_SANDBOX = config('ZARINPAL_SANDBOX', default=True, cast=bool)
 
 # SITE_URL and FRONTEND_URL and ZARINPAL_CALLBACK_URL
-SITE_URL = config('SITE_URL', default='http://localhost:8000')
-FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+SITE_URL = config('SITE_URL', default='https://sarmadclinic.ir')
+FRONTEND_URL = config('FRONTEND_URL', default='https://sarmadclinic.ir')
 ZARINPAL_CALLBACK_URL = config(
     'ZARINPAL_CALLBACK_URL', 
     default=f'{SITE_URL}/api/payment/verify/'

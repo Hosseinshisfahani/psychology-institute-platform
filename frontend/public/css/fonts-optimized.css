@@ -1,0 +1,87 @@
+/* Optimized Persian Font Loading with font-display */
+
+/* Vazir Font - Primary font (Critical) */
+@font-face {
+  font-family: 'Vazir';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir-Light.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir-Light.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'Vazir';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir-Regular.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir-Regular.woff') format('woff'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'Vazir';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir-Medium.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir-Medium.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'Vazir';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir-Bold.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir-Bold.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'Vazir';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir-Black.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir-Black.woff') format('woff');
+}
+
+/* Samim Font - Secondary font (Fallback, loaded on demand) */
+@font-face {
+  font-family: 'Samim';
+  font-style: normal;
+  font-weight: 400;
+  font-display: optional;
+  src: url('https://cdn.jsdelivr.net/gh/rastikerdar/samim-font@v4.0.2/dist/Samim.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/samim-font@v4.0.2/dist/Samim.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'Samim';
+  font-style: normal;
+  font-weight: 700;
+  font-display: optional;
+  src: url('https://cdn.jsdelivr.net/gh/rastikerdar/samim-font@v4.0.2/dist/Samim-Bold.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/samim-font@v4.0.2/dist/Samim-Bold.woff') format('woff');
+}
+
+/* Shabnam Font - Tertiary font (Fallback, loaded on demand) */
+@font-face {
+  font-family: 'Shabnam';
+  font-style: normal;
+  font-weight: 400;
+  font-display: optional;
+  src: url('https://cdn.jsdelivr.net/gh/rastikerdar/shabnam-font@v5.0.1/dist/Shabnam.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/shabnam-font@v5.0.1/dist/Shabnam.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'Shabnam';
+  font-style: normal;
+  font-weight: 700;
+  font-display: optional;
+  src: url('https://cdn.jsdelivr.net/gh/rastikerdar/shabnam-font@v5.0.1/dist/Shabnam-Bold.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/shabnam-font@v5.0.1/dist/Shabnam-Bold.woff') format('woff');
+}

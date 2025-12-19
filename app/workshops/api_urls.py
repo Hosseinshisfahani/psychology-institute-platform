@@ -16,6 +16,10 @@ urlpatterns = [
     path('<slug:workshop_slug>/complete-payment/', api_views.complete_workshop_payment, name='complete_payment'),
     path('<slug:workshop_slug>/add-to-cart/', api_views.add_workshop_to_cart, name='add_to_cart'),
     
+    # Checkout and payment
+    path('orders/<str:order_number>/', api_views.get_workshop_order, name='get_workshop_order'),
+    path('orders/<str:order_number>/payment/', api_views.process_workshop_order_payment, name='process_workshop_order_payment'),
+    
     # User workshops
     path('my/workshops/', api_views.UserWorkshopsAPIView.as_view(), name='user_workshops'),
     

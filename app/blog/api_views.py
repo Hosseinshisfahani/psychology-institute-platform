@@ -1,3 +1,4 @@
+import logging
 from rest_framework import generics, status, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -14,6 +15,8 @@ from .serializers import (
     TagSerializer, CommentSerializer, PostLikeSerializer, NewsletterSubscriptionSerializer
 )
 
+logger = logging.getLogger(__name__)
+
 
 class PostListView(generics.ListAPIView):
     """List all published posts with filtering and search"""
@@ -22,53 +25,80 @@ class PostListView(generics.ListAPIView):
     pagination_class = None  # We'll add custom pagination
     
     def get_queryset(self):
-        queryset = Post.objects.filter(status='published').select_related('author', 'category').prefetch_related('tags')
-        
-        # Search functionality
-        search = self.request.query_params.get('search', None)
-        if search:
-            queryset = queryset.filter(
-                Q(title__icontains=search) | 
-                Q(content__icontains=search) | 
-                Q(excerpt__icontains=search)
-            )
-        
-        # Category filter
-        category = self.request.query_params.get('category', None)
-        if category:
-            queryset = queryset.filter(category__slug=category)
-        
-        # Tag filter
-        tag = self.request.query_params.get('tag', None)
-        if tag:
-            queryset = queryset.filter(tags__slug=tag)
-        
-        return queryset.order_by('-created_at')
+        try:
+            queryset = Post.objects.filter(status='published').select_related('author', 'category').prefetch_related('tags')
+            
+            # Search functionality
+            search = self.request.query_params.get('search', None)
+            if search:
+                queryset = queryset.filter(
+                    Q(title__icontains=search) | 
+                    Q(content__icontains=search) | 
+                    Q(excerpt__icontains=search)
+                )
+            
+            # Category filter
+            category = self.request.query_params.get('category', None)
+            if category:
+                queryset = queryset.filter(category__slug=category)
+            
+            # Tag filter
+            tag = self.request.query_params.get('tag', None)
+            if tag:
+                queryset = queryset.filter(tags__slug=tag)
+            
+            return queryset.order_by('-created_at')
+        except Exception as e:
+            logger.error(f"Error in PostListView.get_queryset: {str(e)}", exc_info=True)
+            # Return empty queryset on error
+            return Post.objects.none()
     
     def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        
-        # Custom pagination
-        page_size = int(request.query_params.get('page_size', 12))
-        page = int(request.query_params.get('page', 1))
-        
-        start = (page - 1) * page_size
-        end = start + page_size
-        
-        posts = queryset[start:end]
-        total_count = queryset.count()
-        
-        serializer = self.get_serializer(posts, many=True)
-        
-        return Response({
-            'results': serializer.data,
-            'count': total_count,
-            'next': f"?page={page + 1}&page_size={page_size}" if end < total_count else None,
-            'previous': f"?page={page - 1}&page_size={page_size}" if page > 1 else None,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': (total_count + page_size - 1) // page_size
-        })
+        try:
+            queryset = self.get_queryset()
+            
+            # Handle limit parameter (used for simple limiting without pagination)
+            limit = request.query_params.get('limit')
+            if limit:
+                try:
+                    limit = int(limit)
+                    posts = queryset[:limit]
+                    serializer = self.get_serializer(posts, many=True)
+                    return Response({
+                        'results': serializer.data,
+                        'count': len(serializer.data)
+                    })
+                except ValueError:
+                    pass  # If limit is not a valid integer, fall through to pagination
+            
+            # Custom pagination
+            page_size = int(request.query_params.get('page_size', 12))
+            page = int(request.query_params.get('page', 1))
+            
+            start = (page - 1) * page_size
+            end = start + page_size
+            
+            posts = queryset[start:end]
+            total_count = queryset.count()
+            
+            serializer = self.get_serializer(posts, many=True)
+            
+            return Response({
+                'results': serializer.data,
+                'count': total_count,
+                'next': f"?page={page + 1}&page_size={page_size}" if end < total_count else None,
+                'previous': f"?page={page - 1}&page_size={page_size}" if page > 1 else None,
+                'page': page,
+                'page_size': page_size,
+                'total_pages': (total_count + page_size - 1) // page_size
+            })
+        except Exception as e:
+            logger.error(f"Error in PostListView: {str(e)}", exc_info=True)
+            return Response({
+                'error': 'An error occurred while fetching posts',
+                'results': [],
+                'count': 0
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class PostDetailView(generics.RetrieveAPIView):

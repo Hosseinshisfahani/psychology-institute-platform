@@ -257,6 +257,7 @@ const CoursesList: React.FC = () => {
                   height="200"
                   image={course.thumbnail || '/static/images/course-placeholder.png'}
                   alt={course.title}
+                  loading="lazy"
                   sx={{ objectFit: 'cover' }}
                 />
                 <CardContent sx={{ flexGrow: 1 }}>

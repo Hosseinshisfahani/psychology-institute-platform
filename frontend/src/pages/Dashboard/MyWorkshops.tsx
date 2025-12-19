@@ -1,18 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Container, Row, Col, Card, Badge, Button, Alert, Spinner, Tab, Tabs, ListGroup, Modal } from 'react-bootstrap';
 import { Helmet } from 'react-helmet-async';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useI18n } from '../../contexts/I18nContext';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { workshopApi, WorkshopRegistration, WorkshopSession } from '../../services/workshopApi';
 
 const MyWorkshops: React.FC = () => {
-  const { user } = useAuth();
+  const { user, checkAuthStatus } = useAuth();
   const { t } = useI18n();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [selectedWorkshop, setSelectedWorkshop] = useState<WorkshopRegistration | null>(null);
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [selectedSession, setSelectedSession] = useState<WorkshopSession | null>(null);
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+
+  // Check for payment success query parameter
+  const paymentSuccess = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('payment') === 'success';
+  }, [location.search]);
+
+  // Show success message if payment was successful
+  useEffect(() => {
+    if (paymentSuccess) {
+      setShowPaymentSuccess(true);
+      // Refresh auth status to ensure user state is up to date after payment redirect
+      checkAuthStatus();
+      // Invalidate and refetch workshops to show updated registration status
+      queryClient.invalidateQueries({ queryKey: ['user-workshops'] });
+      // Remove query parameter from URL after showing message
+      navigate('/dashboard/my-workshops', { replace: true });
+      // Auto-hide success message after 10 seconds
+      const timer = setTimeout(() => {
+        setShowPaymentSuccess(false);
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [paymentSuccess, navigate, checkAuthStatus, queryClient]);
 
   // Debug: Log current user
   console.log('Current user in MyWorkshops:', user);
@@ -152,6 +180,30 @@ const MyWorkshops: React.FC = () => {
       </Helmet>
 
       <Container className="py-5">
+        {showPaymentSuccess && (
+          <Alert 
+            variant="success" 
+            className="mb-4 d-flex align-items-center"
+            dismissible
+            onClose={() => setShowPaymentSuccess(false)}
+          >
+            <div className="d-flex align-items-center w-100">
+              <div
+                className="d-inline-flex align-items-center justify-content-center rounded-circle bg-success bg-opacity-10 text-success me-3"
+                style={{ width: '50px', height: '50px', flexShrink: 0 }}
+              >
+                <i className="fas fa-check fa-lg"></i>
+              </div>
+              <div className="flex-grow-1">
+                <h5 className="mb-1 fw-bold">پرداخت شما با موفقیت انجام شد</h5>
+                <p className="mb-0">
+                  ثبت‌نام شما در کارگاه فعال شد. اکنون می‌توانید به جلسات کارگاه دسترسی داشته باشید.
+                </p>
+              </div>
+            </div>
+          </Alert>
+        )}
+
         <div className="d-flex justify-content-between align-items-center mb-4">
           <div>
             <h2 className="mb-2">کارگاه‌های من</h2>
@@ -177,6 +229,8 @@ const MyWorkshops: React.FC = () => {
                   <Card.Img
                     variant="top"
                     src={registration.workshop.thumbnail}
+                    alt={registration.workshop.title}
+                    loading="lazy"
                     style={{ height: '200px', objectFit: 'cover' }}
                   />
                 )}

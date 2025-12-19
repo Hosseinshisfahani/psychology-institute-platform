@@ -293,6 +293,8 @@ const Workshops: React.FC = () => {
                           <Card.Img
                             variant="top"
                             src={workshop.thumbnail}
+                            alt={workshop.title}
+                            loading="lazy"
                             className="workshop-card-thumbnail"
                             style={thumbnailStyle}
                           />

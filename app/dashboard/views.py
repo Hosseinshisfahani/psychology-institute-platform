@@ -11,7 +11,7 @@ from django.contrib.auth.views import LogoutView as BaseLogoutView
 from .models import User, UserProfile, Notification
 from .forms import CustomSignupForm, CustomLoginForm, ProfileEditForm
 from app.courses.models import Enrollment, CoursePurchase
-from app.tests.models import TestResult
+# from app.tests.models import TestResult  # Tests app removed
 from app.payment.models import Order
 
 
@@ -32,7 +32,7 @@ class DashboardView(LoginRequiredMixin, ListView):
         
         # Get user statistics
         context['enrolled_courses_count'] = Enrollment.objects.filter(user=user).count()
-        context['completed_tests_count'] = TestResult.objects.filter(session__user=user).count()
+        context['completed_tests_count'] = 0  # TestResult.objects.filter(session__user=user).count()  # Tests app removed
         context['certificates_count'] = 0  # Placeholder for certificates
         
         # Get recent activities (placeholder)
@@ -65,7 +65,7 @@ class ProfileView(LoginRequiredMixin, DetailView):
         
         # Get user statistics
         context['enrolled_courses_count'] = Enrollment.objects.filter(user=user).count()
-        context['completed_tests_count'] = TestResult.objects.filter(session__user=user).count()
+        context['completed_tests_count'] = 0  # TestResult.objects.filter(session__user=user).count()  # Tests app removed
         context['certificates_count'] = 0  # Placeholder for certificates
         
         return context
@@ -165,7 +165,7 @@ class UserStatsView(LoginRequiredMixin, CreateView):
         
         # Get user statistics
         enrolled_courses_count = Enrollment.objects.filter(user=user).count()
-        completed_tests_count = TestResult.objects.filter(session__user=user).count()
+        completed_tests_count = 0  # TestResult.objects.filter(session__user=user).count()  # Tests app removed
         
         # Get course progress
         course_progress = []
@@ -180,7 +180,7 @@ class UserStatsView(LoginRequiredMixin, CreateView):
             })
         
         # Get recent test results
-        recent_test_results = TestResult.objects.filter(session__user=user).select_related('session__test').order_by('-generated_at')[:5]
+        recent_test_results = []  # TestResult.objects.filter(session__user=user).select_related('session__test').order_by('-generated_at')[:5]  # Tests app removed
         
         # Calculate monthly stats (placeholder)
         study_time_this_month = 45  # hours

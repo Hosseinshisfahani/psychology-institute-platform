@@ -169,7 +169,8 @@ class OTPCode(models.Model):
     """OTP code for SMS verification"""
     
     phone_number = models.CharField(max_length=15, verbose_name='شماره تلفن')
-    code = models.CharField(max_length=10, verbose_name='کد تایید')
+    code = models.CharField(max_length=10, verbose_name='کد تایید', blank=True, null=True)
+    transaction_id = models.CharField(max_length=50, verbose_name='شناسه تراکنش', blank=True, null=True, help_text='Transaction ID from SMS provider')
     purpose = models.CharField(
         max_length=20,
         choices=[
@@ -192,6 +193,7 @@ class OTPCode(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['phone_number', 'code', 'is_verified']),
+            models.Index(fields=['phone_number', 'transaction_id']),
             models.Index(fields=['phone_number', 'purpose']),
         ]
     

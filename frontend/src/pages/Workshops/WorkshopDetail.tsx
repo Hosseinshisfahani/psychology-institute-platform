@@ -113,11 +113,19 @@ const WorkshopDetail: React.FC = () => {
   });
 
   // Certificate data (only for registered users)
-  const { data: certificate, isLoading: certificateLoading, refetch: refetchCertificate } = useQuery<WorkshopCertificate>({
+  const { data: certificate, isLoading: certificateLoading, refetch: refetchCertificate } = useQuery<WorkshopCertificate | null>({
     queryKey: ['workshop-certificate', slug],
     queryFn: async () => {
-      const res = await axios.get(`/api/workshops/${slug}/certificate/`);
-      return res.data;
+      try {
+        const res = await axios.get(`/api/workshops/${slug}/certificate/`);
+        return res.data;
+      } catch (error: any) {
+        // 404 is expected when certificate doesn't exist yet - don't throw
+        if (error.response?.status === 404) {
+          return null;
+        }
+        throw error;
+      }
     },
     enabled: !!workshop && workshop.registration_status?.is_registered && workshop.registration_status?.status !== 'pending_payment',
     retry: false,
@@ -129,17 +137,16 @@ const WorkshopDetail: React.FC = () => {
       return response.data;
     },
     onSuccess: (data) => {
-      // Redirect to payment gateway
-      if (data.payment_url) {
-        // Close modal
-        setShowRegisterModal(false);
-        // Redirect to payment gateway
-        window.location.href = data.payment_url;
+      // Close modal
+      setShowRegisterModal(false);
+      
+      // Redirect to cart for review before payment
+      if (data.success && data.redirect_url) {
+        // Navigate to cart page
+        navigate(data.redirect_url);
       } else {
-        // Fallback: redirect to My Workshops if no payment URL
-        alert('ثبت‌نام شما با موفقیت انجام شد');
-        setShowRegisterModal(false);
-        navigate('/dashboard/my-workshops');
+        // Fallback: navigate to cart
+        navigate('/payment/cart');
       }
     },
     onError: (error: any) => {
@@ -252,6 +259,8 @@ const WorkshopDetail: React.FC = () => {
                 <Card.Img
                   variant="top"
                   src={workshop.thumbnail}
+                  alt={workshop.title}
+                  loading="lazy"
                   style={{ height: '400px', objectFit: 'cover' }}
                 />
               </Card>

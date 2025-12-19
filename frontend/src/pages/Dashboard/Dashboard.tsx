@@ -202,6 +202,7 @@ const Dashboard: React.FC = () => {
                     src={user.profile_image} 
                     alt="Profile" 
                     className="profile-image"
+                    loading="lazy"
                   />
                 ) : (
                   <div className="profile-placeholder">

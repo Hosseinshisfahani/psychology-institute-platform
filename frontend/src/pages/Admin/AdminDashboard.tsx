@@ -163,10 +163,6 @@ const AdminDashboard: React.FC = () => {
                   <i className="fas fa-download me-2"></i>
                   گزارش
                 </Button>
-                <Button variant="primary">
-                  <i className="fas fa-plus me-2"></i>
-                  افزودن محتوا
-                </Button>
               </div>
             </div>
           </Col>

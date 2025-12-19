@@ -51,13 +51,13 @@ urlpatterns = [
     path('api/appointments/', include('app.appointments.api_urls')),
     path('api/payment/', include('app.payment.api_urls')),
     path('api/chat/', include('app.chat.api_urls')),
+    path('api/mmpi/', include('app.mmpi.api_urls')),
     
     # Redirect root to React frontend
     path('', RedirectView.as_view(url='http://localhost:3000', permanent=False), name='home_redirect'),
     
     # Apps (for API endpoints only)
     path('blog/', include('app.blog.urls')),
-    path('tests/', include('app.tests.urls')),
     path('courses/', include('app.courses.urls')),
     path('dashboard/', include('app.dashboard.urls')),
     path('payment/', include('app.payment.urls')),
@@ -68,6 +68,7 @@ urlpatterns = [
     path('packages/', include('app.packages.urls')),
     path('appointments/', include('app.appointments.urls')),
     path('chat/', include('app.chat.urls')),
+    path('mmpi/', include('app.mmpi.urls')),
 ]
 
 # Static files are now served by nginx (see /etc/nginx/sites-available/psychology-institute)

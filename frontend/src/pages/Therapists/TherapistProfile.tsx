@@ -142,6 +142,7 @@ const TherapistProfile: React.FC = () => {
                     border: '8px solid rgba(255,255,255,0.3)',
                     boxShadow: '0 15px 40px rgba(0,0,0,0.2)',
                   }}
+                  loading="lazy"
                 />
               ) : (
                 <div

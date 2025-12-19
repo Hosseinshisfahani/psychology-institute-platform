@@ -333,6 +333,7 @@ const PackagesList: React.FC = () => {
                       height="200"
                       image={pkg.thumbnail || '/static/images/package-placeholder.png'}
                       alt={pkg.title}
+                      loading="lazy"
                       sx={{ objectFit: 'cover' }}
                     />
                     <Box sx={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 1 }}>

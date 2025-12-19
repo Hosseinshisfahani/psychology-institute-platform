@@ -145,6 +145,7 @@ const BlogPreview: React.FC<BlogPreviewProps> = ({
                 component="img"
                 src={post.featured_image}
                 alt={post.title}
+                loading="lazy"
                 sx={{
                   width: '100%',
                   maxHeight: 400,

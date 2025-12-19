@@ -200,7 +200,7 @@ const Profile: React.FC = () => {
                   <Card.Body className="text-center">
                     <div className="profile-image-wrapper">
                       {imagePreview ? (
-                        <img src={imagePreview} alt="Profile" className="profile-preview-image" />
+                        <img src={imagePreview} alt="Profile" className="profile-preview-image" loading="lazy" />
                       ) : (
                         <div className="profile-placeholder-large">
                           <i className="fas fa-user"></i>

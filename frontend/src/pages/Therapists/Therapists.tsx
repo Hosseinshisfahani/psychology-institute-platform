@@ -231,6 +231,7 @@ const Therapists: React.FC = () => {
                             transition: 'all 0.3s ease',
                             cursor: 'pointer'
                           }}
+                          loading="lazy"
                           onError={(e) => {
                             // If image fails to load, hide it and show placeholder
                             e.currentTarget.style.display = 'none';

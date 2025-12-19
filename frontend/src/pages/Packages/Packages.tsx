@@ -158,6 +158,8 @@ const Packages: React.FC = () => {
                         <Card.Img
                           variant="top"
                           src={pkg.thumbnail}
+                          alt={pkg.title}
+                          loading="lazy"
                           style={{ height: '200px', objectFit: 'cover' }}
                         />
                       )}

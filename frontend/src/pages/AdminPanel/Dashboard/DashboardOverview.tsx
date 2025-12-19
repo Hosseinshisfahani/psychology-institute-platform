@@ -93,9 +93,6 @@ const DashboardOverview: React.FC = () => {
             خوش آمدید به پنل مدیریت سیستم
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<AddIcon />} size="large">
-          افزودن محتوا
-        </Button>
       </Box>
 
       {/* Stats Cards */}

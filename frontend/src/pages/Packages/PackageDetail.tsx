@@ -202,6 +202,8 @@ const PackageDetail: React.FC = () => {
                 <Card.Img
                   variant="top"
                   src={packageData.thumbnail}
+                  alt={packageData.title}
+                  loading="lazy"
                   style={{ height: '400px', objectFit: 'cover' }}
                 />
               </Card>
@@ -296,6 +298,8 @@ const PackageDetail: React.FC = () => {
                                 <Card.Img
                                   variant="top"
                                   src={course.thumbnail}
+                                  alt={course.title}
+                                  loading="lazy"
                                   style={{ height: '150px', objectFit: 'cover' }}
                                 />
                               )}
@@ -599,6 +603,8 @@ const PackageDetail: React.FC = () => {
                               <Card.Img
                                 variant="top"
                                 src={course.thumbnail}
+                                alt={course.title}
+                                loading="lazy"
                                 style={{ height: '180px', objectFit: 'cover' }}
                               />
                             )}

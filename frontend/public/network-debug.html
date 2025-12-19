@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Network Debug Test</title>
+</head>
+<body>
+    <h1>Network Request Test</h1>
+    <button onclick="testRequest()">Test API Request</button>
+    <div id="result"></div>
+    
+    <script>
+        async function testRequest() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('http://185.8.175.241:8000/api/workshops/', {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                resultDiv.innerHTML = `
+                    <h3>Success!</h3>
+                    <p>Status: ${response.status}</p>
+                    <p>URL: ${response.url}</p>
+                    <pre>${JSON.stringify(data, null, 2).substring(0, 500)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h3>Error!</h3>
+                    <p>${error.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

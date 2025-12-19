@@ -70,6 +70,12 @@ class CartItem(models.Model):
     item_id = models.PositiveIntegerField(verbose_name='شناسه آیتم')
     quantity = models.PositiveIntegerField(default=1, verbose_name='تعداد')
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='قیمت واحد')
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='اطلاعات اضافی',
+        help_text='برای ذخیره اطلاعات اضافی مثل payment_type برای کارگاه‌ها'
+    )
     added_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ اضافه شدن')
     
     class Meta:
@@ -152,6 +158,12 @@ class OrderItem(models.Model):
     quantity = models.PositiveIntegerField(default=1, verbose_name='تعداد')
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='قیمت واحد')
     total_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='قیمت کل')
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='اطلاعات اضافی',
+        help_text='برای ذخیره اطلاعات اضافی مثل payment_type برای کارگاه‌ها'
+    )
     
     class Meta:
         verbose_name = _('آیتم سفارش')

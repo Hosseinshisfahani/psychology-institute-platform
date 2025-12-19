@@ -19,6 +19,7 @@ const Login: React.FC = () => {
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('email'); // 'email' or 'phone'
   const [requireOTP, setRequireOTP] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [sendingOTP, setSendingOTP] = useState(false);
@@ -64,11 +65,25 @@ const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // Validate that at least one identifier is provided
+      if (loginMethod === 'email' && !formData.email) {
+        setError('لطفاً ایمیل خود را وارد کنید');
+        setIsLoading(false);
+        return;
+      }
+      
+      if (loginMethod === 'phone' && !formData.phone_number) {
+        setError('لطفاً شماره تلفن خود را وارد کنید');
+        setIsLoading(false);
+        return;
+      }
+
+      // Call login with appropriate identifier
       await login(
-        formData.email, 
+        loginMethod === 'email' ? formData.email : '', 
         formData.password,
         requireOTP ? formData.otp_code : undefined,
-        requireOTP ? formData.phone_number : undefined
+        loginMethod === 'phone' || requireOTP ? formData.phone_number : undefined
       );
       navigate(from, { replace: true });
     } catch (err: any) {
@@ -101,6 +116,7 @@ const Login: React.FC = () => {
                     alt={t('home.title')} 
                     height="60" 
                     className="mb-3"
+                    loading="lazy"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
                     }}
@@ -115,18 +131,84 @@ const Login: React.FC = () => {
                 )}
 
                 <Form onSubmit={handleSubmit}>
+                  {/* Login Method Selection */}
                   <Form.Group className="mb-3">
-                    <Form.Label>{t('auth.login.email')}</Form.Label>
-                    <Form.Control
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      required
-                      placeholder="example@email.com"
-                    />
+                    <Form.Label>روش ورود</Form.Label>
+                    <div className="btn-group w-100" role="group">
+                      <input
+                        type="radio"
+                        className="btn-check"
+                        name="loginMethod"
+                        id="loginEmail"
+                        checked={loginMethod === 'email'}
+                        onChange={() => {
+                          setLoginMethod('email');
+                          setFormData(prev => ({ ...prev, phone_number: '', otp_code: '' }));
+                          setOtpSent(false);
+                          setRequireOTP(false);
+                          setError('');
+                        }}
+                      />
+                      <label className="btn btn-outline-primary" htmlFor="loginEmail">
+                        <i className="fas fa-envelope me-2"></i>
+                        ورود با ایمیل
+                      </label>
+
+                      <input
+                        type="radio"
+                        className="btn-check"
+                        name="loginMethod"
+                        id="loginPhone"
+                        checked={loginMethod === 'phone'}
+                        onChange={() => {
+                          setLoginMethod('phone');
+                          setFormData(prev => ({ ...prev, email: '', otp_code: '' }));
+                          setOtpSent(false);
+                          setRequireOTP(false);
+                          setError('');
+                        }}
+                      />
+                      <label className="btn btn-outline-primary" htmlFor="loginPhone">
+                        <i className="fas fa-phone me-2"></i>
+                        ورود با شماره تلفن
+                      </label>
+                    </div>
                   </Form.Group>
 
+                  {/* Email Field (shown when loginMethod is 'email') */}
+                  {loginMethod === 'email' && (
+                    <Form.Group className="mb-3">
+                      <Form.Label>{t('auth.login.email')}</Form.Label>
+                      <Form.Control
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required={loginMethod === 'email'}
+                        placeholder="example@email.com"
+                        autoComplete="email"
+                      />
+                    </Form.Group>
+                  )}
+
+                  {/* Phone Field (shown when loginMethod is 'phone') */}
+                  {loginMethod === 'phone' && (
+                    <Form.Group className="mb-3">
+                      <Form.Label>شماره تلفن</Form.Label>
+                      <Form.Control
+                        type="tel"
+                        name="phone_number"
+                        value={formData.phone_number}
+                        onChange={handleChange}
+                        required={loginMethod === 'phone'}
+                        placeholder="09123456789"
+                        maxLength={11}
+                        autoComplete="tel"
+                      />
+                    </Form.Group>
+                  )}
+
+                  {/* Password Field */}
                   <Form.Group className="mb-3">
                     <Form.Label>{t('auth.login.password')}</Form.Label>
                     <Form.Control
@@ -136,25 +218,30 @@ const Login: React.FC = () => {
                       onChange={handleChange}
                       required
                       placeholder="••••••••"
+                      autoComplete="current-password"
                     />
                   </Form.Group>
 
-                  <Form.Group className="mb-3">
-                    <Form.Check
-                      type="checkbox"
-                      label="ورود با کد تایید (اختیاری)"
-                      checked={requireOTP}
-                      onChange={(e) => {
-                        setRequireOTP(e.target.checked);
-                        if (!e.target.checked) {
-                          setOtpSent(false);
-                          setFormData(prev => ({ ...prev, phone_number: '', otp_code: '' }));
-                        }
-                      }}
-                    />
-                  </Form.Group>
+                  {/* OTP Option (only for email login) */}
+                  {loginMethod === 'email' && (
+                    <Form.Group className="mb-3">
+                      <Form.Check
+                        type="checkbox"
+                        label="ورود با کد تایید (اختیاری)"
+                        checked={requireOTP}
+                        onChange={(e) => {
+                          setRequireOTP(e.target.checked);
+                          if (!e.target.checked) {
+                            setOtpSent(false);
+                            setFormData(prev => ({ ...prev, phone_number: '', otp_code: '' }));
+                          }
+                        }}
+                      />
+                    </Form.Group>
+                  )}
 
-                  {requireOTP && (
+                  {/* OTP Section for Email Login with OTP option */}
+                  {loginMethod === 'email' && requireOTP && (
                     <>
                       <Form.Group className="mb-3">
                         <Form.Label>شماره تلفن</Form.Label>
@@ -168,6 +255,7 @@ const Login: React.FC = () => {
                             placeholder="09123456789"
                             maxLength={11}
                             disabled={otpSent || sendingOTP}
+                            autoComplete="tel"
                           />
                           {!otpSent && (
                             <Button
@@ -190,13 +278,14 @@ const Login: React.FC = () => {
                             value={formData.otp_code}
                             onChange={handleChange}
                             required={requireOTP}
-                            placeholder="کد 6 رقمی"
+                            placeholder="کد تایید (1234 در حالت تست)"
                             maxLength={6}
                             className="text-center"
                             style={{ fontSize: '1.5rem', letterSpacing: '0.5rem' }}
+                            autoComplete="one-time-code"
                           />
                           <Form.Text className="text-muted">
-                            کد تایید ارسال شده را وارد کنید
+                            کد تایید ارسال شده را وارد کنید (در حالت تست: 1234)
                           </Form.Text>
                         </Form.Group>
                       )}
@@ -208,7 +297,7 @@ const Login: React.FC = () => {
                       type="submit" 
                       variant="primary" 
                       size="lg"
-                      disabled={isLoading || (requireOTP && !otpSent && !formData.otp_code)}
+                      disabled={isLoading || (loginMethod === 'email' && requireOTP && !otpSent && !formData.otp_code)}
                     >
                       {isLoading ? (
                         <>

@@ -45,6 +45,7 @@ const Header: React.FC<HeaderProps> = ({ user, isAuthenticated, onLogout }) => {
                   src="/images/1744027219152.png" 
                   alt="مرکز مشاوره سرمد" 
                   className="logo-image"
+                  loading="eager"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
                     const nextElement = e.currentTarget.nextElementSibling as HTMLElement;
@@ -91,6 +92,7 @@ const Header: React.FC<HeaderProps> = ({ user, isAuthenticated, onLogout }) => {
                     <img 
                       src={user.profile_image || "/images/default-avatar.png"} 
                       alt="User Avatar" 
+                      loading="lazy"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                         const nextElement = e.currentTarget.nextElementSibling as HTMLElement;
@@ -115,6 +117,7 @@ const Header: React.FC<HeaderProps> = ({ user, isAuthenticated, onLogout }) => {
                           <img 
                             src={user.profile_image || "/images/default-avatar.png"} 
                             alt="User Avatar" 
+                            loading="lazy"
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
                               const nextElement = e.currentTarget.nextElementSibling as HTMLElement;

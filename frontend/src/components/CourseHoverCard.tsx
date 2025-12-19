@@ -87,6 +87,7 @@ const CourseHoverCard: React.FC<CourseHoverCardProps> = ({
                         borderRadius: '4px',
                         flexShrink: 0
                       }}
+                      loading="lazy"
                     />
                   )}
                   <div className="flex-grow-1">

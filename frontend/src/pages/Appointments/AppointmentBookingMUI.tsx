@@ -579,6 +579,7 @@ const AppointmentBookingMUI: React.FC = () => {
                                     transition: 'all 0.3s ease',
                                     cursor: 'pointer'
                                   }}
+                                  loading="lazy"
                                   onError={(e) => {
                                     e.currentTarget.style.display = 'none';
                                     const placeholder = e.currentTarget.nextElementSibling;
@@ -697,7 +698,8 @@ const AppointmentBookingMUI: React.FC = () => {
                             {therapists.find(t => t.id === selectedTherapist)?.profile_image ? (
                               <img
                                 src={therapists.find(t => t.id === selectedTherapist)?.profile_image}
-                                alt={therapists.find(t => t.id === selectedTherapist)?.name}
+                                alt={therapists.find(t => t.id === selectedTherapist)?.name || 'Therapist'}
+                                loading="lazy"
                                 style={{
                                   width: '60px',
                                   height: '60px',

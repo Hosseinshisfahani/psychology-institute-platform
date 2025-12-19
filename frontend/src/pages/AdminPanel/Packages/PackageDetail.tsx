@@ -209,6 +209,7 @@ const PackageDetail: React.FC = () => {
               height="300"
               image={packageData.thumbnail || '/static/images/package-placeholder.png'}
               alt={packageData.title}
+              loading="lazy"
               sx={{ objectFit: 'cover' }}
             />
             <CardContent>

@@ -1,9 +1,5 @@
-/* Import Persian Fonts */
-@import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css');
-@import url('https://cdn.jsdelivr.net/gh/rastikerdar/samim-font@v4.0.2/dist/font-face.css');
-@import url('https://cdn.jsdelivr.net/gh/rastikerdar/shabnam-font@v5.0.1/dist/font-face.css');
-
 /* Persian/Farsi RTL Support */
+/* Note: Fonts are now loaded from /css/fonts-optimized.css in index.html with font-display optimization */
 :root {
   --primary-color: #2c5aa0;
   --secondary-color: #f8f9fa;
