@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Container, Row, Col, Card, Badge, Button, ListGroup, Tab, Tabs, Alert, Spinner, Modal } from 'react-bootstrap';
 import { Helmet } from 'react-helmet-async';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
 
@@ -68,6 +68,7 @@ const CourseDetail: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<CourseVideo | null>(null);
   const [couponCode, setCouponCode] = useState('');
@@ -75,6 +76,16 @@ const CourseDetail: React.FC = () => {
   const [couponMessage, setCouponMessage] = useState('');
   const [completedVideoIds, setCompletedVideoIds] = useState<number[]>([]);
   const [shareStatus, setShareStatus] = useState<ShareStatus>(null);
+  const [commentContent, setCommentContent] = useState('');
+  const [replyingTo, setReplyingTo] = useState<number | null>(null);
+  const [replyContent, setReplyContent] = useState('');
+
+  // Invalidate course detail cache on mount to ensure fresh enrollment status
+  useEffect(() => {
+    // Invalidate the course detail query to force a fresh fetch
+    // This ensures enrollment status is always up-to-date
+    queryClient.invalidateQueries({ queryKey: ['course-detail', slug] });
+  }, [slug, queryClient]);
 
   // Prevent right-click and download shortcuts globally when modal is open
   // But allow video controls to work normally
@@ -179,6 +190,11 @@ const CourseDetail: React.FC = () => {
       return response.data;
     },
     enabled: !!slug,
+    // Always refetch enrollment status when window regains focus or user is authenticated
+    // This ensures enrollment status is up-to-date after purchases
+    refetchOnWindowFocus: true,
+    // Cache for 30 seconds only to ensure enrollment status is fresh
+    staleTime: 30000,
   });
 
   // Add to cart mutation
@@ -229,6 +245,58 @@ const CourseDetail: React.FC = () => {
       alert(error.response?.data?.error || 'خطا در خرید دوره');
     },
   });
+
+  // Fetch comments
+  const { data: comments = [], refetch: refetchComments } = useQuery({
+    queryKey: ['course-comments', slug],
+    queryFn: async () => {
+      const response = await axios.get(`/api/courses/${slug}/comments/`);
+      return response.data;
+    },
+    enabled: !!slug,
+  });
+
+  // Create comment mutation
+  const createCommentMutation = useMutation({
+    mutationFn: async (data: { content: string; parent?: number }) => {
+      const response = await axios.post(`/api/courses/${slug}/comments/`, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      setCommentContent('');
+      setReplyContent('');
+      setReplyingTo(null);
+      refetchComments();
+      alert('نظر شما با موفقیت ثبت شد و پس از تایید نمایش داده خواهد شد.');
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.error || 'خطا در ثبت نظر');
+    },
+  });
+
+  const handleSubmitComment = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    if (!commentContent.trim()) {
+      alert('لطفاً متن نظر را وارد کنید');
+      return;
+    }
+    createCommentMutation.mutate({ content: commentContent });
+  };
+
+  const handleSubmitReply = (parentId: number) => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    if (!replyContent.trim()) {
+      alert('لطفاً متن پاسخ را وارد کنید');
+      return;
+    }
+    createCommentMutation.mutate({ content: replyContent, parent: parentId });
+  };
 
   const formatPrice = (price: string | number) => {
     const numPrice = typeof price === 'string' ? parseFloat(price) : price;
@@ -690,30 +758,140 @@ const CourseDetail: React.FC = () => {
                     </div>
                   </Tab>
 
-                  <Tab eventKey="reviews" title={`نظرات (${course.review_count})`}>
-                    {course.review_count > 0 ? (
-                      <div className="text-center py-4">
-                        <div className="mb-3">
-                          <h2 className="text-primary">{course.rating.toFixed(1)}</h2>
-                          <div className="mb-2">
-                            {[...Array(5)].map((_, i) => (
-                              <i
-                                key={i}
-                                className={`fas fa-star ${i < Math.round(course.rating) ? 'text-warning' : 'text-muted'}`}
-                              ></i>
-                            ))}
-                          </div>
-                          <p className="text-muted">بر اساس {course.review_count} نظر</p>
-                        </div>
-                        <Alert variant="info">
-                          سیستم نظردهی به زودی راه‌اندازی خواهد شد.
+                  <Tab eventKey="reviews" title={`نظرات (${comments?.length || 0})`}>
+                    <div className="py-3">
+                      {/* Comment Form */}
+                      {isAuthenticated ? (
+                        <Card className="mb-4">
+                          <Card.Body>
+                            <h5 className="mb-3">ثبت نظر جدید</h5>
+                            <div className="mb-3">
+                              <textarea
+                                className="form-control"
+                                rows={4}
+                                placeholder="نظر خود را در مورد این دوره بنویسید..."
+                                value={commentContent}
+                                onChange={(e) => setCommentContent(e.target.value)}
+                                disabled={createCommentMutation.isPending}
+                              />
+                            </div>
+                            <Button
+                              variant="primary"
+                              onClick={handleSubmitComment}
+                              disabled={createCommentMutation.isPending || !commentContent.trim()}
+                            >
+                              {createCommentMutation.isPending ? (
+                                <>
+                                  <Spinner size="sm" className="me-2" />
+                                  در حال ارسال...
+                                </>
+                              ) : (
+                                <>
+                                  <i className="fas fa-paper-plane me-2"></i>
+                                  ارسال نظر
+                                </>
+                              )}
+                            </Button>
+                          </Card.Body>
+                        </Card>
+                      ) : (
+                        <Alert variant="info" className="mb-4">
+                          <i className="fas fa-info-circle me-2"></i>
+                          برای ثبت نظر، لطفاً <Link to="/login">وارد حساب کاربری</Link> خود شوید.
                         </Alert>
-                      </div>
-                    ) : (
-                      <Alert variant="info" className="text-center">
-                        هنوز نظری برای این دوره ثبت نشده است.
-                      </Alert>
-                    )}
+                      )}
+
+                      {/* Comments List */}
+                      {comments.length > 0 ? (
+                        <div>
+                          <h5 className="mb-3">نظرات کاربران ({comments.length})</h5>
+                          {comments.map((comment: any) => (
+                            <Card key={comment.id} className="mb-3">
+                              <Card.Body>
+                                <div className="d-flex justify-content-between align-items-start mb-2">
+                                  <div>
+                                    <strong>{comment.author_name}</strong>
+                                    <small className="text-muted ms-2">
+                                      <i className="fas fa-clock me-1"></i>
+                                      {comment.created_at_persian || comment.created_at}
+                                    </small>
+                                  </div>
+                                </div>
+                                <p className="mb-2" style={{ whiteSpace: 'pre-wrap' }}>
+                                  {comment.content}
+                                </p>
+                                {isAuthenticated && (
+                                  <div>
+                                    {replyingTo === comment.id ? (
+                                      <div className="mt-3 p-3 bg-light rounded">
+                                        <textarea
+                                          className="form-control mb-2"
+                                          rows={3}
+                                          placeholder="پاسخ خود را بنویسید..."
+                                          value={replyContent}
+                                          onChange={(e) => setReplyContent(e.target.value)}
+                                          disabled={createCommentMutation.isPending}
+                                        />
+                                        <div>
+                                          <Button
+                                            variant="primary"
+                                            size="sm"
+                                            className="me-2"
+                                            onClick={() => handleSubmitReply(comment.id)}
+                                            disabled={createCommentMutation.isPending || !replyContent.trim()}
+                                          >
+                                            {createCommentMutation.isPending ? (
+                                              <>
+                                                <Spinner size="sm" className="me-2" />
+                                                در حال ارسال...
+                                              </>
+                                            ) : (
+                                              'ارسال پاسخ'
+                                            )}
+                                          </Button>
+                                          <Button
+                                            variant="outline-secondary"
+                                            size="sm"
+                                            onClick={() => {
+                                              setReplyingTo(null);
+                                              setReplyContent('');
+                                            }}
+                                          >
+                                            انصراف
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <Button
+                                        variant="link"
+                                        size="sm"
+                                        className="p-0 text-decoration-none"
+                                        onClick={() => setReplyingTo(comment.id)}
+                                      >
+                                        <i className="fas fa-reply me-1"></i>
+                                        پاسخ
+                                      </Button>
+                                    )}
+                                  </div>
+                                )}
+                                {comment.replies_count > 0 && (
+                                  <div className="mt-2">
+                                    <small className="text-muted">
+                                      <i className="fas fa-comments me-1"></i>
+                                      {comment.replies_count} پاسخ
+                                    </small>
+                                  </div>
+                                )}
+                              </Card.Body>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <Alert variant="info" className="text-center">
+                          هنوز نظری برای این دوره ثبت نشده است. اولین نفری باشید که نظر می‌دهد!
+                        </Alert>
+                      )}
+                    </div>
                   </Tab>
                 </Tabs>
               </Card.Body>

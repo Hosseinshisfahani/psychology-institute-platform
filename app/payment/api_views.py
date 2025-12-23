@@ -134,11 +134,20 @@ class CartAPIView(APIView):
                 try:
                     from app.courses.models import Course
                     course = Course.objects.select_related('category', 'instructor').get(id=item.item_id)
+                    
+                    # Get thumbnail URL
+                    thumbnail_url = None
+                    if course.thumbnail:
+                        try:
+                            thumbnail_url = request.build_absolute_uri(course.thumbnail.url)
+                        except Exception:
+                            thumbnail_url = course.thumbnail.url
+                    
                     item_data['course'] = {
                         'id': course.id,
                         'title': course.title,
                         'slug': course.slug,
-                        'thumbnail': request.build_absolute_uri(course.thumbnail.url) if course.thumbnail else None,
+                        'thumbnail': thumbnail_url,
                         'price': float(course.price) if course.price else 0,
                         'discount_price': float(course.discount_price) if course.discount_price else None,
                         'instructor_name': course.instructor.full_name if course.instructor else 'نامشخص'
@@ -151,11 +160,20 @@ class CartAPIView(APIView):
                 try:
                     from app.packages.models import Package
                     package = Package.objects.select_related('category').get(id=item.item_id)
+                    
+                    # Get thumbnail URL
+                    thumbnail_url = None
+                    if package.thumbnail:
+                        try:
+                            thumbnail_url = request.build_absolute_uri(package.thumbnail.url)
+                        except Exception:
+                            thumbnail_url = package.thumbnail.url
+                    
                     item_data['package'] = {
                         'id': package.id,
                         'title': package.title,
                         'slug': package.slug,
-                        'thumbnail': request.build_absolute_uri(package.thumbnail.url) if package.thumbnail else None,
+                        'thumbnail': thumbnail_url,
                         'price': float(package.price) if package.price else 0,
                         'discount_price': float(package.discount_price) if package.discount_price else None,
                         'current_price': float(package.current_price),
@@ -169,15 +187,25 @@ class CartAPIView(APIView):
             elif item.item_type == 'workshop':
                 try:
                     from app.workshops.models import Workshop
-                    workshop = Workshop.objects.select_related('category').get(id=item.item_id)
+                    workshop = Workshop.objects.select_related('category', 'instructor').get(id=item.item_id)
+                    
+                    # Get thumbnail URL
+                    thumbnail_url = None
+                    if workshop.thumbnail:
+                        try:
+                            thumbnail_url = request.build_absolute_uri(workshop.thumbnail.url)
+                        except Exception:
+                            # If build_absolute_uri fails, use relative URL
+                            thumbnail_url = workshop.thumbnail.url
+                    
                     item_data['workshop'] = {
                         'id': workshop.id,
                         'title': workshop.title,
                         'slug': workshop.slug,
-                        'thumbnail': request.build_absolute_uri(workshop.thumbnail.url) if workshop.thumbnail else None,
+                        'thumbnail': thumbnail_url,
                         'price': float(workshop.price) if workshop.price else 0,
                         'current_price': float(workshop.current_price),
-                        'instructor_name': workshop.instructor_name,
+                        'instructor_name': workshop.instructor.full_name if workshop.instructor else 'نامشخص',
                         'category_name': workshop.category.name if workshop.category else None,
                     }
                     item_data['item_title'] = workshop.title
@@ -186,6 +214,9 @@ class CartAPIView(APIView):
                         item_data['payment_type'] = item.metadata.get('payment_type')
                         item_data['installment_months'] = item.metadata.get('installment_months')
                 except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Error fetching workshop {item.item_id}: {str(e)}", exc_info=True)
                     item_data['workshop'] = None
                     item_data['item_title'] = f"{item.get_item_type_display()} #{item.item_id}"
             else:
@@ -319,9 +350,17 @@ def process_payment(request):
                 
                 # Calculate totals
                 subtotal = cart.total_amount
-                discount_amount = Decimal('0')  # TODO: Calculate discount from coupon
+                
+                # Get discount from session (set by apply_coupon)
+                discount_amount = Decimal('0')
+                if 'coupon_discount' in request.session:
+                    try:
+                        discount_amount = Decimal(request.session['coupon_discount'])
+                    except (ValueError, TypeError):
+                        pass
+                
                 tax_amount = Decimal('0')  # TODO: Calculate tax if needed
-                total_amount = subtotal - discount_amount + tax_amount
+                total_amount = max(Decimal('0'), subtotal - discount_amount + tax_amount)
                 
                 # Create order
                 order = Order.objects.create(
@@ -374,6 +413,104 @@ def process_payment(request):
                         total_price=cart_item.total_price,
                         metadata=metadata
                     )
+            
+            # Handle free orders (100% discount applied)
+            if order.total_amount == 0:
+                from django.utils import timezone
+                
+                # Use a dedicated payment method for free/zero-amount orders
+                free_payment_method, _ = PaymentMethod.objects.get_or_create(
+                    payment_type='wallet',
+                    defaults={
+                        'name': 'پرداخت رایگان',
+                        'is_active': True,
+                    },
+                )
+                
+                # Mark order as paid
+                order.payment_status = 'completed'
+                order.status = 'paid'
+                order.payment_method = free_payment_method
+                order.paid_at = timezone.now()
+                order.save()
+                
+                # Create a payment record for tracking
+                Payment.objects.create(
+                    order=order,
+                    payment_method=free_payment_method,
+                    amount=Decimal('0'),
+                    status='completed',
+                )
+                
+                # Process the purchase (enroll in courses/packages)
+                from app.courses.models import Course, Enrollment
+                from app.packages.models import Package, PackagePurchase
+                
+                for order_item in order.items.all():
+                    if order_item.item_type == 'course':
+                        try:
+                            course = Course.objects.get(id=order_item.item_id)
+                            Enrollment.objects.get_or_create(
+                                user=request.user,
+                                course=course,
+                                defaults={
+                                    'status': 'active',
+                                    'amount_paid': Decimal('0'),
+                                    'discount_amount': order_item.total_price
+                                }
+                            )
+                        except Course.DoesNotExist:
+                            pass
+                    
+                    elif order_item.item_type == 'package':
+                        try:
+                            package = Package.objects.get(id=order_item.item_id)
+                            PackagePurchase.objects.get_or_create(
+                                user=request.user,
+                                package=package,
+                                defaults={
+                                    'amount_paid': Decimal('0'),
+                                    'discount_amount': order_item.total_price
+                                }
+                            )
+                        except Package.DoesNotExist:
+                            pass
+                
+                # Clear cart
+                if not order_id and 'cart' in locals():
+                    cart.items.all().delete()
+                
+                # Increment coupon usage count
+                applied_coupon_code = request.session.get('applied_coupon_code', '').upper()
+                if applied_coupon_code:
+                    from app.courses.models import Coupon
+                    from app.packages.models import PackageCoupon
+                    try:
+                        course_coupon = Coupon.objects.get(code=applied_coupon_code)
+                        course_coupon.used_count += 1
+                        course_coupon.save()
+                    except Coupon.DoesNotExist:
+                        pass
+                    
+                    try:
+                        package_coupon = PackageCoupon.objects.get(code=applied_coupon_code)
+                        package_coupon.used_count += 1
+                        package_coupon.save()
+                    except PackageCoupon.DoesNotExist:
+                        pass
+                
+                # Clear coupon from session
+                if 'applied_coupon_code' in request.session:
+                    del request.session['applied_coupon_code']
+                if 'coupon_discount' in request.session:
+                    del request.session['coupon_discount']
+                
+                return Response({
+                    'success': True,
+                    'message': 'سفارش شما با موفقیت ثبت شد',
+                    'order_id': order.id,
+                    'free_order': True
+                })
             
             # Get payment method
             if payment_method == 'zarinpal':
@@ -433,6 +570,12 @@ def process_payment(request):
                     if not order_id and 'cart' in locals():
                         cart.items.all().delete()
                     
+                    # Clear coupon from session after order is created
+                    if 'applied_coupon_code' in request.session:
+                        del request.session['applied_coupon_code']
+                    if 'coupon_discount' in request.session:
+                        del request.session['coupon_discount']
+                    
                     return Response({
                         'success': True,
                         'payment_url': payment_result['payment_url'],
@@ -464,7 +607,11 @@ def process_payment(request):
 @permission_classes([permissions.IsAuthenticated])
 def apply_coupon(request):
     """Apply coupon code to cart"""
-    coupon_code = request.data.get('code', '').strip()
+    from app.courses.models import Coupon
+    from app.packages.models import PackageCoupon
+    from decimal import Decimal
+    
+    coupon_code = request.data.get('code', '').strip().upper()
     
     if not coupon_code:
         return Response(
@@ -472,20 +619,99 @@ def apply_coupon(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    # TODO: Implement actual coupon validation
-    # For now, simulate a simple validation
-    if coupon_code.upper() == 'WELCOME10':
-        discount_amount = 10000  # 10,000 Toman discount
-        return Response({
-            'success': True,
-            'message': f'کد تخفیف با موفقیت اعمال شد. تخفیف: {discount_amount:,} تومان',
-            'discount_amount': discount_amount
-        })
-    else:
+    # Get user's cart
+    try:
+        cart = Cart.objects.get(user=request.user)
+    except Cart.DoesNotExist:
         return Response(
-            {'error': 'کد تخفیف نامعتبر است'},
+            {'error': 'سبد خرید شما خالی است'},
             status=status.HTTP_400_BAD_REQUEST
         )
+    
+    if not cart.items.exists():
+        return Response(
+            {'error': 'سبد خرید شما خالی است'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Try to find coupon in both models
+    course_coupon = None
+    package_coupon = None
+    
+    try:
+        course_coupon = Coupon.objects.get(code=coupon_code)
+    except Coupon.DoesNotExist:
+        pass
+    
+    try:
+        package_coupon = PackageCoupon.objects.get(code=coupon_code)
+    except PackageCoupon.DoesNotExist:
+        pass
+    
+    if not course_coupon and not package_coupon:
+        return Response(
+            {'error': 'کد تخفیف نامعتبر است'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Calculate discount for cart items
+    total_discount = Decimal('0')
+    cart_total = cart.total_amount
+    
+    # Check each cart item and calculate applicable discount
+    for item in cart.items.all():
+        if item.item_type == 'course' and course_coupon:
+            if not course_coupon.is_valid():
+                return Response(
+                    {'error': 'کد تخفیف منقضی شده یا غیرفعال است'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            # Apply course coupon
+            discount = course_coupon.calculate_discount(item.total_price)
+            total_discount += discount
+            
+        elif item.item_type == 'package' and package_coupon:
+            if not package_coupon.is_valid():
+                return Response(
+                    {'error': 'کد تخفیف منقضی شده یا غیرفعال است'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            # Apply package coupon
+            discount = package_coupon.calculate_discount(item.total_price)
+            total_discount += discount
+    
+    if total_discount == 0:
+        # Check if any coupon is invalid
+        if course_coupon and not course_coupon.is_valid():
+            return Response(
+                {'error': 'کد تخفیف منقضی شده یا غیرفعال است'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if package_coupon and not package_coupon.is_valid():
+            return Response(
+                {'error': 'کد تخفیف منقضی شده یا غیرفعال است'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        # Coupon doesn't apply to any items in cart
+        return Response(
+            {'error': 'این کد تخفیف برای آیتم‌های موجود در سبد خرید شما قابل اعمال نیست'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Store coupon in session for later use during checkout
+    request.session['applied_coupon_code'] = coupon_code
+    request.session['coupon_discount'] = str(total_discount)
+    
+    final_amount = cart_total - total_discount
+    
+    return Response({
+        'success': True,
+        'message': f'کد تخفیف با موفقیت اعمال شد',
+        'coupon_code': coupon_code,
+        'subtotal': float(cart_total),
+        'discount': float(total_discount),
+        'total': float(final_amount)
+    })
 
 
 @api_view(['GET'])

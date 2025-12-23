@@ -11,7 +11,9 @@ from .api_views import (
     purchase_course,
     CourseListAPIView,
     CourseCategoryListAPIView,
-    CourseDetailAPIView
+    CourseDetailAPIView,
+    toggle_course_like,
+    CourseCommentListCreateView
 )
 
 urlpatterns = [
@@ -32,4 +34,8 @@ urlpatterns = [
     path('purchase/<slug:course_slug>/', purchase_course, name='api_purchase_course'),
     path('validate-coupon/', validate_coupon, name='api_validate_coupon'),
     path('my-purchases/', user_purchases, name='api_user_purchases'),
+    
+    # Likes and Comments
+    path('<slug:course_slug>/like/', toggle_course_like, name='api_toggle_like'),
+    path('<slug:course_slug>/comments/', CourseCommentListCreateView.as_view(), name='api_comment_list_create'),
 ]

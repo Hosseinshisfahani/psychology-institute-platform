@@ -150,7 +150,14 @@ class CommentListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         post_slug = self.kwargs.get('post_slug')
         post = get_object_or_404(Post, slug=post_slug, status='published')
-        serializer.save(author=self.request.user, post=post)
+        parent = serializer.validated_data.get('parent')
+        
+        # Validate that parent comment belongs to the same post
+        if parent and parent.post != post:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'parent': 'Parent comment must belong to the same post.'})
+        
+        serializer.save(author=self.request.user, post=post, parent=parent)
 
 
 @api_view(['POST'])

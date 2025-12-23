@@ -3,16 +3,25 @@ import { Container, Row, Col, Card, Button, Alert, ListGroup } from 'react-boots
 import { Link, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 
 const PaymentSuccess: React.FC = () => {
   const location = useLocation();
   const { checkAuthStatus } = useAuth();
+  const queryClient = useQueryClient();
 
   // Refresh auth state on mount to ensure user is authenticated after payment redirect
   useEffect(() => {
     // Refresh auth status to ensure user state is up to date after payment redirect
     checkAuthStatus();
-  }, [checkAuthStatus]);
+    
+    // Invalidate all course and package queries to ensure fresh data is fetched
+    // This is important because the user may have just purchased a course or package
+    queryClient.invalidateQueries({ queryKey: ['course-detail'] });
+    queryClient.invalidateQueries({ queryKey: ['package'] });
+    queryClient.invalidateQueries({ queryKey: ['user-courses'] });
+    queryClient.invalidateQueries({ queryKey: ['user-packages'] });
+  }, [checkAuthStatus, queryClient]);
 
   const { orderId, orderNumber, refId, appointmentId, registrationId, workshopSlug, itemType } = useMemo(() => {
     const params = new URLSearchParams(location.search);

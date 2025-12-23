@@ -6,7 +6,7 @@ from decimal import Decimal
 from .models import (
     ClinicLocation, AppointmentType, TherapistSchedule, TherapistTimeOff,
     Appointment, AppointmentCancellation, AppointmentReschedule,
-    CancellationPolicy, AppointmentReminder
+    CancellationPolicy, AppointmentReminder, python_weekday_to_persian
 )
 
 User = get_user_model()
@@ -144,7 +144,8 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
     def _is_therapist_available(self, therapist, scheduled_datetime, duration_minutes, location=None):
         """Check if therapist is available based on schedule and time off"""
         # Check if therapist has schedule for this day
-        day_of_week = scheduled_datetime.weekday()
+        # Convert Python weekday to Persian calendar
+        day_of_week = python_weekday_to_persian(scheduled_datetime.weekday())
         start_time = scheduled_datetime.time()
         end_time = (scheduled_datetime + timedelta(minutes=duration_minutes)).time()
         

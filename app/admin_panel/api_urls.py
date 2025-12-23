@@ -13,12 +13,15 @@ from .api_views import (
     AdminBlogCategoryListAPIView, AdminBlogCategoryDetailAPIView,
     AdminBlogTagListAPIView, AdminBlogTagDetailAPIView,
     AdminBlogCommentListAPIView, AdminBlogCommentDetailAPIView, bulk_blog_comment_action,
+    AdminCourseCommentListAPIView, AdminCourseCommentDetailAPIView, bulk_course_comment_action,
     AdminWorkshopListAPIView, AdminWorkshopDetailAPIView, AdminWorkshopSessionListAPIView,
     AdminWorkshopSessionDetailAPIView, AdminWorkshopRegistrationListAPIView,
     AdminWorkshopCategoryListAPIView, AdminWorkshopCategoryDetailAPIView,
+    AdminWorkshopReviewListAPIView, AdminWorkshopReviewDetailAPIView, bulk_workshop_review_action,
     bulk_workshop_action, approve_workshop_registration,
     reject_workshop_registration, AdminPackageListAPIView, AdminPackageDetailAPIView,
     AdminPackageCategoryListAPIView, AdminPackageCategoryDetailAPIView, bulk_package_action,
+    AdminPackageCommentListAPIView, AdminPackageCommentDetailAPIView, bulk_package_comment_action,
     admin_payments_overview, admin_payments_revenue_series, admin_recent_payments,
     admin_user_financial_logs
 )
@@ -49,6 +52,11 @@ urlpatterns = [
     path('courses/', AdminCourseListAPIView.as_view(), name='api_admin_courses'),
     path('courses/<int:pk>/', AdminCourseDetailAPIView.as_view(), name='api_admin_course_detail'),
     path('courses/bulk-action/', bulk_course_action, name='api_bulk_course_action'),
+    
+    # Course Comments
+    path('courses/comments/', AdminCourseCommentListAPIView.as_view(), name='api_admin_course_comments'),
+    path('courses/comments/<int:pk>/', AdminCourseCommentDetailAPIView.as_view(), name='api_admin_course_comment_detail'),
+    path('courses/comments/bulk-action/', bulk_course_comment_action, name='api_bulk_course_comment_action'),
     
     # Sessions - commented out due to therapy_sessions app deletion
     # path('sessions/', AdminSessionListAPIView.as_view(), name='api_admin_sessions'),
@@ -113,12 +121,22 @@ urlpatterns = [
     path('workshops/categories/', AdminWorkshopCategoryListAPIView.as_view(), name='api_admin_workshop_categories'),
     path('workshops/categories/<int:pk>/', AdminWorkshopCategoryDetailAPIView.as_view(), name='api_admin_workshop_category_detail'),
     
+    # Workshop Reviews
+    path('workshops/reviews/', AdminWorkshopReviewListAPIView.as_view(), name='api_admin_workshop_reviews'),
+    path('workshops/reviews/<int:pk>/', AdminWorkshopReviewDetailAPIView.as_view(), name='api_admin_workshop_review_detail'),
+    path('workshops/reviews/bulk-action/', bulk_workshop_review_action, name='api_bulk_workshop_review_action'),
+    
     # Package Management
     path('packages/', AdminPackageListAPIView.as_view(), name='api_admin_packages'),
     path('packages/<int:pk>/', AdminPackageDetailAPIView.as_view(), name='api_admin_package_detail'),
     path('packages/bulk-action/', bulk_package_action, name='api_bulk_package_action'),
     path('packages/categories/', AdminPackageCategoryListAPIView.as_view(), name='api_admin_package_categories'),
     path('packages/categories/<int:pk>/', AdminPackageCategoryDetailAPIView.as_view(), name='api_admin_package_category_detail'),
+    
+    # Package Comments
+    path('packages/comments/', AdminPackageCommentListAPIView.as_view(), name='api_admin_package_comments'),
+    path('packages/comments/<int:pk>/', AdminPackageCommentDetailAPIView.as_view(), name='api_admin_package_comment_detail'),
+    path('packages/comments/bulk-action/', bulk_package_comment_action, name='api_bulk_package_comment_action'),
     
     # File Upload
     path('upload/', upload_file, name='api_upload_file'),

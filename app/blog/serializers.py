@@ -24,7 +24,7 @@ class PostListSerializer(serializers.ModelSerializer):
         model = Post
         fields = [
             'id', 'title', 'slug', 'excerpt', 'content', 'featured_image',
-            'status', 'view_count',
+            'status', 'view_count', 'like_count',
             'category', 'tags', 'author_name', 'created_at', 'created_at_persian'
         ]
     
@@ -44,11 +44,20 @@ class PostDetailSerializer(PostListSerializer):
 
 class CommentSerializer(serializers.ModelSerializer):
     author_name = serializers.CharField(source='author.full_name', read_only=True)
+    author = serializers.SerializerMethodField()
     created_at_persian = serializers.SerializerMethodField()
+    parent = serializers.PrimaryKeyRelatedField(queryset=Comment.objects.all(), required=False, allow_null=True)
     
     class Meta:
         model = Comment
-        fields = ['id', 'content', 'author_name', 'created_at', 'created_at_persian', 'is_approved']
+        fields = ['id', 'content', 'author', 'author_name', 'parent', 'created_at', 'created_at_persian', 'is_approved']
+        read_only_fields = ['author', 'author_name', 'created_at', 'created_at_persian', 'is_approved']
+    
+    def get_author(self, obj):
+        return {
+            'id': obj.author.id,
+            'full_name': obj.author.full_name
+        }
     
     def get_created_at_persian(self, obj):
         from django.utils import timezone

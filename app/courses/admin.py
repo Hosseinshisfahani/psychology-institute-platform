@@ -2,7 +2,8 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from .models import (
     CourseCategory, Course, CourseVideo, CourseModule, Lesson, 
-    Enrollment, LessonProgress, CoursePurchase, CourseReview, Coupon
+    Enrollment, LessonProgress, CoursePurchase, CourseReview, Coupon,
+    CourseLike, CourseComment
 )
 
 
@@ -70,7 +71,7 @@ class CourseAdmin(admin.ModelAdmin):
     list_filter = ('status', 'level', 'is_free', 'category', 'created_at')
     search_fields = ('title', 'description', 'instructor__first_name', 'instructor__last_name')
     prepopulated_fields = {'slug': ('title',)}
-    readonly_fields = ('created_at', 'updated_at', 'enrollment_count', 'rating', 'review_count')
+    readonly_fields = ('created_at', 'updated_at', 'enrollment_count', 'rating', 'review_count', 'like_count')
     inlines = [CourseVideoInline]
     
     fieldsets = (
@@ -90,7 +91,7 @@ class CourseAdmin(admin.ModelAdmin):
             'fields': ('status',)
         }),
         (_('Statistics'), {
-            'fields': ('enrollment_count', 'rating', 'review_count'),
+            'fields': ('enrollment_count', 'rating', 'review_count', 'like_count'),
             'classes': ('collapse',)
         }),
         (_('Timestamps'), {
@@ -256,3 +257,59 @@ class CouponAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+@admin.register(CourseLike)
+class CourseLikeAdmin(admin.ModelAdmin):
+    """Admin configuration for CourseLike model"""
+    
+    list_display = ('course', 'user', 'created_at')
+    list_filter = ('created_at', 'course__category')
+    search_fields = ('course__title', 'user__first_name', 'user__last_name', 'user__email')
+    readonly_fields = ('created_at',)
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('course', 'user')
+
+
+@admin.register(CourseComment)
+class CourseCommentAdmin(admin.ModelAdmin):
+    """Admin configuration for CourseComment model"""
+    
+    list_display = ('course', 'author', 'is_approved', 'created_at', 'replies_count')
+    list_filter = ('is_approved', 'created_at', 'course__category')
+    search_fields = ('course__title', 'author__first_name', 'author__last_name', 'content')
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('-created_at',)
+    
+    fieldsets = (
+        (None, {
+            'fields': ('course', 'author', 'content', 'parent')
+        }),
+        (_('Moderation'), {
+            'fields': ('is_approved',)
+        }),
+        (_('Timestamps'), {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    actions = ['approve_comments', 'reject_comments']
+    
+    def replies_count(self, obj):
+        return obj.replies.count()
+    replies_count.short_description = _('Replies')
+    
+    def approve_comments(self, request, queryset):
+        updated = queryset.update(is_approved=True)
+        self.message_user(request, _(f'{updated} comments approved.'))
+    approve_comments.short_description = _('Approve selected comments')
+    
+    def reject_comments(self, request, queryset):
+        updated = queryset.update(is_approved=False)
+        self.message_user(request, _(f'{updated} comments rejected.'))
+    reject_comments.short_description = _('Reject selected comments')
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('course', 'author', 'parent')

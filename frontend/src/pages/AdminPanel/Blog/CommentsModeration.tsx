@@ -24,10 +24,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Divider,
   Stack,
   Badge,
@@ -36,8 +32,6 @@ import {
   Check as ApproveIcon,
   Close as RejectIcon,
   Delete as DeleteIcon,
-  Reply as ReplyIcon,
-  Visibility as ViewIcon,
   FilterList as FilterIcon,
   Clear as ClearIcon,
 } from '@mui/icons-material';
@@ -50,9 +44,6 @@ const CommentsModeration: React.FC = () => {
   const { enqueueSnackbar } = useSnackbar();
   const [selectedComments, setSelectedComments] = useState<number[]>([]);
   const [filters, setFilters] = useState<CommentFilters>({});
-  const [replyDialogOpen, setReplyDialogOpen] = useState(false);
-  const [selectedComment, setSelectedComment] = useState<BlogComment | null>(null);
-  const [replyText, setReplyText] = useState('');
 
   // Fetch comments
   const { data: commentsData, isLoading, error } = useQuery({
@@ -61,10 +52,13 @@ const CommentsModeration: React.FC = () => {
   });
 
   // Fetch posts for filter dropdown
-  const { data: posts = [] } = useQuery({
+  const { data: postsData } = useQuery({
     queryKey: ['admin-blog-posts-for-comments'],
     queryFn: () => blogPostApi.getPosts({ page_size: 100 }),
   });
+  
+  // Extract posts from paginated response
+  const posts = Array.isArray(postsData) ? postsData : (postsData?.results || []);
 
   // Approve comment mutation
   const approveMutation = useMutation({
@@ -151,17 +145,6 @@ const CommentsModeration: React.FC = () => {
     bulkActionMutation.mutate({ action, commentIds: selectedComments });
   };
 
-  const handleReply = (comment: BlogComment) => {
-    setSelectedComment(comment);
-    setReplyText('');
-    setReplyDialogOpen(true);
-  };
-
-  const handleSendReply = () => {
-    // TODO: Implement reply functionality
-    enqueueSnackbar('قابلیت پاسخ به نظرات به زودی اضافه خواهد شد', { variant: 'info' });
-    setReplyDialogOpen(false);
-  };
 
   const handleFilterChange = (key: keyof CommentFilters, value: any) => {
     setFilters(prev => ({
@@ -450,15 +433,6 @@ const CommentsModeration: React.FC = () => {
                               </IconButton>
                             </Tooltip>
                           )}
-                          <Tooltip title="پاسخ">
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              onClick={() => handleReply(comment)}
-                            >
-                              <ReplyIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
                           <Tooltip title="حذف">
                             <IconButton
                               size="small"
@@ -536,45 +510,6 @@ const CommentsModeration: React.FC = () => {
         </Card>
       )}
 
-      {/* Reply Dialog */}
-      <Dialog open={replyDialogOpen} onClose={() => setReplyDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          پاسخ به نظر {selectedComment?.author_name}
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              نظر اصلی:
-            </Typography>
-            <Paper sx={{ p: 2, backgroundColor: 'grey.50' }}>
-              <Typography variant="body2">
-                {selectedComment?.content}
-              </Typography>
-            </Paper>
-          </Box>
-          <TextField
-            fullWidth
-            multiline
-            rows={4}
-            label="پاسخ شما"
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            placeholder="پاسخ خود را بنویسید..."
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setReplyDialogOpen(false)}>
-            لغو
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleSendReply}
-            disabled={!replyText.trim()}
-          >
-            ارسال پاسخ
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };

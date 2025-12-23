@@ -269,7 +269,8 @@ export const blogCommentApi = {
 
   // Update comment (approve/reject)
   updateComment: async (id: number, data: Partial<BlogComment>) => {
-    const response = await api.put(`/blog/comments/${id}/`, data);
+    // Use PATCH for partial updates (only send fields that need to be updated)
+    const response = await api.patch(`/blog/comments/${id}/`, data);
     return response.data;
   },
 

@@ -9,12 +9,13 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 from .models import (
     Package, PackageCategory, PackagePurchase, PackageEnrollment,
-    PackageProgress, PackageReview, PackageCoupon
+    PackageProgress, PackageReview, PackageCoupon, PackageLike, PackageComment
 )
 from .serializers import (
     PackageListSerializer, PackageDetailSerializer, PackageCategorySerializer,
     PackagePurchaseSerializer, PackageEnrollmentSerializer,
-    PackageProgressSerializer, PackageReviewSerializer, PackageCouponSerializer
+    PackageProgressSerializer, PackageReviewSerializer, PackageCouponSerializer,
+    PackageLikeSerializer, PackageCommentSerializer
 )
 from app.courses.models import Enrollment
 from app.payment.models import Cart, CartItem
@@ -425,4 +426,43 @@ def user_package_enrollments(request):
         })
     
     return Response(data)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def toggle_package_like(request, package_slug):
+    """Toggle like for a package"""
+    package = get_object_or_404(Package, slug=package_slug, status='published')
+    like, created = PackageLike.objects.get_or_create(user=request.user, package=package)
+    
+    if not created:
+        like.delete()
+        liked = False
+    else:
+        liked = True
+    
+    # Update like count
+    package.like_count = PackageLike.objects.filter(package=package).count()
+    package.save(update_fields=['like_count'])
+    
+    return Response({
+        'liked': liked,
+        'like_count': package.like_count
+    })
+
+
+class PackageCommentListCreateView(generics.ListCreateAPIView):
+    """List and create comments for a package"""
+    serializer_class = PackageCommentSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    
+    def get_queryset(self):
+        package_slug = self.kwargs.get('package_slug')
+        package = get_object_or_404(Package, slug=package_slug, status='published')
+        return PackageComment.objects.filter(package=package, is_approved=True).order_by('-created_at')
+    
+    def perform_create(self, serializer):
+        package_slug = self.kwargs.get('package_slug')
+        package = get_object_or_404(Package, slug=package_slug, status='published')
+        serializer.save(author=self.request.user, package=package)
 

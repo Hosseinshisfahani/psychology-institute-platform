@@ -29,5 +29,9 @@ urlpatterns = [
     
     # Coupons
     path('<slug:package_slug>/validate-coupon/', api_views.validate_package_coupon, name='validate_coupon'),
+    
+    # Likes and Comments
+    path('<slug:package_slug>/like/', api_views.toggle_package_like, name='toggle_like'),
+    path('<slug:package_slug>/comments/', api_views.PackageCommentListCreateView.as_view(), name='comment_list_create'),
 ]
 

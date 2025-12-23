@@ -8,6 +8,26 @@ from django.utils import timezone
 User = get_user_model()
 
 
+def python_weekday_to_persian(python_weekday):
+    """
+    Convert Python's weekday to Persian calendar weekday.
+    
+    Python's weekday:
+        Monday=0, Tuesday=1, Wednesday=2, Thursday=3, Friday=4, Saturday=5, Sunday=6
+    
+    Persian calendar weekday (used in TherapistSchedule.DAYS_OF_WEEK):
+        شنبه (Saturday)=0, یکشنبه (Sunday)=1, دوشنبه (Monday)=2, 
+        سه‌شنبه (Tuesday)=3, چهارشنبه (Wednesday)=4, پنج‌شنبه (Thursday)=5, جمعه (Friday)=6
+    
+    Args:
+        python_weekday (int): Python's datetime.weekday() result (0-6)
+    
+    Returns:
+        int: Persian calendar day (0-6)
+    """
+    return (python_weekday + 2) % 7
+
+
 class ClinicLocation(models.Model):
     """Central clinic locations where sessions occur"""
     

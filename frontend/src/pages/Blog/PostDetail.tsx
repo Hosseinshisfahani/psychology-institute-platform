@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Container, Row, Col, Card, Button, Spinner, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Spinner, Alert, Form } from 'react-bootstrap';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import { useI18n } from '../../contexts/I18nContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { blogApi } from '../../services/blogApi';
+import { blogApi, Comment } from '../../services/blogApi';
 
 interface Post {
   id: number;
@@ -35,6 +35,11 @@ const PostDetail: React.FC = () => {
   const [isLiked, setIsLiked] = useState<boolean>(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState<boolean>(false);
   const [likeAnimation, setLikeAnimation] = useState<boolean>(false);
+  const [commentContent, setCommentContent] = useState<string>('');
+  const [replyTo, setReplyTo] = useState<number | null>(null);
+  const [replyContent, setReplyContent] = useState<{ [key: number]: string }>({});
+  const [commentError, setCommentError] = useState<string>('');
+  const [commentSuccess, setCommentSuccess] = useState<boolean>(false);
 
   const { data: post, isLoading } = useQuery({
     queryKey: ['post', slug],
@@ -43,6 +48,18 @@ const PostDetail: React.FC = () => {
     },
     enabled: !!slug,
   });
+
+  // Fetch comments
+  const { data: commentsData, isLoading: commentsLoading, refetch: refetchComments } = useQuery({
+    queryKey: ['post-comments', slug],
+    queryFn: async () => {
+      return await blogApi.getComments(slug!);
+    },
+    enabled: !!slug,
+  });
+
+  // Ensure comments is always an array
+  const comments = Array.isArray(commentsData) ? commentsData : (commentsData?.results || []);
 
   // Check if user has already liked this post (this would need backend support)
   // For now, we'll track it locally after the first like action
@@ -92,6 +109,93 @@ const PostDetail: React.FC = () => {
     }
     likeMutation.mutate();
   };
+
+  // Comment mutation
+  const commentMutation = useMutation({
+    mutationFn: ({ content, parentId }: { content: string; parentId?: number }) => 
+      blogApi.createComment(slug!, content, parentId),
+    onSuccess: () => {
+      setCommentContent('');
+      setReplyTo(null);
+      setCommentError('');
+      setCommentSuccess(true);
+      refetchComments();
+      queryClient.invalidateQueries({ queryKey: ['post', slug] });
+      // Hide success message after 3 seconds
+      setTimeout(() => {
+        setCommentSuccess(false);
+      }, 3000);
+    },
+    onError: (error: any) => {
+      console.error('Comment submission error:', error);
+      if (error.response?.status === 401) {
+        setCommentError('لطفاً ابتدا وارد شوید');
+      } else if (error.response?.status === 400) {
+        setCommentError(error.response?.data?.error || 'لطفاً متن نظر را وارد کنید');
+      } else {
+        setCommentError('خطا در ثبت نظر. لطفاً دوباره تلاش کنید.');
+      }
+      // Clear error after 5 seconds
+      setTimeout(() => {
+        setCommentError('');
+      }, 5000);
+    },
+  });
+
+  const handleSubmitComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAuthenticated) {
+      alert('لطفاً ابتدا وارد شوید');
+      return;
+    }
+    if (!commentContent.trim()) {
+      alert('لطفاً متن نظر را وارد کنید');
+      return;
+    }
+    commentMutation.mutate({ content: commentContent });
+  };
+
+  const handleReply = (parentId: number, content: string) => {
+    if (!isAuthenticated) {
+      alert('لطفاً ابتدا وارد شوید');
+      return;
+    }
+    if (!content.trim()) {
+      alert('لطفاً متن پاسخ را وارد کنید');
+      return;
+    }
+    commentMutation.mutate({ content, parentId });
+    setReplyContent({ ...replyContent, [parentId]: '' });
+  };
+
+  // Organize comments into tree structure
+  const organizeComments = (comments: Comment[]): Comment[] => {
+    const commentMap = new Map<number, Comment & { replies?: Comment[] }>();
+    const rootComments: (Comment & { replies?: Comment[] })[] = [];
+
+    // First pass: create map of all comments
+    comments.forEach(comment => {
+      commentMap.set(comment.id, { ...comment, replies: [] });
+    });
+
+    // Second pass: organize into tree
+    comments.forEach(comment => {
+      const commentWithReplies = commentMap.get(comment.id)!;
+      if (comment.parent) {
+        const parent = commentMap.get(comment.parent);
+        if (parent) {
+          if (!parent.replies) parent.replies = [];
+          parent.replies.push(commentWithReplies);
+        }
+      } else {
+        rootComments.push(commentWithReplies);
+      }
+    });
+
+    return rootComments;
+  };
+
+  const organizedComments = organizeComments(comments);
 
   if (isLoading) {
     return (
@@ -245,6 +349,99 @@ const PostDetail: React.FC = () => {
                   )}
                 </div>
               </div>
+
+              {/* Comments Section */}
+              <div className="mt-5">
+                <h4 className="mb-4">
+                  <i className="fas fa-comments me-2"></i>
+                  نظرات ({comments.length})
+                </h4>
+
+                {/* Comment Form */}
+                {isAuthenticated ? (
+                  <Card className="mb-4">
+                    <Card.Body>
+                      <Form onSubmit={handleSubmitComment}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>نظر شما</Form.Label>
+                          <Form.Control
+                            as="textarea"
+                            rows={4}
+                            value={commentContent}
+                            onChange={(e) => {
+                              setCommentContent(e.target.value);
+                              setCommentError('');
+                            }}
+                            placeholder="نظر خود را بنویسید..."
+                            required
+                            disabled={commentMutation.isPending}
+                          />
+                        </Form.Group>
+                        {commentSuccess && (
+                          <Alert variant="success" className="mb-3">
+                            <i className="fas fa-check-circle me-2"></i>
+                            نظر شما با موفقیت ثبت شد و پس از تایید نمایش داده خواهد شد.
+                          </Alert>
+                        )}
+                        {commentError && (
+                          <Alert variant="danger" className="mb-3">
+                            <i className="fas fa-exclamation-circle me-2"></i>
+                            {commentError}
+                          </Alert>
+                        )}
+                        <Button 
+                          type="submit" 
+                          variant="primary"
+                          disabled={commentMutation.isPending || !commentContent.trim()}
+                        >
+                          {commentMutation.isPending ? (
+                            <>
+                              <Spinner size="sm" className="me-2" />
+                              در حال ارسال...
+                            </>
+                          ) : (
+                            <>
+                              <i className="fas fa-paper-plane me-2"></i>
+                              ارسال نظر
+                            </>
+                          )}
+                        </Button>
+                      </Form>
+                    </Card.Body>
+                  </Card>
+                ) : (
+                  <Alert variant="info" className="mb-4">
+                    <i className="fas fa-info-circle me-2"></i>
+                    برای ثبت نظر، لطفاً <Link to="/login">وارد حساب کاربری</Link> خود شوید.
+                  </Alert>
+                )}
+
+                {/* Comments List */}
+                {commentsLoading ? (
+                  <div className="text-center py-4">
+                    <Spinner animation="border" />
+                  </div>
+                ) : organizedComments.length > 0 ? (
+                  <div>
+                    {organizedComments.map((comment) => (
+                      <CommentItem
+                        key={comment.id}
+                        comment={comment}
+                        isAuthenticated={isAuthenticated}
+                        replyContent={replyContent}
+                        setReplyContent={setReplyContent}
+                        handleReply={handleReply}
+                        commentMutation={commentMutation}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <Alert variant="secondary" className="text-center">
+                    <i className="fas fa-comment-slash me-2"></i>
+                    هنوز نظری ثبت نشده است. اولین نفری باشید که نظر می‌دهد!
+                  </Alert>
+                )}
+              </div>
             </article>
           </Col>
 
@@ -261,6 +458,114 @@ const PostDetail: React.FC = () => {
         </Row>
       </Container>
     </>
+  );
+};
+
+// Comment Item Component
+interface CommentItemProps {
+  comment: Comment & { replies?: Comment[] };
+  isAuthenticated: boolean;
+  replyContent: { [key: number]: string };
+  setReplyContent: (content: { [key: number]: string }) => void;
+  handleReply: (parentId: number, content: string) => void;
+  commentMutation: any;
+}
+
+const CommentItem: React.FC<CommentItemProps> = ({
+  comment,
+  isAuthenticated,
+  replyContent,
+  setReplyContent,
+  handleReply,
+  commentMutation,
+}) => {
+  const [showReplyForm, setShowReplyForm] = useState(false);
+
+  return (
+    <Card className="mb-3" style={{ marginRight: comment.parent ? '2rem' : '0' }}>
+      <Card.Body>
+        <div className="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <strong>{comment.author.full_name}</strong>
+            <small className="text-muted ms-2">{comment.created_at_persian}</small>
+          </div>
+        </div>
+        <p className="mb-2" style={{ whiteSpace: 'pre-wrap' }}>{comment.content}</p>
+        
+        {isAuthenticated && (
+          <Button
+            variant="link"
+            size="sm"
+            className="p-0 text-decoration-none"
+            onClick={() => setShowReplyForm(!showReplyForm)}
+          >
+            <i className="fas fa-reply me-1"></i>
+            پاسخ
+          </Button>
+        )}
+
+        {showReplyForm && isAuthenticated && (
+          <div className="mt-3 p-3 bg-light rounded">
+            <Form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const content = replyContent[comment.id] || '';
+                if (content.trim()) {
+                  handleReply(comment.id, content);
+                  setShowReplyForm(false);
+                }
+              }}
+            >
+              <Form.Group className="mb-2">
+                <Form.Control
+                  as="textarea"
+                  rows={2}
+                  value={replyContent[comment.id] || ''}
+                  onChange={(e) =>
+                    setReplyContent({ ...replyContent, [comment.id]: e.target.value })
+                  }
+                  placeholder="پاسخ خود را بنویسید..."
+                  required
+                />
+              </Form.Group>
+              <div className="d-flex gap-2">
+                <Button type="submit" size="sm" variant="primary" disabled={commentMutation.isPending}>
+                  ارسال پاسخ
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowReplyForm(false);
+                    setReplyContent({ ...replyContent, [comment.id]: '' });
+                  }}
+                >
+                  انصراف
+                </Button>
+              </div>
+            </Form>
+          </div>
+        )}
+
+        {/* Nested Replies */}
+        {comment.replies && comment.replies.length > 0 && (
+          <div className="mt-3" style={{ marginRight: '1.5rem' }}>
+            {comment.replies.map((reply) => (
+              <CommentItem
+                key={reply.id}
+                comment={reply}
+                isAuthenticated={isAuthenticated}
+                replyContent={replyContent}
+                setReplyContent={setReplyContent}
+                handleReply={handleReply}
+                commentMutation={commentMutation}
+              />
+            ))}
+          </div>
+        )}
+      </Card.Body>
+    </Card>
   );
 };
 

@@ -58,6 +58,8 @@ import {
   SessionFormDialog 
 } from '../../../components/Admin/Workshops';
 import WorkshopSessions from './WorkshopSessions';
+import WorkshopReviewsModeration from './WorkshopReviewsModeration';
+import { Tabs, Tab } from '@mui/material';
 
 const WorkshopsList: React.FC = () => {
   const navigate = useNavigate();
@@ -75,6 +77,7 @@ const WorkshopsList: React.FC = () => {
     workshopId?: number;
     session?: any;
   }>({ open: false });
+  const [activeTab, setActiveTab] = useState(0);
 
   // Fetch workshops
   const { data: workshopsData, isLoading, error } = useQuery({
@@ -232,6 +235,17 @@ const WorkshopsList: React.FC = () => {
         </Typography>
       </Box>
 
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
+          <Tab label="لیست کارگاه‌ها" />
+          <Tab label="مدیریت نظرات" />
+        </Tabs>
+      </Box>
+
+      {activeTab === 1 && <WorkshopReviewsModeration />}
+      {activeTab === 0 && (
+        <>
       {/* Filters */}
       <WorkshopFilters
         filters={filters}
@@ -528,16 +542,20 @@ const WorkshopsList: React.FC = () => {
           </Card>
         </Box>
       )}
+        </>
+      )}
 
       {/* Session Form Dialog */}
-      <SessionFormDialog
-        open={sessionDialog.open}
-        onClose={() => setSessionDialog({ open: false })}
-        onSave={handleSessionSave}
-        session={sessionDialog.session}
-        workshopTitle={workshopsData?.results?.find((w: Workshop) => w.id === sessionDialog.workshopId)?.title}
-        nextSessionNumber={1} // This should be calculated based on existing sessions
-      />
+      {activeTab === 0 && (
+        <SessionFormDialog
+          open={sessionDialog.open}
+          onClose={() => setSessionDialog({ open: false })}
+          onSave={handleSessionSave}
+          session={sessionDialog.session}
+          workshopTitle={workshopsData?.results?.find((w: Workshop) => w.id === sessionDialog.workshopId)?.title}
+          nextSessionNumber={1} // This should be calculated based on existing sessions
+        />
+      )}
     </Box>
   );
 };

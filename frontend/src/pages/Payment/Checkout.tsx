@@ -13,9 +13,11 @@ const Checkout: React.FC = () => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('zarinpal');
   const [couponCode, setCouponCode] = useState<string>('');
   const [agreeToTerms, setAgreeToTerms] = useState<boolean>(false);
+  const [couponMessage, setCouponMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
 
   // Fetch cart summary
-  const { data: cart } = useQuery({
+  const { data: cart, refetch: refetchCart } = useQuery({
     queryKey: ['cart-summary'],
     queryFn: async () => {
       const response = await axios.get('/api/payment/cart/');
@@ -29,6 +31,16 @@ const Checkout: React.FC = () => {
       const response = await axios.post('/api/payment/apply-coupon/', { code });
       return response.data;
     },
+    onSuccess: (data) => {
+      setCouponMessage({ type: 'success', text: data.message || 'کد تخفیف با موفقیت اعمال شد' });
+      setAppliedDiscount(data.discount || 0);
+      refetchCart(); // Refresh cart to show updated totals
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.error || 'خطا در اعمال کد تخفیف';
+      setCouponMessage({ type: 'error', text: errorMessage });
+      setAppliedDiscount(0);
+    },
   });
 
   // Process payment mutation
@@ -38,7 +50,10 @@ const Checkout: React.FC = () => {
       return response.data;
     },
     onSuccess: (data) => {
-      if (data.success && data.payment_url) {
+      if (data.success && data.free_order) {
+        // Free order - redirect to success page
+        navigate('/payment/success', { state: { freeOrder: true, orderId: data.order_id } });
+      } else if (data.success && data.payment_url) {
         // Redirect to Zarinpal payment gateway
         window.location.href = data.payment_url;
       } else if (data.success) {
@@ -124,6 +139,16 @@ const Checkout: React.FC = () => {
                 </h5>
               </Card.Header>
               <Card.Body>
+                {couponMessage && (
+                  <Alert 
+                    variant={couponMessage.type === 'success' ? 'success' : 'danger'}
+                    dismissible
+                    onClose={() => setCouponMessage(null)}
+                    className="mb-3"
+                  >
+                    {couponMessage.text}
+                  </Alert>
+                )}
                 <Form.Group>
                   <Form.Label>کد تخفیف دارید؟</Form.Label>
                   <div className="d-flex gap-2">
@@ -131,14 +156,21 @@ const Checkout: React.FC = () => {
                       type="text"
                       placeholder="کد تخفیف را وارد کنید"
                       value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value)}
+                      onChange={(e) => {
+                        setCouponCode(e.target.value.toUpperCase());
+                        setCouponMessage(null); // Clear message when user types
+                      }}
                     />
                     <Button
                       variant="outline-primary"
                       onClick={() => applyCouponMutation.mutate(couponCode)}
                       disabled={!couponCode || applyCouponMutation.isPending}
                     >
-                      اعمال
+                      {applyCouponMutation.isPending ? (
+                        <span className="spinner-border spinner-border-sm"></span>
+                      ) : (
+                        'اعمال'
+                      )}
                     </Button>
                   </div>
                 </Form.Group>
@@ -242,13 +274,13 @@ const Checkout: React.FC = () => {
 
                 <div className="d-flex justify-content-between mb-2">
                   <span>جمع:</span>
-                  <span>{formatPrice(cart.subtotal)} تومان</span>
+                  <span>{formatPrice(cart.subtotal || cart.total)} تومان</span>
                 </div>
 
-                {cart.discount > 0 && (
+                {(appliedDiscount > 0 || cart.discount > 0) && (
                   <div className="d-flex justify-content-between mb-2 text-success">
                     <span>تخفیف:</span>
-                    <span>-{formatPrice(cart.discount)} تومان</span>
+                    <span>-{formatPrice(appliedDiscount || cart.discount || 0)} تومان</span>
                   </div>
                 )}
 
@@ -256,7 +288,9 @@ const Checkout: React.FC = () => {
 
                 <div className="d-flex justify-content-between mb-3 fs-5 fw-bold">
                   <span>مبلغ نهایی:</span>
-                  <span className="text-primary">{formatPrice(cart.total)} تومان</span>
+                  <span className="text-primary">
+                    {formatPrice((cart.subtotal || cart.total) - (appliedDiscount || cart.discount || 0))} تومان
+                  </span>
                 </div>
 
                 <Button

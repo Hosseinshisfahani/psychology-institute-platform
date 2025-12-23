@@ -153,7 +153,9 @@ const PackageForm: React.FC = () => {
         if (key === 'thumbnail' || key === 'intro_video') {
           if (value) formDataToSend.append(key, value);
         } else if (key === 'course_ids') {
-          value.forEach((id: any, index: number) => formDataToSend.append(`course_ids[${index}]`, id.toString()));
+          if (Array.isArray(value)) {
+            value.forEach((id: any, index: number) => formDataToSend.append(`course_ids[${index}]`, id.toString()));
+          }
         } else if (value !== null && value !== undefined) {
           formDataToSend.append(key, value.toString());
         }

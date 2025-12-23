@@ -63,6 +63,7 @@ export interface Comment {
   created_at: string;
   created_at_persian: string;
   is_approved: boolean;
+  parent?: number;
 }
 
 export interface LikeResponse {
@@ -114,6 +115,16 @@ export const blogApi = {
   // Get comments for a post
   getComments: async (postSlug: string) => {
     const response = await api.get(`/posts/${postSlug}/comments/`);
+    return response.data;
+  },
+
+  // Create comment for a post
+  createComment: async (postSlug: string, content: string, parentId?: number) => {
+    const payload: { content: string; parent?: number } = { content };
+    if (parentId !== undefined) {
+      payload.parent = parentId;
+    }
+    const response = await api.post(`/posts/${postSlug}/comments/`, payload);
     return response.data;
   },
 

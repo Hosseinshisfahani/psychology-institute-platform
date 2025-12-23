@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import { useI18n } from '../../contexts/I18nContext';
 import axios from 'axios';
+import './Home.css';
 
 interface Post {
   id: number;
@@ -155,25 +156,25 @@ const Home: React.FC = () => {
       <section className="hero-section">
         <Container>
           <Row className="align-items-center">
-            <Col lg={6}>
-              <h1 className="display-4 fw-bold mb-4">{t('home.title')}</h1>
-              <p className="lead mb-4">{t('home.subtitle')}</p>
-              <div className="d-flex flex-wrap gap-3">
-                <Link to="/tests" className="btn btn-light btn-lg">
-                  <i className="fas fa-brain me-2"></i>
+            <Col lg={6} className="hero-content">
+              <h1 className="hero-title">{t('home.title')}</h1>
+              <p className="hero-subtitle">{t('home.subtitle')}</p>
+              <div className="hero-buttons-container">
+                <Link to="/tests" className="hero-btn hero-btn-primary">
+                  <i className="fas fa-brain"></i>
                   {t('home.cta.tests')}
                 </Link>
-                <Link to="/therapists" className="btn btn-outline-light btn-lg">
-                  <i className="fas fa-user-md me-2"></i>
+                <Link to="/therapists" className="hero-btn hero-btn-primary">
+                  <i className="fas fa-user-md"></i>
                   درمانگران
                 </Link>
-                <Link to="/workshops" className="btn btn-outline-light btn-lg">
-                  <i className="fas fa-chalkboard-teacher me-2"></i>
+                <Link to="/workshops" className="hero-btn hero-btn-primary">
+                  <i className="fas fa-chalkboard-teacher"></i>
                   کارگاه‌ها
                 </Link>
-                <Link to="/packages" className="btn btn-outline-light btn-lg">
-                  <i className="fas fa-box-open me-2"></i>
-                  پکیج ها
+                <Link to="/packages" className="hero-btn hero-btn-primary">
+                  <i className="fas fa-box-open"></i>
+                  پکیج‌ها
                 </Link>
               </div>
             </Col>

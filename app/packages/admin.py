@@ -4,7 +4,7 @@ from django.utils.html import format_html
 from .models import (
 # from psychology_institute.admin import persian_admin_site
     PackageCategory, Package, PackagePurchase, PackageEnrollment,
-    PackageProgress, PackageReview, PackageCoupon
+    PackageProgress, PackageReview, PackageCoupon, PackageLike, PackageComment
 )
 
 
@@ -63,7 +63,7 @@ class PackageAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         (_('Statistics'), {
-            'fields': ('purchase_count', 'rating', 'review_count')
+            'fields': ('purchase_count', 'rating', 'review_count', 'like_count')
         }),
         (_('Timestamps'), {
             'fields': ('created_at', 'updated_at', 'published_at'),
@@ -282,3 +282,59 @@ class PackageCouponAdmin(admin.ModelAdmin):
         updated = queryset.update(is_active=False)
         self.message_user(request, _(f'{updated} coupons deactivated.'))
     deactivate_coupons.short_description = _('Deactivate selected coupons')
+
+
+@admin.register(PackageLike)
+class PackageLikeAdmin(admin.ModelAdmin):
+    """Admin configuration for PackageLike model"""
+    
+    list_display = ('package', 'user', 'created_at')
+    list_filter = ('created_at', 'package__category')
+    search_fields = ('package__title', 'user__first_name', 'user__last_name', 'user__email')
+    readonly_fields = ('created_at',)
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('package', 'user')
+
+
+@admin.register(PackageComment)
+class PackageCommentAdmin(admin.ModelAdmin):
+    """Admin configuration for PackageComment model"""
+    
+    list_display = ('package', 'author', 'is_approved', 'created_at', 'replies_count')
+    list_filter = ('is_approved', 'created_at', 'package__category')
+    search_fields = ('package__title', 'author__first_name', 'author__last_name', 'content')
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('-created_at',)
+    
+    fieldsets = (
+        (_('Comment'), {
+            'fields': ('package', 'author', 'content', 'parent')
+        }),
+        (_('Moderation'), {
+            'fields': ('is_approved',)
+        }),
+        (_('Timestamps'), {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    actions = ['approve_comments', 'reject_comments']
+    
+    def replies_count(self, obj):
+        return obj.replies.count()
+    replies_count.short_description = _('Replies')
+    
+    def approve_comments(self, request, queryset):
+        updated = queryset.update(is_approved=True)
+        self.message_user(request, _(f'{updated} comments approved.'))
+    approve_comments.short_description = _('Approve selected comments')
+    
+    def reject_comments(self, request, queryset):
+        updated = queryset.update(is_approved=False)
+        self.message_user(request, _(f'{updated} comments rejected.'))
+    reject_comments.short_description = _('Reject selected comments')
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('package', 'author', 'parent')

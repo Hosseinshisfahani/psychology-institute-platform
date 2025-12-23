@@ -9,13 +9,14 @@ from datetime import datetime, timedelta
 from django.contrib.auth import get_user_model
 from django.db.models.functions import TruncDate
 from app.blog.models import Post, Category, Tag, Comment
-from app.courses.models import Course, Enrollment
+from app.courses.models import Course, Enrollment, CourseComment
 # from app.therapy_sessions.models import Session, Therapist, SessionBooking, SessionType  # Removed - therapy_sessions app deleted
 from app.dashboard.models import Activity, Notification
 from app.workshops.models import (
     Workshop, WorkshopCategory, WorkshopSession, WorkshopRegistration,
     WorkshopSessionAttendance, InstallmentPlan, InstallmentPayment, WorkshopReview
 )
+from app.packages.models import PackageComment
 from app.packages.models import Package, PackageCategory, PackagePurchase
 from app.payment.models import Order, Payment, PaymentMethod, OrderItem
 from .serializers import (
@@ -23,9 +24,10 @@ from .serializers import (
     # AdminSessionSerializer, AdminAppointmentSerializer, AdminTherapistSerializer, AdminSessionTypeSerializer,  # Removed - therapy_sessions app deleted
     AdminActivitySerializer, AdminNotificationSerializer,
     DashboardStatsSerializer, AdminBlogPostSerializer, AdminCategorySerializer,
-    AdminTagSerializer, AdminCommentSerializer, AdminWorkshopSerializer,
+    AdminTagSerializer, AdminCommentSerializer, AdminCourseCommentSerializer, AdminWorkshopSerializer,
     AdminWorkshopCategorySerializer, AdminWorkshopSessionSerializer,
-    AdminWorkshopRegistrationSerializer, AdminPackageSerializer, AdminPackageCategorySerializer
+    AdminWorkshopRegistrationSerializer, AdminWorkshopReviewSerializer,
+    AdminPackageSerializer, AdminPackageCategorySerializer, AdminPackageCommentSerializer
 )
 
 User = get_user_model()
@@ -1094,6 +1096,63 @@ def bulk_blog_comment_action(request):
     return Response({'message': message})
 
 
+# Course Comment Admin Views
+
+class AdminCourseCommentListAPIView(generics.ListAPIView):
+    """
+    List course comments for admin moderation
+    """
+    serializer_class = AdminCourseCommentSerializer
+    permission_classes = [AdminPermission]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['is_approved', 'course']
+    search_fields = ['content', 'author__first_name', 'author__last_name', 'author__email']
+    ordering_fields = ['created_at', 'updated_at']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        return CourseComment.objects.all().select_related('author', 'course')
+
+class AdminCourseCommentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Get, update, or delete a course comment
+    """
+    serializer_class = AdminCourseCommentSerializer
+    permission_classes = [AdminPermission]
+    
+    def get_queryset(self):
+        return CourseComment.objects.all().select_related('author', 'course')
+
+@api_view(['POST'])
+@permission_classes([AdminPermission])
+def bulk_course_comment_action(request):
+    """
+    Perform bulk actions on course comments
+    """
+    action = request.data.get('action')
+    comment_ids = request.data.get('comment_ids', [])
+    
+    if not comment_ids:
+        return Response({'error': 'هیچ نظری انتخاب نشده است'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    comments = CourseComment.objects.filter(id__in=comment_ids)
+    
+    if action == 'approve':
+        comments.update(is_approved=True)
+        message = f'{comments.count()} نظر تایید شدند'
+    elif action == 'reject':
+        comments.update(is_approved=False)
+        message = f'{comments.count()} نظر رد شدند'
+    elif action == 'delete':
+        count = comments.count()
+        comments.delete()
+        message = f'{count} نظر حذف شدند'
+    else:
+        return Response({'error': 'عملیات نامعتبر است'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    return Response({'message': message})
+
+
 # Workshop Admin Views
 
 class AdminWorkshopListAPIView(generics.ListCreateAPIView):
@@ -1405,3 +1464,117 @@ class AdminWorkshopCategoryDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     
     def get_queryset(self):
         return WorkshopCategory.objects.all()
+
+
+# Workshop Review Admin Views
+
+class AdminWorkshopReviewListAPIView(generics.ListAPIView):
+    """
+    List workshop reviews for admin moderation
+    """
+    serializer_class = AdminWorkshopReviewSerializer
+    permission_classes = [AdminPermission]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['is_approved']
+    search_fields = ['content', 'title', 'registration__user__first_name', 'registration__user__last_name', 'registration__user__email']
+    ordering_fields = ['created_at', 'updated_at', 'rating']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        return WorkshopReview.objects.all().select_related('registration__user', 'registration__workshop')
+
+class AdminWorkshopReviewDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Get, update, or delete a workshop review
+    """
+    serializer_class = AdminWorkshopReviewSerializer
+    permission_classes = [AdminPermission]
+    
+    def get_queryset(self):
+        return WorkshopReview.objects.all().select_related('registration__user', 'registration__workshop')
+
+@api_view(['POST'])
+@permission_classes([AdminPermission])
+def bulk_workshop_review_action(request):
+    """
+    Perform bulk actions on workshop reviews
+    """
+    action = request.data.get('action')
+    review_ids = request.data.get('review_ids', [])
+    
+    if not review_ids:
+        return Response({'error': 'هیچ نظری انتخاب نشده است'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    reviews = WorkshopReview.objects.filter(id__in=review_ids)
+    
+    if action == 'approve':
+        reviews.update(is_approved=True)
+        message = f'{reviews.count()} نظر تایید شدند'
+    elif action == 'reject':
+        reviews.update(is_approved=False)
+        message = f'{reviews.count()} نظر رد شدند'
+    elif action == 'delete':
+        count = reviews.count()
+        reviews.delete()
+        message = f'{count} نظر حذف شدند'
+    else:
+        return Response({'error': 'عملیات نامعتبر است'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    return Response({'message': message})
+
+
+# Package Comment Admin Views
+
+class AdminPackageCommentListAPIView(generics.ListAPIView):
+    """
+    List package comments for admin moderation
+    """
+    serializer_class = AdminPackageCommentSerializer
+    permission_classes = [AdminPermission]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['is_approved', 'package']
+    search_fields = ['content', 'author__first_name', 'author__last_name', 'author__email']
+    ordering_fields = ['created_at', 'updated_at']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        return PackageComment.objects.all().select_related('author', 'package')
+
+class AdminPackageCommentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Get, update, or delete a package comment
+    """
+    serializer_class = AdminPackageCommentSerializer
+    permission_classes = [AdminPermission]
+    
+    def get_queryset(self):
+        return PackageComment.objects.all().select_related('author', 'package')
+
+@api_view(['POST'])
+@permission_classes([AdminPermission])
+def bulk_package_comment_action(request):
+    """
+    Perform bulk actions on package comments
+    """
+    action = request.data.get('action')
+    comment_ids = request.data.get('comment_ids', [])
+    
+    if not comment_ids:
+        return Response({'error': 'هیچ نظری انتخاب نشده است'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    comments = PackageComment.objects.filter(id__in=comment_ids)
+    
+    if action == 'approve':
+        comments.update(is_approved=True)
+        message = f'{comments.count()} نظر تایید شدند'
+    elif action == 'reject':
+        comments.update(is_approved=False)
+        message = f'{comments.count()} نظر رد شدند'
+    elif action == 'delete':
+        count = comments.count()
+        comments.delete()
+        message = f'{count} نظر حذف شدند'
+    else:
+        return Response({'error': 'عملیات نامعتبر است'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    return Response({'message': message})

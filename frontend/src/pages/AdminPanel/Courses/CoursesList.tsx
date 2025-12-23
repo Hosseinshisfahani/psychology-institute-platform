@@ -13,6 +13,8 @@ import {
   CardContent,
   CardActions,
   Avatar,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -26,6 +28,7 @@ import axios from 'axios';
 import { useSnackbar } from 'notistack';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
+import CourseCommentsModeration from './CourseCommentsModeration';
 
 interface Course {
   id: number;
@@ -61,6 +64,7 @@ const CoursesList: React.FC = () => {
     difficulty: '',
     category: '',
   });
+  const [activeTab, setActiveTab] = useState(0);
 
   // Check if we're on an admin route
   const isAdminRoute = location.pathname.startsWith('/admin-panel');
@@ -169,19 +173,32 @@ const CoursesList: React.FC = () => {
             مشاهده و مدیریت دوره‌های آموزشی
           </Typography>
         </Box>
-        <Button 
-          variant="contained" 
-          startIcon={<AddIcon />} 
-          size="large"
-          onClick={() => {
-            const apiUrl = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
-            window.location.href = `${apiUrl}/admin/courses/course/add/`;
-          }}
-        >
-          افزودن دوره جدید
-        </Button>
+        {activeTab === 0 && (
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />} 
+            size="large"
+            onClick={() => {
+              const apiUrl = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
+              window.location.href = `${apiUrl}/admin/courses/course/add/`;
+            }}
+          >
+            افزودن دوره جدید
+          </Button>
+        )}
       </Box>
 
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
+          <Tab label="لیست دوره‌ها" />
+          <Tab label="مدیریت نظرات" />
+        </Tabs>
+      </Box>
+
+      {activeTab === 1 && <CourseCommentsModeration />}
+      {activeTab === 0 && (
+        <>
       {/* Filters */}
       <Box sx={{ mb: 3, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(4, 1fr)' }, gap: 2 }}>
         <TextField
@@ -338,6 +355,8 @@ const CoursesList: React.FC = () => {
             </Box>
           ))}
         </Box>
+      )}
+        </>
       )}
     </Box>
   );

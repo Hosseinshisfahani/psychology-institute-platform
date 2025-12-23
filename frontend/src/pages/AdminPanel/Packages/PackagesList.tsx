@@ -38,6 +38,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useSnackbar } from 'notistack';
+import { Tabs, Tab } from '@mui/material';
+import PackageCommentsModeration from './PackageCommentsModeration';
 
 interface Package {
   id: number;
@@ -89,6 +91,7 @@ const PackagesList: React.FC = () => {
   const [selectedPackages, setSelectedPackages] = useState<number[]>([]);
   const [bulkActionDialog, setBulkActionDialog] = useState(false);
   const [bulkAction, setBulkAction] = useState('');
+  const [activeTab, setActiveTab] = useState(0);
 
   // Fetch packages
   const { data: packages = [], isLoading } = useQuery({
@@ -238,6 +241,17 @@ const PackagesList: React.FC = () => {
         </Box>
       </Box>
 
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
+          <Tab label="لیست پکیج‌ها" />
+          <Tab label="مدیریت نظرات" />
+        </Tabs>
+      </Box>
+
+      {activeTab === 1 && <PackageCommentsModeration />}
+      {activeTab === 0 && (
+        <>
       {/* Filters */}
       <Box sx={{ mb: 3, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(4, 1fr)' }, gap: 2 }}>
         <TextField
@@ -484,6 +498,8 @@ const PackagesList: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+        </>
+      )}
     </Box>
   );
 };

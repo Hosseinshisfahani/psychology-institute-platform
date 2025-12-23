@@ -21,18 +21,26 @@ import {
   Alert,
   Pagination,
   Stack,
+  Collapse,
+  Badge,
+  Divider,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
   Search as SearchIcon,
   FilterList as FilterIcon,
   Preview as PreviewIcon,
+  Check as ApproveIcon,
+  Close as RejectIcon,
+  Comment as CommentIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import { useAuth } from '../../../contexts/AuthContext';
-import { blogPostApi, blogCategoryApi, blogTagApi, BlogPost, BlogFilters as BlogFiltersType } from '../../../services/blogAdminApi';
+import { blogPostApi, blogCategoryApi, blogTagApi, blogCommentApi, BlogPost, BlogFilters as BlogFiltersType, BlogComment } from '../../../services/blogAdminApi';
 import StatusBadge from '../../../components/Admin/Blog/StatusBadge';
 import CategoryChip from '../../../components/Admin/Blog/CategoryChip';
 import TagChip from '../../../components/Admin/Blog/TagChip';
@@ -47,6 +55,7 @@ const BlogList: React.FC = () => {
   const [filters, setFilters] = useState<BlogFiltersType>({});
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
+  const [showCommentsSection, setShowCommentsSection] = useState(true);
 
   // Fetch posts
   const { data: postsData, isLoading, error } = useQuery({
@@ -64,6 +73,16 @@ const BlogList: React.FC = () => {
     queryKey: ['admin-blog-tags'],
     queryFn: () => blogTagApi.getTags(),
   });
+
+  // Fetch pending comments for approval
+  const { data: pendingCommentsData, refetch: refetchPendingComments } = useQuery({
+    queryKey: ['admin-blog-pending-comments'],
+    queryFn: () => blogCommentApi.getComments({ is_approved: false }),
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  const pendingComments = pendingCommentsData?.results || [];
+  const pendingCount = pendingComments.length;
 
   // Ensure categories and tags are always arrays
   const categories = Array.isArray(categoriesData) ? categoriesData : [];
@@ -92,6 +111,32 @@ const BlogList: React.FC = () => {
     },
     onError: (error: any) => {
       enqueueSnackbar(error.response?.data?.error || 'خطا در حذف پست', { variant: 'error' });
+    },
+  });
+
+  // Approve comment mutation
+  const approveCommentMutation = useMutation({
+    mutationFn: (id: number) => blogCommentApi.updateComment(id, { is_approved: true }),
+    onSuccess: () => {
+      enqueueSnackbar('نظر تایید شد', { variant: 'success' });
+      queryClient.invalidateQueries({ queryKey: ['admin-blog-pending-comments'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-blog-comments'] });
+    },
+    onError: (error: any) => {
+      enqueueSnackbar(error.response?.data?.error || 'خطا در تایید نظر', { variant: 'error' });
+    },
+  });
+
+  // Reject comment mutation
+  const rejectCommentMutation = useMutation({
+    mutationFn: (id: number) => blogCommentApi.updateComment(id, { is_approved: false }),
+    onSuccess: () => {
+      enqueueSnackbar('نظر رد شد', { variant: 'success' });
+      queryClient.invalidateQueries({ queryKey: ['admin-blog-pending-comments'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-blog-comments'] });
+    },
+    onError: (error: any) => {
+      enqueueSnackbar(error.response?.data?.error || 'خطا در رد نظر', { variant: 'error' });
     },
   });
 
@@ -157,6 +202,14 @@ const BlogList: React.FC = () => {
     return Array.from(authorMap.values());
   }, [postsData?.results]);
 
+  const handleApproveComment = (commentId: number) => {
+    approveCommentMutation.mutate(commentId);
+  };
+
+  const handleRejectComment = (commentId: number) => {
+    rejectCommentMutation.mutate(commentId);
+  };
+
   if (error) {
     return (
       <Alert severity="error" sx={{ mt: 2 }}>
@@ -180,8 +233,151 @@ const BlogList: React.FC = () => {
           >
             فیلترها
           </Button>
+          <Button
+            variant="outlined"
+            startIcon={<CommentIcon />}
+            onClick={() => navigate('/admin-panel/blog/comments')}
+          >
+            مدیریت نظرات
+          </Button>
         </Box>
       </Box>
+
+      {/* Pending Comments Section */}
+      {pendingCount > 0 && (
+        <Card sx={{ mb: 3, border: '2px solid', borderColor: 'warning.main' }}>
+          <CardContent>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                cursor: 'pointer',
+              }}
+              onClick={() => setShowCommentsSection(!showCommentsSection)}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Badge badgeContent={pendingCount} color="error">
+                  <CommentIcon color="warning" sx={{ fontSize: 32 }} />
+                </Badge>
+                <Box>
+                  <Typography variant="h6" fontWeight={600}>
+                    نظرات در انتظار تایید
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {pendingCount} نظر نیاز به بررسی دارد
+                  </Typography>
+                </Box>
+              </Box>
+              <IconButton>
+                {showCommentsSection ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              </IconButton>
+            </Box>
+
+            <Collapse in={showCommentsSection}>
+              <Divider sx={{ my: 2 }} />
+              {pendingComments.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+                  هیچ نظری در انتظار تایید نیست
+                </Typography>
+              ) : (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>نظر</TableCell>
+                        <TableCell>نویسنده</TableCell>
+                        <TableCell>پست</TableCell>
+                        <TableCell>تاریخ</TableCell>
+                        <TableCell align="center">عملیات</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {pendingComments.slice(0, 5).map((comment: BlogComment) => (
+                        <TableRow key={comment.id} hover>
+                          <TableCell>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                maxWidth: 300,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {comment.content}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Avatar sx={{ width: 24, height: 24, fontSize: '0.75rem' }}>
+                                {comment.author_name?.charAt(0)}
+                              </Avatar>
+                              <Typography variant="body2">{comment.author_name}</Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                maxWidth: 200,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {comment.post_title}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" color="text.secondary">
+                              {comment.created_at_persian}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                              <Tooltip title="تایید">
+                                <IconButton
+                                  size="small"
+                                  color="success"
+                                  onClick={() => handleApproveComment(comment.id!)}
+                                  disabled={approveCommentMutation.isPending}
+                                >
+                                  <ApproveIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="رد">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => handleRejectComment(comment.id!)}
+                                  disabled={rejectCommentMutation.isPending}
+                                >
+                                  <RejectIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+              {pendingCount > 5 && (
+                <Box sx={{ mt: 2, textAlign: 'center' }}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => navigate('/admin-panel/blog/comments', { state: { filterPending: true } })}
+                  >
+                    مشاهده همه نظرات ({pendingCount})
+                  </Button>
+                </Box>
+              )}
+            </Collapse>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       {showFilters && (

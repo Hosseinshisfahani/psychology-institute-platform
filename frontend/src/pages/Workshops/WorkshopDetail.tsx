@@ -90,9 +90,15 @@ interface Workshop {
 const WorkshopDetail: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [paymentType, setPaymentType] = useState('full_payment');
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewTitle, setReviewTitle] = useState('');
+  const [reviewContent, setReviewContent] = useState('');
+  const [instructorRating, setInstructorRating] = useState(5);
+  const [contentRating, setContentRating] = useState(5);
+  const [interactionRating, setInteractionRating] = useState(5);
 
   const { data: workshop, isLoading } = useQuery<Workshop>({
     queryKey: ['workshop', slug],
@@ -211,6 +217,85 @@ const WorkshopDetail: React.FC = () => {
     } else if (certificate?.id) {
       window.open(`/api/workshops/certificates/${certificate.id}/download/`, '_blank');
     }
+  };
+
+  // Fetch reviews
+  const { data: reviews = [], refetch: refetchReviews } = useQuery({
+    queryKey: ['workshop-reviews', slug],
+    queryFn: async () => {
+      const response = await axios.get(`/api/workshops/${slug}/reviews/`);
+      return response.data;
+    },
+    enabled: !!slug,
+  });
+
+  // Create review mutation
+  const createReviewMutation = useMutation({
+    mutationFn: async (data: {
+      rating: number;
+      title: string;
+      content: string;
+      instructor_rating: number;
+      content_rating: number;
+      interaction_rating: number;
+    }) => {
+      const response = await axios.post(`/api/workshops/${slug}/review/`, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      setReviewRating(5);
+      setReviewTitle('');
+      setReviewContent('');
+      setInstructorRating(5);
+      setContentRating(5);
+      setInteractionRating(5);
+      refetchReviews();
+      alert('نظر شما با موفقیت ثبت شد و پس از تایید نمایش داده خواهد شد.');
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.error || 'خطا در ثبت نظر');
+    },
+  });
+
+  const handleSubmitReview = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    if (!reviewTitle.trim() || !reviewContent.trim()) {
+      alert('لطفاً عنوان و متن نظر را وارد کنید');
+      return;
+    }
+    createReviewMutation.mutate({
+      rating: reviewRating,
+      title: reviewTitle,
+      content: reviewContent,
+      instructor_rating: instructorRating,
+      content_rating: contentRating,
+      interaction_rating: interactionRating,
+    });
+  };
+
+  const renderStarRating = (value: number, onChange: (value: number) => void, label: string) => {
+    return (
+      <div className="mb-3">
+        <label className="form-label">{label}</label>
+        <div className="d-flex align-items-center gap-2">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              type="button"
+              className="btn btn-link p-0 border-0"
+              onClick={() => onChange(star)}
+              style={{ fontSize: '1.5rem', color: star <= value ? '#ffc107' : '#ccc' }}
+            >
+              <i className="fas fa-star"></i>
+            </button>
+          ))}
+          <span className="text-muted ms-2">({value} از 5)</span>
+        </div>
+      </div>
+    );
   };
 
   const handleRegister = () => {
@@ -467,6 +552,147 @@ const WorkshopDetail: React.FC = () => {
                       )}
                     </Tab>
                   )}
+
+                  {/* Reviews Tab */}
+                  <Tab eventKey="reviews" title={`نظرات (${reviews?.length || 0})`}>
+                    <div className="py-3">
+                      {/* Review Form - Only for registered users */}
+                      {workshop.registration_status?.is_registered && workshop.registration_status?.status !== 'pending_payment' ? (
+                        <Card className="mb-4">
+                          <Card.Body>
+                            <h5 className="mb-3">ثبت نظر جدید</h5>
+                            <div className="mb-3">
+                              <label className="form-label">عنوان نظر</label>
+                              <input
+                                type="text"
+                                className="form-control"
+                                placeholder="عنوان نظر خود را وارد کنید..."
+                                value={reviewTitle}
+                                onChange={(e) => setReviewTitle(e.target.value)}
+                                disabled={createReviewMutation.isPending}
+                              />
+                            </div>
+                            {renderStarRating(reviewRating, setReviewRating, 'امتیاز کلی')}
+                            {renderStarRating(instructorRating, setInstructorRating, 'امتیاز مدرس')}
+                            {renderStarRating(contentRating, setContentRating, 'کیفیت محتوا')}
+                            {renderStarRating(interactionRating, setInteractionRating, 'تعامل و پشتیبانی')}
+                            <div className="mb-3">
+                              <label className="form-label">متن نظر</label>
+                              <textarea
+                                className="form-control"
+                                rows={5}
+                                placeholder="نظر خود را در مورد این کارگاه بنویسید..."
+                                value={reviewContent}
+                                onChange={(e) => setReviewContent(e.target.value)}
+                                disabled={createReviewMutation.isPending}
+                              />
+                            </div>
+                            <Button
+                              variant="primary"
+                              onClick={handleSubmitReview}
+                              disabled={createReviewMutation.isPending || !reviewTitle.trim() || !reviewContent.trim()}
+                            >
+                              {createReviewMutation.isPending ? (
+                                <>
+                                  <Spinner size="sm" className="me-2" />
+                                  در حال ارسال...
+                                </>
+                              ) : (
+                                <>
+                                  <i className="fas fa-paper-plane me-2"></i>
+                                  ارسال نظر
+                                </>
+                              )}
+                            </Button>
+                          </Card.Body>
+                        </Card>
+                      ) : (
+                        <Alert variant="info" className="mb-4">
+                          <i className="fas fa-info-circle me-2"></i>
+                          فقط شرکت‌کنندگان کارگاه می‌توانند نظر بدهند.
+                        </Alert>
+                      )}
+
+                      {/* Reviews List */}
+                      {reviews.length > 0 ? (
+                        <div>
+                          <h5 className="mb-3">نظرات کاربران ({reviews.length})</h5>
+                          {reviews.map((review: any) => (
+                            <Card key={review.id} className="mb-3">
+                              <Card.Body>
+                                <div className="d-flex justify-content-between align-items-start mb-2">
+                                  <div>
+                                    <strong>{review.user_name}</strong>
+                                    <div className="mb-2">
+                                      {[...Array(5)].map((_, i) => (
+                                        <i
+                                          key={i}
+                                          className={`fas fa-star ${i < review.rating ? 'text-warning' : 'text-muted'}`}
+                                        ></i>
+                                      ))}
+                                    </div>
+                                    {review.title && <h6 className="mb-2">{review.title}</h6>}
+                                    <small className="text-muted">
+                                      <i className="fas fa-clock me-1"></i>
+                                      {new Date(review.created_at).toLocaleDateString('fa-IR')}
+                                    </small>
+                                  </div>
+                                </div>
+                                <p className="mb-2" style={{ whiteSpace: 'pre-wrap' }}>
+                                  {review.content}
+                                </p>
+                                {(review.instructor_rating || review.content_rating || review.interaction_rating) && (
+                                  <div className="mt-3 p-2 bg-light rounded">
+                                    <small className="text-muted d-block mb-1">امتیازهای جزئی:</small>
+                                    {review.instructor_rating && (
+                                      <div className="small">
+                                        <span>مدرس: </span>
+                                        {[...Array(5)].map((_, i) => (
+                                          <i
+                                            key={i}
+                                            className={`fas fa-star ${i < review.instructor_rating ? 'text-warning' : 'text-muted'}`}
+                                            style={{ fontSize: '0.8rem' }}
+                                          ></i>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {review.content_rating && (
+                                      <div className="small">
+                                        <span>محتوا: </span>
+                                        {[...Array(5)].map((_, i) => (
+                                          <i
+                                            key={i}
+                                            className={`fas fa-star ${i < review.content_rating ? 'text-warning' : 'text-muted'}`}
+                                            style={{ fontSize: '0.8rem' }}
+                                          ></i>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {review.interaction_rating && (
+                                      <div className="small">
+                                        <span>تعامل: </span>
+                                        {[...Array(5)].map((_, i) => (
+                                          <i
+                                            key={i}
+                                            className={`fas fa-star ${i < review.interaction_rating ? 'text-warning' : 'text-muted'}`}
+                                            style={{ fontSize: '0.8rem' }}
+                                          ></i>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </Card.Body>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <Alert variant="info" className="text-center">
+                          هنوز نظری برای این کارگاه ثبت نشده است.
+                        </Alert>
+                      )}
+                    </div>
+                  </Tab>
                 </Tabs>
               </Card.Body>
             </Card>

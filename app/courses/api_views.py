@@ -5,8 +5,12 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Course, Lesson, Enrollment, LessonProgress, Coupon, CoursePurchase, CourseCategory
-from .serializers import CourseDetailSerializer, LessonProgressSerializer, EnrollmentSerializer, CourseListSerializer, CourseCategorySerializer, CourseDetailPublicSerializer
+from .models import Course, Lesson, Enrollment, LessonProgress, Coupon, CoursePurchase, CourseCategory, CourseLike, CourseComment
+from .serializers import (
+    CourseDetailSerializer, LessonProgressSerializer, EnrollmentSerializer, 
+    CourseListSerializer, CourseCategorySerializer, CourseDetailPublicSerializer,
+    CourseLikeSerializer, CourseCommentSerializer
+)
 from app.payment.models import Cart, CartItem
 
 class CourseLearnAPIView(generics.RetrieveAPIView):
@@ -372,3 +376,42 @@ class CourseDetailAPIView(generics.RetrieveAPIView):
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def toggle_course_like(request, course_slug):
+    """Toggle like for a course"""
+    course = get_object_or_404(Course, slug=course_slug, status='published')
+    like, created = CourseLike.objects.get_or_create(user=request.user, course=course)
+    
+    if not created:
+        like.delete()
+        liked = False
+    else:
+        liked = True
+    
+    # Update like count
+    course.like_count = CourseLike.objects.filter(course=course).count()
+    course.save(update_fields=['like_count'])
+    
+    return Response({
+        'liked': liked,
+        'like_count': course.like_count
+    })
+
+
+class CourseCommentListCreateView(generics.ListCreateAPIView):
+    """List and create comments for a course"""
+    serializer_class = CourseCommentSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    
+    def get_queryset(self):
+        course_slug = self.kwargs.get('course_slug')
+        course = get_object_or_404(Course, slug=course_slug, status='published')
+        return CourseComment.objects.filter(course=course, is_approved=True).order_by('-created_at')
+    
+    def perform_create(self, serializer):
+        course_slug = self.kwargs.get('course_slug')
+        course = get_object_or_404(Course, slug=course_slug, status='published')
+        serializer.save(author=self.request.user, course=course)

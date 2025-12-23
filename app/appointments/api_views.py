@@ -12,7 +12,7 @@ from decimal import Decimal
 from .models import (
     ClinicLocation, AppointmentType, TherapistSchedule, TherapistTimeOff,
     Appointment, AppointmentCancellation, AppointmentReschedule,
-    CancellationPolicy, AppointmentReminder
+    CancellationPolicy, AppointmentReminder, python_weekday_to_persian
 )
 from .serializers import (
     ClinicLocationSerializer, AppointmentTypeSerializer, TherapistScheduleSerializer,
@@ -382,7 +382,8 @@ class TherapistAvailabilityAPIView(APIView):
     
     def _get_available_slots(self, therapist, target_date, location_id=None):
         """Calculate available time slots for a therapist on a specific date"""
-        day_of_week = target_date.weekday()
+        # Convert Python weekday to Persian calendar
+        day_of_week = python_weekday_to_persian(target_date.weekday())
         slots = []
         
         # Get therapist's schedule for this day
@@ -533,7 +534,8 @@ def appointment_availability(request):
             
             try:
                 therapist = User.objects.get(id=therapist_id_int, user_type='therapist')
-                day_of_week = target_date.weekday()
+                # Convert Python weekday to Persian calendar
+                day_of_week = python_weekday_to_persian(target_date.weekday())
                 
                 # Check if therapist has schedule for this day
                 schedules = TherapistSchedule.objects.filter(

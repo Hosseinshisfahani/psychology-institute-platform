@@ -76,6 +76,7 @@ class Course(models.Model):
     enrollment_count = models.PositiveIntegerField(default=0, verbose_name='تعداد ثبت‌نام')
     rating = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(5)], verbose_name='امتیاز')
     review_count = models.PositiveIntegerField(default=0, verbose_name='تعداد نظر')
+    like_count = models.PositiveIntegerField(default=0, verbose_name='تعداد لایک')
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
@@ -345,3 +346,39 @@ class CoursePurchase(models.Model):
     
     def __str__(self):
         return f"{self.user.full_name} purchased {self.course.title}"
+
+
+class CourseLike(models.Model):
+    """Course likes"""
+    
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='likes', verbose_name='دوره')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='course_likes', verbose_name='کاربر')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    
+    class Meta:
+        verbose_name = _('لایک دوره')
+        verbose_name_plural = _('لایک‌های دوره')
+        unique_together = ['course', 'user']
+    
+    def __str__(self):
+        return f"{self.user.full_name} likes {self.course.title}"
+
+
+class CourseComment(models.Model):
+    """Comments on courses"""
+    
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='comments', verbose_name='دوره')
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='course_comments', verbose_name='نویسنده')
+    content = models.TextField(verbose_name='محتوای')
+    is_approved = models.BooleanField(default=False, verbose_name='تأیید شده')
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, blank=True, null=True, related_name='replies', verbose_name='نظر والد')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
+    
+    class Meta:
+        verbose_name = _('نظر دوره')
+        verbose_name_plural = _('نظرات دوره')
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Comment by {self.author.full_name} on {self.course.title}"

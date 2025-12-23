@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     Package, PackageCategory, PackagePurchase, PackageEnrollment,
-    PackageProgress, PackageReview, PackageCoupon
+    PackageProgress, PackageReview, PackageCoupon, PackageLike, PackageComment
 )
 from app.courses.models import Course, Enrollment
 from app.courses.serializers import CourseDetailSerializer
@@ -47,7 +47,7 @@ class PackageListSerializer(serializers.ModelSerializer):
             'status', 'price', 'discount_price', 'current_price',
             'discount_percentage', 'is_featured', 'total_courses',
             'total_hours', 'duration_months', 'thumbnail', 'rating',
-            'purchase_count', 'savings_amount', 'savings_percentage'
+            'purchase_count', 'like_count', 'savings_amount', 'savings_percentage'
         ]
 
 
@@ -73,7 +73,7 @@ class PackageDetailSerializer(serializers.ModelSerializer):
             'prerequisites', 'learning_objectives', 'thumbnail', 'intro_video',
             'courses', 'total_courses', 'total_hours', 'original_total_price',
             'savings_amount', 'savings_percentage', 'purchase_count', 'rating',
-            'review_count', 'published_at_persian', 'purchase_status'
+            'review_count', 'like_count', 'published_at_persian', 'purchase_status'
         ]
     
     def get_purchase_status(self, obj):
@@ -232,5 +232,38 @@ class PackageCouponSerializer(serializers.ModelSerializer):
     def get_valid_until_persian(self, obj):
         if obj.valid_until:
             return jdatetime.datetime.fromgregorian(datetime=obj.valid_until).strftime('%Y/%m/%d')
+        return None
+
+
+class PackageLikeSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.full_name', read_only=True)
+    
+    class Meta:
+        model = PackageLike
+        fields = ['id', 'user', 'user_name', 'package', 'created_at']
+        read_only_fields = ['user', 'created_at']
+
+
+class PackageCommentSerializer(serializers.ModelSerializer):
+    author_name = serializers.CharField(source='author.full_name', read_only=True)
+    author_email = serializers.CharField(source='author.email', read_only=True)
+    replies_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PackageComment
+        fields = [
+            'id', 'package', 'author', 'author_name', 'author_email',
+            'content', 'is_approved', 'parent', 'replies_count',
+            'created_at', 'created_at_persian', 'updated_at'
+        ]
+        read_only_fields = ['package', 'author', 'created_at', 'updated_at']
+    
+    def get_replies_count(self, obj):
+        return obj.replies.count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
 

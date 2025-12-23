@@ -89,19 +89,21 @@ const Header: React.FC<HeaderProps> = ({ user, isAuthenticated, onLogout }) => {
                   aria-expanded={isProfileDropdownOpen}
                 >
                   <div className="user-avatar">
-                    <img 
-                      src={user.profile_image || "/images/default-avatar.png"} 
-                      alt="User Avatar" 
-                      loading="lazy"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        const nextElement = e.currentTarget.nextElementSibling as HTMLElement;
-                        if (nextElement) {
-                          nextElement.style.display = 'flex';
-                        }
-                      }}
-                    />
-                    <div className="avatar-placeholder">
+                    {user.profile_image ? (
+                      <img 
+                        src={user.profile_image} 
+                        alt="User Avatar" 
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const nextElement = e.currentTarget.nextElementSibling as HTMLElement;
+                          if (nextElement) {
+                            nextElement.style.display = 'flex';
+                          }
+                        }}
+                      />
+                    ) : null}
+                    <div className="avatar-placeholder" style={{ display: user.profile_image ? 'none' : 'flex' }}>
                       <i className="fas fa-user"></i>
                     </div>
                   </div>
@@ -114,19 +116,21 @@ const Header: React.FC<HeaderProps> = ({ user, isAuthenticated, onLogout }) => {
                     <div className="dropdown-header">
                       <div className="dropdown-user-info">
                         <div className="dropdown-avatar">
-                          <img 
-                            src={user.profile_image || "/images/default-avatar.png"} 
-                            alt="User Avatar" 
-                            loading="lazy"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                              const nextElement = e.currentTarget.nextElementSibling as HTMLElement;
-                              if (nextElement) {
-                                nextElement.style.display = 'flex';
-                              }
-                            }}
-                          />
-                          <div className="avatar-placeholder">
+                          {user.profile_image ? (
+                            <img 
+                              src={user.profile_image} 
+                              alt="User Avatar" 
+                              loading="lazy"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const nextElement = e.currentTarget.nextElementSibling as HTMLElement;
+                                if (nextElement) {
+                                  nextElement.style.display = 'flex';
+                                }
+                              }}
+                            />
+                          ) : null}
+                          <div className="avatar-placeholder" style={{ display: user.profile_image ? 'none' : 'flex' }}>
                             <i className="fas fa-user"></i>
                           </div>
                         </div>

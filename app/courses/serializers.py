@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Course, Lesson, Enrollment, LessonProgress, CourseCategory, CourseVideo
+from .models import Course, Lesson, Enrollment, LessonProgress, CourseCategory, CourseVideo, CourseLike, CourseComment
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 import jdatetime
@@ -221,7 +221,7 @@ class CourseDetailPublicSerializer(serializers.ModelSerializer):
             'price', 'discount_price', 'current_price', 'discount_percentage',
             'is_free', 'difficulty', 'duration_hours', 'language', 'level',
             'instructor_name', 'category_name', 'category_slug',
-            'enrollment_count', 'rating', 'review_count',
+            'enrollment_count', 'rating', 'review_count', 'like_count',
             'prerequisites', 'learning_objectives',
             'created_at', 'created_at_persian', 'published_at',
             'videos', 'enrollment_status'
@@ -248,12 +248,30 @@ class CourseDetailPublicSerializer(serializers.ModelSerializer):
                     'status': enrollment.status,
                 }
             except Enrollment.DoesNotExist:
-                # Check if purchased
+                # Check if course was purchased directly
                 from .models import CoursePurchase
                 if CoursePurchase.objects.filter(user=request.user, course=obj).exists():
                     return {
                         'is_enrolled': True,
                         'is_purchased': True,
+                    }
+                # Check if course is included in any purchased package
+                try:
+                    from app.packages.models import PackagePurchase
+                    has_package_access = PackagePurchase.objects.filter(
+                        user=request.user,
+                        package__courses=obj,
+                        order__payment_status='completed',
+                        order__status='paid',
+                    ).exists()
+                except Exception:
+                    has_package_access = False
+                
+                if has_package_access:
+                    return {
+                        'is_enrolled': True,
+                        'is_purchased': True,
+                        'via_package': True,
                     }
                 return {'is_enrolled': False}
         return {'is_enrolled': False}
@@ -277,11 +295,44 @@ class CourseListSerializer(serializers.ModelSerializer):
             'price', 'discount_price', 'current_price', 'discount_percentage',
             'is_free', 'difficulty', 'duration_hours', 'language', 'level',
             'instructor_name', 'category_name', 'category_slug',
-            'enrollment_count', 'rating', 'review_count',
+            'enrollment_count', 'rating', 'review_count', 'like_count',
             'created_at', 'created_at_persian'
         ]
     
     def get_created_at_persian(self, obj):
         if obj.created_at:
             return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d')
+        return None
+
+
+class CourseLikeSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.full_name', read_only=True)
+    
+    class Meta:
+        model = CourseLike
+        fields = ['id', 'user', 'user_name', 'course', 'created_at']
+        read_only_fields = ['user', 'created_at']
+
+
+class CourseCommentSerializer(serializers.ModelSerializer):
+    author_name = serializers.CharField(source='author.full_name', read_only=True)
+    author_email = serializers.CharField(source='author.email', read_only=True)
+    replies_count = serializers.SerializerMethodField()
+    created_at_persian = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = CourseComment
+        fields = [
+            'id', 'course', 'author', 'author_name', 'author_email',
+            'content', 'is_approved', 'parent', 'replies_count',
+            'created_at', 'created_at_persian', 'updated_at'
+        ]
+        read_only_fields = ['course', 'author', 'created_at', 'updated_at']
+    
+    def get_replies_count(self, obj):
+        return obj.replies.count()
+    
+    def get_created_at_persian(self, obj):
+        if obj.created_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.created_at).strftime('%Y/%m/%d %H:%M')
         return None
