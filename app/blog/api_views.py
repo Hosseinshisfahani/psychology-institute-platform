@@ -28,7 +28,11 @@ class PostListView(generics.ListAPIView):
         try:
             queryset = Post.objects.filter(status='published').select_related('author', 'category').prefetch_related('tags')
             
-            # Search functionality
+            # Search functionality - support separate title and content search
+            search_title = self.request.query_params.get('search_title', None)
+            search_content = self.request.query_params.get('search_content', None)
+            
+            # Backward compatibility: if old 'search' parameter is used, search in both title and content
             search = self.request.query_params.get('search', None)
             if search:
                 queryset = queryset.filter(
@@ -36,6 +40,14 @@ class PostListView(generics.ListAPIView):
                     Q(content__icontains=search) | 
                     Q(excerpt__icontains=search)
                 )
+            
+            # Separate title search
+            if search_title:
+                queryset = queryset.filter(Q(title__icontains=search_title))
+            
+            # Separate content search
+            if search_content:
+                queryset = queryset.filter(Q(content__icontains=search_content))
             
             # Category filter
             category = self.request.query_params.get('category', None)

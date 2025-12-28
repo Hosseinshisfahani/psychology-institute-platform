@@ -87,12 +87,59 @@ class AppointmentListAPIView(generics.ListCreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        use_wallet = request.data.get('use_wallet', False)
+
         with transaction.atomic():
             appointment = serializer.save(client=request.user)
             deposit_payload = None
 
             if appointment.deposit_required and appointment.deposit_amount > Decimal('0'):
-                deposit_payload = self._initiate_deposit_payment(request.user, appointment, request=request)
+                # Check if user wants to use wallet
+                if use_wallet:
+                    from app.payment.models import Wallet
+                    wallet, _ = Wallet.objects.get_or_create(user=request.user)
+                    
+                    if wallet.balance >= appointment.deposit_amount:
+                        # Use wallet to pay deposit
+                        wallet.deduct_credit(
+                            amount=appointment.deposit_amount,
+                            transaction_type='purchase',
+                            reference_id=appointment.id,
+                            description=f'پرداخت ودیعه نوبت #{appointment.id}'
+                        )
+                        
+                        # Mark deposit as paid
+                        appointment.mark_deposit_paid()
+                        
+                        deposit_payload = {
+                            'required': False,
+                            'paid_with_wallet': True,
+                            'amount': str(appointment.deposit_amount),
+                            'wallet_balance_after': str(wallet.balance)
+                        }
+                    else:
+                        # Partial wallet payment - use available balance
+                        wallet_amount_used = wallet.balance
+                        remaining_amount = appointment.deposit_amount - wallet_amount_used
+                        
+                        if wallet_amount_used > Decimal('0'):
+                            wallet.deduct_credit(
+                                amount=wallet_amount_used,
+                                transaction_type='purchase',
+                                reference_id=appointment.id,
+                                description=f'پرداخت جزئی ودیعه نوبت #{appointment.id}'
+                            )
+                        
+                        # Create order for remaining amount
+                        deposit_payload = self._initiate_deposit_payment(
+                            request.user, 
+                            appointment, 
+                            request=request,
+                            remaining_amount=remaining_amount,
+                            wallet_amount_used=wallet_amount_used
+                        )
+                else:
+                    deposit_payload = self._initiate_deposit_payment(request.user, appointment, request=request)
 
         output_serializer = AppointmentSerializer(
             appointment,
@@ -106,10 +153,10 @@ class AppointmentListAPIView(generics.ListCreateAPIView):
         headers = self.get_success_headers(output_serializer.data)
         return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
 
-    def _initiate_deposit_payment(self, user, appointment, request=None):
+    def _initiate_deposit_payment(self, user, appointment, request=None, remaining_amount=None, wallet_amount_used=None):
         from app.payment.api_views import get_frontend_url
         
-        deposit_amount = appointment.deposit_amount
+        deposit_amount = remaining_amount if remaining_amount is not None else appointment.deposit_amount
 
         if deposit_amount <= Decimal('0'):
             raise serializers.ValidationError({'deposit': 'مبلغ ودیعه نامعتبر است'})
@@ -173,7 +220,7 @@ class AppointmentListAPIView(generics.ListCreateAPIView):
         appointment.deposit_payment = payment
         appointment.save(update_fields=['deposit_order', 'deposit_payment'])
 
-        return {
+        result = {
             'required': True,
             'amount': str(deposit_amount),
             'currency': 'IRT',
@@ -184,6 +231,12 @@ class AppointmentListAPIView(generics.ListCreateAPIView):
             'payment_url': payment_url,
             'expires_at': expires_at
         }
+        
+        if wallet_amount_used and wallet_amount_used > Decimal('0'):
+            result['wallet_used'] = str(wallet_amount_used)
+            result['remaining_amount'] = str(deposit_amount)
+        
+        return result
 
 
 class AppointmentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
@@ -281,10 +334,31 @@ def cancel_appointment(request, appointment_id):
                     cancellation.refund_amount = Decimal('0.00')
                     cancellation.policy_applied = 'deposit_forfeit_24h'
                     cancellation.save(update_fields=['cancellation_fee', 'refund_amount', 'policy_applied'])
+                else:
+                    # Calculate refund amount (outside 24h window)
+                    if appointment.deposit_paid and appointment.deposit_amount > Decimal('0'):
+                        # Full refund if cancelled outside 24h window
+                        cancellation.refund_amount = appointment.deposit_amount
+                        cancellation.cancellation_fee = Decimal('0.00')
+                        cancellation.policy_applied = 'full_refund_outside_24h'
+                        cancellation.save(update_fields=['refund_amount', 'cancellation_fee', 'policy_applied'])
+                        
+                        # Add credits to user's wallet
+                        if cancellation.refund_amount > Decimal('0'):
+                            from app.payment.models import Wallet
+                            wallet, _ = Wallet.objects.get_or_create(user=appointment.client)
+                            wallet.add_credit(
+                                amount=cancellation.refund_amount,
+                                transaction_type='refund',
+                                reference_id=appointment.id,
+                                description=f'بازگشت وجه نوبت #{appointment.id} - {appointment.appointment_type.name}'
+                            )
                 
                 return Response({
                     'message': 'نوبت با موفقیت لغو شد',
                     'deposit_forfeit': bool(within_24_hours and appointment.deposit_paid),
+                    'refund_added_to_wallet': bool(not within_24_hours and cancellation.refund_amount > Decimal('0')),
+                    'refund_amount': str(cancellation.refund_amount) if cancellation.refund_amount > Decimal('0') else None,
                     'warning': 'در صورت کنسل کردن نوبت در این بازه زمانی، ودیعه شما بازگردانده نخواهد شد.' if within_24_hours else None
                 }, status=status.HTTP_201_CREATED)
         except Exception as e:

@@ -1,16 +1,25 @@
 # Import necessary modules
 import os
 from pathlib import Path
-from decouple import Csv, AutoConfig
+from decouple import Csv, Config, RepositoryEnv
 
 #some necessary variables
 BASE_DIR = Path(__file__).resolve().parent.parent
+ENV_DIR = BASE_DIR / 'dependencies'
 
-ENV_FILE_PATH = BASE_DIR / 'dependencies' / '.env'
-config = AutoConfig(search_path=str(BASE_DIR / 'dependencies'))
+# Choose which .env file to use
+if os.getenv('DJANGO_USE_DEV_ENV') == 'true':
+    ENV_FILE = 'dev.env'  # Development mode
+else:
+    ENV_FILE = '.env'  # Production mode
 
-SECRET_KEY = config('SECRET_KEY') 
+# Create config with chosen file using RepositoryEnv
+ENV_FILE_PATH = ENV_DIR / ENV_FILE
+repository = RepositoryEnv(str(ENV_FILE_PATH))
+config = Config(repository)
 
+# Read settings from the chosen file
+SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = [
@@ -18,6 +27,7 @@ ALLOWED_HOSTS = [
     'www.sarmadclinic.ir',
     'localhost',
     '127.0.0.1',
+    '185.8.175.241',
 ]
 
 
@@ -219,6 +229,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:3001",
     "http://127.0.0.1:3001",
+    "http://localhost:3010",
+    "http://127.0.0.1:3010",
     "http://185.8.175.241:3000",
     "http://sarmadclinic.ir",
     "https://sarmadclinic.ir",
@@ -229,7 +241,7 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 # CORS_ALLOW_ALL_ORIGINS
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only in development
+CORS_ALLOW_ALL_ORIGINS = DEBUG  
 
 # CSRF_TRUSTED_ORIGINS
 CSRF_TRUSTED_ORIGINS = [
@@ -237,6 +249,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:3000',
     'http://localhost:3001',
     'http://127.0.0.1:3001',
+    'http://localhost:3010',  
+    'http://127.0.0.1:3010',
     'http://185.8.175.241',
     'http://185.8.175.241:3000',
     'http://185.8.175.241:8000',
@@ -255,14 +269,21 @@ USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # For HTTPS behind reverse proxy
 FORCE_SCRIPT_NAME = ''  # Empty string means use relative URLs
 
-# Security settings for production
-if not DEBUG:
+DEVELOPMENT_MODE = config('DEVELOPMENT_MODE', default=DEBUG, cast=bool)
+
+# Security settings for production (disabled in development mode)
+if not DEBUG and not DEVELOPMENT_MODE:
     SECURE_SSL_REDIRECT = True
     SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+else:
+    # Disable SSL redirect in development
+    SECURE_SSL_REDIRECT = False
+    SECURE_HSTS_SECONDS = 0
+
+SESSION_COOKIE_SECURE = not DEVELOPMENT_MODE  # False in development, True in production
+CSRF_COOKIE_SECURE = not DEVELOPMENT_MODE  # False in development, True in production
 
 # CELERY_BROKER_URL and CELERY_RESULT_BACKEND and CELERY_ACCEPT_CONTENT and CELERY_TASK_SERIALIZER and CELERY_RESULT_SERIALIZER and CELERY_TIMEZONE
 CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
@@ -327,10 +348,8 @@ JALALI_DATE_DEFAULT_DATETIME_FORMAT = '%Y/%m/%d %H:%M:%S'
 JALALI_DATE_DEFAULT_DATE_FORMAT = '%Y/%m/%d'
 JALALI_DATE_DEFAULT_TIME_FORMAT = '%H:%M:%S'
 
-# ZARINPAL_MERCHANT_ID and ZARINPAL_SANDBOX
-# Default to test/sandbox merchant ID - update to production ID when deploying
-ZARINPAL_MERCHANT_ID = config('ZARINPAL_MERCHANT_ID', default='512a778d-3908-4299-948a-fec4245c48ef')
-ZARINPAL_SANDBOX = config('ZARINPAL_SANDBOX', default=True, cast=bool)
+ZARINPAL_MERCHANT_ID = config('ZARINPAL_MERCHANT_ID')
+ZARINPAL_SANDBOX = config('ZARINPAL_SANDBOX', cast=bool)
 
 # SITE_URL and FRONTEND_URL and ZARINPAL_CALLBACK_URL
 SITE_URL = config('SITE_URL', default='https://sarmadclinic.ir')

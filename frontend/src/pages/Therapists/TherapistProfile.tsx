@@ -121,10 +121,6 @@ const TherapistProfile: React.FC = () => {
                   <i className="fas fa-calendar-check me-2"></i>
                   رزرو نوبت
                 </Link>
-                <Button variant="outline-light" size="lg" disabled={!therapist.is_available}>
-                  <i className="fas fa-phone me-2"></i>
-                  تماس مستقیم
-                </Button>
               </div>
             </Col>
             <Col lg={4} className="text-center">
@@ -348,11 +344,6 @@ const TherapistProfile: React.FC = () => {
                       <i className="fas fa-calendar-check me-2"></i>
                       رزرو نوبت
                     </Link>
-                    
-                    <Button variant="outline-primary" size="lg" disabled={!therapist.is_available}>
-                      <i className="fas fa-phone me-2"></i>
-                      تماس مستقیم
-                    </Button>
                   </div>
 
                   {!therapist.is_available && (

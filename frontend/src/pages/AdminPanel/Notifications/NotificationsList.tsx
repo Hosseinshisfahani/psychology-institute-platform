@@ -42,7 +42,7 @@ import { useSnackbar } from 'notistack';
 import { Helmet } from 'react-helmet-async';
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://sarmadclinic.ir';
 
 interface Notification {
   id: number;
@@ -100,7 +100,7 @@ const NotificationsList: React.FC = () => {
         params.append('is_read', 'true');
       }
 
-      const response = await axios.get(`${API_BASE_URL}/api/admin/notifications/?${params}`, {
+      const response = await axios.get(`/api/admin/notifications/?${params}`, {
         withCredentials: true,
         headers: csrfToken ? { 'X-CSRFToken': csrfToken } : {},
       });
@@ -127,7 +127,7 @@ const NotificationsList: React.FC = () => {
     mutationFn: async (notificationId: number) => {
       const csrfToken = getCsrfToken();
       await axios.patch(
-        `${API_BASE_URL}/api/admin/notifications/${notificationId}/read/`,
+        `/api/admin/notifications/${notificationId}/read/`,
         {},
         {
           withCredentials: true,
@@ -150,7 +150,7 @@ const NotificationsList: React.FC = () => {
     mutationFn: async (notificationId: number) => {
       const csrfToken = getCsrfToken();
       await axios.patch(
-        `${API_BASE_URL}/api/admin/notifications/${notificationId}/unread/`,
+        `/api/admin/notifications/${notificationId}/unread/`,
         {},
         {
           withCredentials: true,
@@ -173,7 +173,7 @@ const NotificationsList: React.FC = () => {
     mutationFn: async () => {
       const csrfToken = getCsrfToken();
       await axios.post(
-        `${API_BASE_URL}/api/admin/notifications/mark-all-read/`,
+        `/api/admin/notifications/mark-all-read/`,
         {},
         {
           withCredentials: true,
@@ -196,7 +196,7 @@ const NotificationsList: React.FC = () => {
   const deleteMutation = useMutation({
     mutationFn: async (notificationId: number) => {
       const csrfToken = getCsrfToken();
-      await axios.delete(`${API_BASE_URL}/api/admin/notifications/${notificationId}/delete/`, {
+      await axios.delete(`/api/admin/notifications/${notificationId}/delete/`, {
         withCredentials: true,
         headers: csrfToken ? { 'X-CSRFToken': csrfToken } : {},
       });

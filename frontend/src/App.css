@@ -366,6 +366,336 @@ p {
   font-weight: 400;
 }
 
+/* Blog Post Content Styling */
+.post-content {
+  font-family: 'Vazir', Arial, sans-serif;
+  font-size: 1.1rem;
+  line-height: 2;
+  color: #333;
+  direction: rtl;
+  text-align: right;
+  max-width: 100%;
+}
+
+/* Paragraph Spacing */
+.post-content p {
+  margin-bottom: 1.5rem;
+  margin-top: 0;
+}
+
+.post-content p:first-child {
+  margin-top: 0;
+}
+
+.post-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* Heading Hierarchy */
+.post-content h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  line-height: 1.3;
+  color: #1a1a1a;
+  font-family: 'Vazir', Arial, sans-serif;
+}
+
+.post-content h2 {
+  font-size: 2rem;
+  font-weight: 600;
+  margin-top: 1.75rem;
+  margin-bottom: 0.875rem;
+  line-height: 1.4;
+  color: #1a1a1a;
+  font-family: 'Vazir', Arial, sans-serif;
+}
+
+.post-content h3 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
+  color: #1a1a1a;
+  font-family: 'Vazir', Arial, sans-serif;
+}
+
+.post-content h4 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 1.25rem;
+  margin-bottom: 0.625rem;
+  line-height: 1.5;
+  color: #1a1a1a;
+  font-family: 'Vazir', Arial, sans-serif;
+}
+
+.post-content h5 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+  color: #1a1a1a;
+  font-family: 'Vazir', Arial, sans-serif;
+}
+
+.post-content h6 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 0.875rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+  color: #1a1a1a;
+  font-family: 'Vazir', Arial, sans-serif;
+}
+
+/* Lists */
+.post-content ul,
+.post-content ol {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  padding-right: 2rem;
+  padding-left: 0;
+}
+
+.post-content li {
+  margin-bottom: 0.5rem;
+  line-height: 1.8;
+}
+
+.post-content ul ul,
+.post-content ol ol,
+.post-content ul ol,
+.post-content ol ul {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-right: 1.5rem;
+}
+
+.post-content ul {
+  list-style-type: disc;
+}
+
+.post-content ol {
+  list-style-type: decimal;
+}
+
+/* Links */
+.post-content a {
+  color: #2c5aa0;
+  text-decoration: underline;
+  transition: color 0.3s ease;
+}
+
+.post-content a:hover {
+  color: #1e3f73;
+  text-decoration: none;
+}
+
+.post-content a:visited {
+  color: #5a7ba8;
+}
+
+/* Blockquotes */
+.post-content blockquote {
+  border-right: 4px solid #2c5aa0;
+  padding-right: 1.5rem;
+  padding-left: 0;
+  margin: 1.5rem 0;
+  background-color: #f8f9fa;
+  font-style: italic;
+  color: #555;
+  border-radius: 4px;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.post-content blockquote p {
+  margin-bottom: 0.5rem;
+}
+
+.post-content blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* Code Blocks */
+.post-content pre {
+  background-color: #f4f4f4;
+  padding: 1rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 1.5rem 0;
+  direction: ltr;
+  text-align: left;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.post-content code {
+  background-color: #f4f4f4;
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9em;
+}
+
+.post-content pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+/* Images */
+.post-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 1.5rem 0;
+  display: block;
+}
+
+.post-content figure {
+  margin: 1.5rem 0;
+  text-align: center;
+}
+
+.post-content figcaption {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: #666;
+  font-style: italic;
+}
+
+/* Tables */
+.post-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  direction: rtl;
+}
+
+.post-content table th,
+.post-content table td {
+  padding: 0.75rem;
+  border: 1px solid #dee2e6;
+  text-align: right;
+}
+
+.post-content table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+}
+
+.post-content table tr:nth-child(even) {
+  background-color: #f8f9fa;
+}
+
+/* Horizontal Rules */
+.post-content hr {
+  border: none;
+  border-top: 2px solid #dee2e6;
+  margin: 2rem 0;
+}
+
+/* Strong and Emphasis */
+.post-content strong {
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.post-content em {
+  font-style: italic;
+}
+
+/* Responsive Design for Post Content */
+@media (max-width: 768px) {
+  .post-content {
+    font-size: 1rem;
+    line-height: 1.8;
+  }
+
+  .post-content h1 {
+    font-size: 2rem;
+    margin-top: 1.5rem;
+    margin-bottom: 0.875rem;
+  }
+
+  .post-content h2 {
+    font-size: 1.75rem;
+    margin-top: 1.25rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .post-content h3 {
+    font-size: 1.5rem;
+    margin-top: 1rem;
+    margin-bottom: 0.625rem;
+  }
+
+  .post-content h4 {
+    font-size: 1.25rem;
+    margin-top: 0.875rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .post-content h5 {
+    font-size: 1.1rem;
+    margin-top: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .post-content h6 {
+    font-size: 1rem;
+    margin-top: 0.625rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .post-content p {
+    margin-bottom: 1.25rem;
+  }
+
+  .post-content ul,
+  .post-content ol {
+    padding-right: 1.5rem;
+  }
+
+  .post-content blockquote {
+    padding-right: 1rem;
+    margin: 1.25rem 0;
+  }
+}
+
+@media (max-width: 576px) {
+  .post-content {
+    font-size: 0.95rem;
+    line-height: 1.75;
+  }
+
+  .post-content h1 {
+    font-size: 1.75rem;
+  }
+
+  .post-content h2 {
+    font-size: 1.5rem;
+  }
+
+  .post-content h3 {
+    font-size: 1.25rem;
+  }
+
+  .post-content p {
+    margin-bottom: 1rem;
+  }
+
+  .post-content blockquote {
+    padding-right: 0.875rem;
+    margin: 1rem 0;
+  }
+}
+
 /* Test Specific Styles */
 .test-question {
   font-family: var(--font-primary);

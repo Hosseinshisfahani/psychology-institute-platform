@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Cart, CartItem, Order, OrderItem, Payment, PaymentMethod
+from .models import Cart, CartItem, Order, OrderItem, Payment, PaymentMethod, Wallet, WalletTransaction
 
 
 class PaymentMethodSerializer(serializers.ModelSerializer):
@@ -104,4 +104,28 @@ class ProcessPaymentSerializer(serializers.Serializer):
     payment_method = serializers.CharField(required=True)
     coupon_code = serializers.CharField(max_length=50, required=False, allow_blank=True)
     order_id = serializers.IntegerField(required=False)
+    use_wallet = serializers.BooleanField(default=False, required=False)
+
+
+class WalletSerializer(serializers.ModelSerializer):
+    """Serializer for wallet balance"""
+    
+    class Meta:
+        model = Wallet
+        fields = ['id', 'balance', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'balance', 'created_at', 'updated_at']
+
+
+class WalletTransactionSerializer(serializers.ModelSerializer):
+    """Serializer for wallet transactions"""
+    
+    transaction_type_display = serializers.CharField(source='get_transaction_type_display', read_only=True)
+    
+    class Meta:
+        model = WalletTransaction
+        fields = [
+            'id', 'transaction_type', 'transaction_type_display', 'amount', 
+            'balance_after', 'reference_id', 'description', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
 

@@ -234,7 +234,7 @@ const AboutFounder: React.FC = () => {
             <Col lg={6} className="mb-4 mb-lg-0">
               <div className="content-image-wrapper">
                 <img 
-                  src={getImagePath('IMG_20251002_163910_364.jpg')}
+                  src={getImagePath('2_20250125_115350_0001.png')}
                   onError={handleImageError}
                   alt="دکتر سید مجتبی امامی دوست - تجربه و تخصص" 
                   className="content-image"
@@ -263,7 +263,7 @@ const AboutFounder: React.FC = () => {
                   <Col lg={4} className="text-center">
                     <div className="vision-image-wrapper">
                       <img 
-                        src={getImagePath('IMG_20251002_163910_364.jpg')}
+                        src={getImagePath('8_20250125_115351_0007.png')}
                         onError={handleImageError}
                         alt="رویکرد حرفه‌ای دکتر امامی دوست" 
                         className="vision-image"
@@ -300,6 +300,39 @@ const AboutFounder: React.FC = () => {
                   src={getImagePath('IMG_20251002_163910_364.jpg')}
                   onError={handleImageError}
                   alt="دکتر سید مجتبی امامی دوست - تخصص و تجربه" 
+                  className="gallery-image"
+                  loading="lazy"
+                />
+              </div>
+            </Col>
+            <Col md={4}>
+              <div className="gallery-image-wrapper">
+                <img 
+                  src={getImagePath('2_20250125_115350_0001.png')}
+                  onError={handleImageError}
+                  alt="دکتر سید مجتبی امامی دوست - فعالیت‌های آموزشی" 
+                  className="gallery-image"
+                  loading="lazy"
+                />
+              </div>
+            </Col>
+            <Col md={4}>
+              <div className="gallery-image-wrapper">
+                <img 
+                  src={getImagePath('3_20250125_115351_0002.png')}
+                  onError={handleImageError}
+                  alt="دکتر سید مجتبی امامی دوست - تجربه و تخصص" 
+                  className="gallery-image"
+                  loading="lazy"
+                />
+              </div>
+            </Col>
+            <Col md={4}>
+              <div className="gallery-image-wrapper">
+                <img 
+                  src={getImagePath('8_20250125_115351_0007.png')}
+                  onError={handleImageError}
+                  alt="دکتر سید مجتبی امامی دوست - رویکرد حرفه‌ای" 
                   className="gallery-image"
                   loading="lazy"
                 />
@@ -463,6 +496,7 @@ const AboutFounder: React.FC = () => {
           height: auto;
           display: block;
           object-fit: cover;
+          object-position: center 30%;
           border-radius: 15px;
           transition: transform 0.5s ease;
         }
@@ -506,6 +540,7 @@ const AboutFounder: React.FC = () => {
           height: auto;
           max-height: 500px;
           object-fit: cover;
+          object-position: center 30%;
           border-radius: 15px;
           box-shadow: 0 10px 30px rgba(0,0,0,0.15);
           transition: transform 0.3s ease, box-shadow 0.3s ease;

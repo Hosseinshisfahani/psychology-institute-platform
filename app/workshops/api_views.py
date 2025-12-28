@@ -32,6 +32,7 @@ class WorkshopListAPIView(generics.ListAPIView):
     """List all published workshops"""
     serializer_class = WorkshopListSerializer
     permission_classes = [permissions.AllowAny]
+    pagination_class = None
     
     def get_queryset(self):
         queryset = Workshop.objects.filter(status__in=['published', 'registration_open'])
@@ -52,6 +53,38 @@ class WorkshopListAPIView(generics.ListAPIView):
             queryset = queryset.filter(payment_type=payment_type)
         
         return queryset.select_related('category', 'instructor').order_by('-created_at')
+    
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.get_queryset()
+            
+            # Handle limit parameter
+            limit = request.query_params.get('limit')
+            if limit:
+                try:
+                    limit = int(limit)
+                    workshops = queryset[:limit]
+                    serializer = self.get_serializer(workshops, many=True)
+                    return Response({
+                        'results': serializer.data,
+                        'count': len(serializer.data)
+                    })
+                except ValueError:
+                    pass
+            
+            # Return all results if no limit
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({
+                'results': serializer.data,
+                'count': len(serializer.data)
+            })
+        except Exception as e:
+            logger.error(f"Error in WorkshopListAPIView: {str(e)}", exc_info=True)
+            return Response({
+                'error': 'An error occurred while fetching workshops',
+                'results': [],
+                'count': 0
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class WorkshopDetailAPIView(generics.RetrieveAPIView):

@@ -11,11 +11,11 @@ from django.conf import settings
 from decimal import Decimal
 from urllib.parse import urlencode
 
-from .models import Cart, CartItem, Order, OrderItem, Payment, PaymentMethod
+from .models import Cart, CartItem, Order, OrderItem, Payment, PaymentMethod, Wallet, WalletTransaction
 from .serializers import (
     CartSerializer, CartItemSerializer, OrderSerializer, 
     PaymentSerializer, PaymentMethodSerializer, CreateOrderSerializer,
-    ProcessPaymentSerializer
+    ProcessPaymentSerializer, WalletSerializer, WalletTransactionSerializer
 )
 from .zarinpal import ZarinpalPayment
 
@@ -332,12 +332,21 @@ def process_payment(request):
     payment_method = serializer.validated_data.get('payment_method')
     coupon_code = serializer.validated_data.get('coupon_code', '')
     order_id = serializer.validated_data.get('order_id')
+    use_wallet = serializer.validated_data.get('use_wallet', False)
     
     try:
         with transaction.atomic():
+            wallet_amount_used = Decimal('0')
+            
             # Get or create order
             if order_id:
                 order = get_object_or_404(Order, id=order_id, user=request.user)
+                # Calculate wallet usage for existing order
+                if use_wallet:
+                    wallet, _ = Wallet.objects.get_or_create(user=request.user)
+                    wallet_amount_used = min(wallet.balance, order.total_amount)
+                    order.total_amount -= wallet_amount_used
+                    order.save(update_fields=['total_amount'])
             else:
                 # Create order from cart
                 cart = get_object_or_404(Cart, user=request.user)
@@ -361,6 +370,12 @@ def process_payment(request):
                 
                 tax_amount = Decimal('0')  # TODO: Calculate tax if needed
                 total_amount = max(Decimal('0'), subtotal - discount_amount + tax_amount)
+                
+                # Handle wallet payment if requested
+                if use_wallet:
+                    wallet, _ = Wallet.objects.get_or_create(user=request.user)
+                    wallet_amount_used = min(wallet.balance, total_amount)
+                    total_amount -= wallet_amount_used
                 
                 # Create order
                 order = Order.objects.create(
@@ -414,7 +429,34 @@ def process_payment(request):
                         metadata=metadata
                     )
             
-            # Handle free orders (100% discount applied)
+            # Handle wallet payment if used
+            if wallet_amount_used > Decimal('0'):
+                wallet, _ = Wallet.objects.get_or_create(user=request.user)
+                wallet.deduct_credit(
+                    amount=wallet_amount_used,
+                    transaction_type='purchase',
+                    reference_id=order.id,
+                    description=f'پرداخت سفارش {order.order_number}'
+                )
+                
+                # Create payment record for wallet
+                wallet_payment_method, _ = PaymentMethod.objects.get_or_create(
+                    payment_type='wallet',
+                    defaults={
+                        'name': 'کیف پول',
+                        'is_active': True,
+                    },
+                )
+                
+                Payment.objects.create(
+                    order=order,
+                    payment_method=wallet_payment_method,
+                    amount=wallet_amount_used,
+                    status='completed',
+                    completed_at=timezone.now()
+                )
+            
+            # Handle free orders (100% discount applied) or fully paid with wallet
             if order.total_amount == 0:
                 from django.utils import timezone
                 
@@ -509,7 +551,61 @@ def process_payment(request):
                     'success': True,
                     'message': 'سفارش شما با موفقیت ثبت شد',
                     'order_id': order.id,
-                    'free_order': True
+                    'free_order': True,
+                    'wallet_used': float(wallet_amount_used) if wallet_amount_used > 0 else 0
+                })
+            
+            # If order is fully paid with wallet, return success
+            if order.total_amount == 0 and wallet_amount_used > Decimal('0'):
+                order.payment_status = 'completed'
+                order.status = 'paid'
+                order.paid_at = timezone.now()
+                order.save()
+                
+                # Process the purchase (enroll in courses/packages)
+                from app.courses.models import Course, Enrollment
+                from app.packages.models import Package, PackagePurchase
+                
+                for order_item in order.items.all():
+                    if order_item.item_type == 'course':
+                        try:
+                            course = Course.objects.get(id=order_item.item_id)
+                            Enrollment.objects.get_or_create(
+                                user=request.user,
+                                course=course,
+                                defaults={
+                                    'status': 'active',
+                                    'amount_paid': wallet_amount_used if order_item.total_price <= wallet_amount_used else Decimal('0'),
+                                    'discount_amount': order_item.total_price
+                                }
+                            )
+                        except Course.DoesNotExist:
+                            pass
+                    
+                    elif order_item.item_type == 'package':
+                        try:
+                            package = Package.objects.get(id=order_item.item_id)
+                            PackagePurchase.objects.get_or_create(
+                                user=request.user,
+                                package=package,
+                                defaults={
+                                    'amount_paid': wallet_amount_used if order_item.total_price <= wallet_amount_used else Decimal('0'),
+                                    'discount_amount': order_item.total_price
+                                }
+                            )
+                        except Package.DoesNotExist:
+                            pass
+                
+                # Clear cart
+                if not order_id and 'cart' in locals():
+                    cart.items.all().delete()
+                
+                return Response({
+                    'success': True,
+                    'message': 'سفارش شما با موفقیت ثبت شد',
+                    'order_id': order.id,
+                    'wallet_used': float(wallet_amount_used),
+                    'fully_paid_with_wallet': True
                 })
             
             # Get payment method
@@ -583,7 +679,9 @@ def process_payment(request):
                         'order_id': order.id,
                         'payment_id': payment_result['payment_id'],
                         'expires_at': payment_result.get('expires_at'),
-                        'existing_payment': False
+                        'existing_payment': False,
+                        'wallet_used': float(wallet_amount_used) if wallet_amount_used > 0 else 0,
+                        'remaining_amount': float(order.total_amount)
                     })
                 else:
                     return Response(
@@ -1035,4 +1133,103 @@ class OrderDetailAPIView(generics.RetrieveAPIView):
         return Order.objects.filter(user=self.request.user).select_related(
             'user', 'payment_method'
         ).prefetch_related('items', 'payments')
+
+
+class WalletBalanceAPIView(APIView):
+    """Get current wallet balance"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        wallet, created = Wallet.objects.get_or_create(user=request.user)
+        serializer = WalletSerializer(wallet)
+        return Response(serializer.data)
+
+
+class WalletTransactionsAPIView(generics.ListAPIView):
+    """Get wallet transaction history"""
+    serializer_class = WalletTransactionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        wallet, _ = Wallet.objects.get_or_create(user=self.request.user)
+        queryset = WalletTransaction.objects.filter(wallet=wallet)
+        
+        # Optional filtering by transaction type
+        transaction_type = self.request.query_params.get('transaction_type')
+        if transaction_type:
+            queryset = queryset.filter(transaction_type=transaction_type)
+        
+        return queryset
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def use_wallet_credits(request):
+    """Use wallet credits for a purchase"""
+    amount = request.data.get('amount')
+    order_id = request.data.get('order_id')
+    
+    if not amount:
+        return Response(
+            {'error': 'مبلغ الزامی است'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        amount = Decimal(str(amount))
+        if amount <= 0:
+            return Response(
+                {'error': 'مبلغ باید بیشتر از صفر باشد'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    except (ValueError, TypeError):
+        return Response(
+            {'error': 'مبلغ نامعتبر است'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        with transaction.atomic():
+            wallet, _ = Wallet.objects.get_or_create(user=request.user)
+            
+            if amount > wallet.balance:
+                return Response(
+                    {'error': 'موجودی کافی نیست', 'available_balance': str(wallet.balance)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Deduct from wallet
+            description = f'استفاده از اعتبار برای سفارش'
+            if order_id:
+                try:
+                    order = Order.objects.get(id=order_id, user=request.user)
+                    description = f'استفاده از اعتبار برای سفارش {order.order_number}'
+                except Order.DoesNotExist:
+                    pass
+            
+            wallet.deduct_credit(
+                amount=amount,
+                transaction_type='purchase',
+                reference_id=order_id,
+                description=description
+            )
+            
+            serializer = WalletSerializer(wallet)
+            return Response({
+                'success': True,
+                'message': 'اعتبار با موفقیت استفاده شد',
+                'amount_used': str(amount),
+                'remaining_balance': str(wallet.balance),
+                'wallet': serializer.data
+            })
+    except ValueError as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'خطا در استفاده از اعتبار: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 

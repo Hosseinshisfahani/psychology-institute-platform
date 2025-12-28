@@ -16,18 +16,32 @@ def upload_file(request):
     """
     Upload a file and return the URL
     """
+    # Debug: Log request details
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Upload request - FILES keys: {list(request.FILES.keys())}, POST keys: {list(request.POST.keys())}")
+    
     if 'file' not in request.FILES:
+        logger.warning("No file in request.FILES")
         return Response({
-            'error': 'No file provided'
+            'error': 'No file provided',
+            'debug': {
+                'files_keys': list(request.FILES.keys()),
+                'post_keys': list(request.POST.keys()),
+            }
         }, status=status.HTTP_400_BAD_REQUEST)
     
     file = request.FILES['file']
+    logger.info(f"File received - name: {file.name}, size: {file.size}, content_type: {file.content_type}")
     
     # Validate file type
     allowed_types = ['image/jpeg', 'image/png', 'image/webp']
     if file.content_type not in allowed_types:
+        logger.warning(f"Invalid file type: {file.content_type}")
         return Response({
-            'error': 'File type not supported. Please use JPG, PNG, or WebP format.'
+            'error': 'File type not supported. Please use JPG, PNG, or WebP format.',
+            'received_type': file.content_type,
+            'allowed_types': allowed_types
         }, status=status.HTTP_400_BAD_REQUEST)
     
     # Validate file size (5MB limit)

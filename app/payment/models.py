@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from decimal import Decimal
@@ -234,3 +234,125 @@ class InstallmentSchedule(models.Model):
     def is_completed(self):
         """Check if all installments are paid"""
         return self.current_installment >= self.total_installments
+
+
+class Wallet(models.Model):
+    """User credit wallet for storing refund credits"""
+    
+    user = models.OneToOneField(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='wallet',
+        verbose_name='کاربر'
+    )
+    balance = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        verbose_name='موجودی'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
+    
+    class Meta:
+        verbose_name = _('کیف پول')
+        verbose_name_plural = _('کیف پول‌ها')
+        ordering = ['-updated_at']
+    
+    def __str__(self):
+        return f"Wallet for {self.user.full_name} - {self.balance} تومان"
+    
+    def add_credit(self, amount, transaction_type='refund', reference_id=None, description=''):
+        """Add credit to wallet and create transaction record"""
+        if amount <= 0:
+            raise ValueError("مبلغ باید بیشتر از صفر باشد")
+        
+        with transaction.atomic():
+            self.balance += amount
+            self.save(update_fields=['balance', 'updated_at'])
+            
+            WalletTransaction.objects.create(
+                wallet=self,
+                transaction_type=transaction_type,
+                amount=amount,
+                balance_after=self.balance,
+                reference_id=reference_id,
+                description=description
+            )
+    
+    def deduct_credit(self, amount, transaction_type='purchase', reference_id=None, description=''):
+        """Deduct credit from wallet and create transaction record"""
+        if amount <= 0:
+            raise ValueError("مبلغ باید بیشتر از صفر باشد")
+        
+        if amount > self.balance:
+            raise ValueError("موجودی کافی نیست")
+        
+        with transaction.atomic():
+            self.balance -= amount
+            self.save(update_fields=['balance', 'updated_at'])
+            
+            WalletTransaction.objects.create(
+                wallet=self,
+                transaction_type=transaction_type,
+                amount=-amount,  # Negative for deduction
+                balance_after=self.balance,
+                reference_id=reference_id,
+                description=description
+            )
+
+
+class WalletTransaction(models.Model):
+    """Transaction history for wallet credits"""
+    
+    TRANSACTION_TYPES = [
+        ('refund', _('بازگشت وجه')),
+        ('purchase', _('خرید')),
+        ('admin_adjustment', _('تغییر دستی')),
+    ]
+    
+    wallet = models.ForeignKey(
+        Wallet, 
+        on_delete=models.CASCADE, 
+        related_name='transactions',
+        verbose_name='کیف پول'
+    )
+    transaction_type = models.CharField(
+        max_length=20, 
+        choices=TRANSACTION_TYPES,
+        verbose_name='نوع تراکنش'
+    )
+    amount = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        verbose_name='مبلغ',
+        help_text='مثبت برای افزودن، منفی برای کسر'
+    )
+    balance_after = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        verbose_name='موجودی پس از تراکنش'
+    )
+    reference_id = models.PositiveIntegerField(
+        blank=True, 
+        null=True,
+        verbose_name='شناسه مرجع',
+        help_text='شناسه سفارش، نوبت یا تراکنش مرتبط'
+    )
+    description = models.TextField(
+        blank=True,
+        verbose_name='توضیحات'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    
+    class Meta:
+        verbose_name = _('تراکنش کیف پول')
+        verbose_name_plural = _('تراکنش‌های کیف پول')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['wallet', '-created_at']),
+            models.Index(fields=['transaction_type']),
+        ]
+    
+    def __str__(self):
+        return f"{self.get_transaction_type_display()} - {self.amount} تومان - {self.wallet.user.full_name}"

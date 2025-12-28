@@ -6,6 +6,7 @@ import { Alert, Container, Button, Spinner } from 'react-bootstrap';
 import { useAuth } from '../../contexts/AuthContext';
 import { useI18n } from '../../contexts/I18nContext';
 import axios from 'axios';
+import { getWalletBalance, getWalletTransactions, WalletBalanceResponse, WalletTransaction } from '../../services/walletApi';
 import './Dashboard.css';
 
 interface DashboardStats {
@@ -76,6 +77,23 @@ const Dashboard: React.FC = () => {
     queryFn: async () => {
       const response = await axios.get('/api/dashboard/stats/');
       return response.data as DashboardStats;
+    },
+    enabled: isAuthenticated,
+  });
+
+  // Fetch wallet balance
+  const { data: walletBalance, isLoading: walletLoading } = useQuery<WalletBalanceResponse>({
+    queryKey: ['wallet-balance'],
+    queryFn: getWalletBalance,
+    enabled: isAuthenticated,
+  });
+
+  // Fetch recent wallet transactions
+  const { data: walletTransactions } = useQuery<{ results: WalletTransaction[] }>({
+    queryKey: ['wallet-transactions'],
+    queryFn: async () => {
+      const data = await getWalletTransactions(1);
+      return { results: data.results.slice(0, 5) }; // Get only first 5
     },
     enabled: isAuthenticated,
   });
@@ -336,6 +354,36 @@ const Dashboard: React.FC = () => {
                   <i className="fas fa-eye me-2"></i>
                   مشاهده
                 </Link>
+              </div>
+
+              {/* Wallet Card */}
+              <div className="feature-card card-orange">
+                <div className="card-icon">
+                  <i className="fas fa-wallet"></i>
+                </div>
+                {walletLoading ? (
+                  <Spinner animation="border" size="sm" />
+                ) : (
+                  <>
+                    <div className="card-count" style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fff' }}>
+                      {walletBalance ? `${parseFloat(walletBalance.balance).toLocaleString('fa-IR')} تومان` : '0 تومان'}
+                    </div>
+                    <h4 className="card-title">کیف پول</h4>
+                    <p className="card-subtitle">
+                      {walletTransactions && walletTransactions.results.length > 0
+                        ? `آخرین تراکنش: ${walletTransactions.results[0].transaction_type_display}`
+                        : 'هیچ تراکنشی وجود ندارد'}
+                    </p>
+                    <div style={{ marginTop: '10px', fontSize: '0.9rem', color: '#fff' }}>
+                      {walletTransactions && walletTransactions.results.length > 0 && (
+                        <div>
+                          <strong>موجودی پس از تراکنش:</strong>{' '}
+                          {parseFloat(walletTransactions.results[0].balance_after).toLocaleString('fa-IR')} تومان
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

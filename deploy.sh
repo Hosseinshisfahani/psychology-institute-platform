@@ -82,6 +82,26 @@ echo ""
 print_status "Step 1: Rebuilding frontend..."
 cd "$FRONTEND_DIR" || exit 1
 
+# Stop any running development servers that might consume memory
+print_status "Checking for running development servers..."
+DEV_SERVER_PIDS=$(pgrep -f "react-scripts.*start" || true)
+if [ -n "$DEV_SERVER_PIDS" ]; then
+    print_warning "Found running development server(s). Stopping to free memory..."
+    echo "$DEV_SERVER_PIDS" | xargs kill -9 2>/dev/null || true
+    sleep 2
+    print_success "Development server(s) stopped"
+else
+    print_status "No development servers running"
+fi
+
+# Also check for TypeScript checker processes
+TS_CHECKER_PIDS=$(pgrep -f "fork-ts-checker-webpack-plugin" || true)
+if [ -n "$TS_CHECKER_PIDS" ]; then
+    print_warning "Found TypeScript checker processes. Stopping to free memory..."
+    echo "$TS_CHECKER_PIDS" | xargs kill -9 2>/dev/null || true
+    sleep 1
+fi
+
 print_status "Installing dependencies (if needed)..."
 if [ ! -d "node_modules" ]; then
     npm install --legacy-peer-deps
@@ -89,12 +109,92 @@ else
     print_status "Dependencies already installed, skipping..."
 fi
 
-print_status "Building frontend (this may take a few minutes)..."
-export NODE_OPTIONS="--max-old-space-size=2048"
+print_status "Checking system resources..."
+print_status "Available memory:"
+free -h
+print_status "Disk space:"
+df -h "$FRONTEND_DIR" | tail -1
+
+# Check if swap is available
+if swapon --show | grep -q .; then
+    print_success "Swap space is available"
+    swapon --show
+else
+    print_warning "No swap space detected. Consider adding swap for builds."
+fi
+
+# Calculate available memory and set appropriate Node.js memory limit
+# Get available memory in MB (free + buffers/cache)
+AVAILABLE_MEM_MB=$(free -m | awk 'NR==2{printf "%.0f", $7}')
+TOTAL_MEM_MB=$(free -m | awk 'NR==2{print $2}')
+
+# Calculate safe memory limit (use 70% of available or max 2.5GB, whichever is smaller)
+# Leave some memory for system processes
+if [ "$AVAILABLE_MEM_MB" -gt 2500 ]; then
+    NODE_MEM_LIMIT=2500
+elif [ "$AVAILABLE_MEM_MB" -gt 1500 ]; then
+    # Use 70% of available memory, but cap at 2.5GB
+    NODE_MEM_LIMIT=$((AVAILABLE_MEM_MB * 70 / 100))
+    # Ensure minimum of 1536MB for builds
+    if [ "$NODE_MEM_LIMIT" -lt 1536 ]; then
+        NODE_MEM_LIMIT=1536
+    fi
+else
+    # Very low memory - use conservative limit
+    NODE_MEM_LIMIT=1536
+    print_warning "Low available memory detected. Using conservative memory limit."
+fi
+
+print_status "Detected available memory: ${AVAILABLE_MEM_MB}MB (Total: ${TOTAL_MEM_MB}MB)"
+print_status "Setting Node.js memory limit to ${NODE_MEM_LIMIT}MB"
+
+# Warn if memory is very low
+if [ "$AVAILABLE_MEM_MB" -lt 1000 ]; then
+    print_warning "Very low available memory (${AVAILABLE_MEM_MB}MB). Build may fail."
+    print_warning "Consider stopping other services or adding more swap space."
+fi
+
+# Free up memory before build
+print_status "Freeing up memory before build..."
+sync
+# Try to drop caches (requires root, but won't fail if not possible)
+if [ -w /proc/sys/vm/drop_caches ]; then
+    echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true
+    print_status "System caches cleared"
+else
+    print_status "Cannot clear system caches (requires root), continuing anyway..."
+fi
+sleep 1
+
+# Increase Node.js memory limit and disable source maps to save memory
+export NODE_OPTIONS="--max-old-space-size=${NODE_MEM_LIMIT}"
+export GENERATE_SOURCEMAP=false
+
+# Set production API URL for build (CRITICAL: This ensures production uses correct backend)
+export REACT_APP_API_URL=https://sarmadclinic.ir
+print_status "Building with production API URL: $REACT_APP_API_URL"
+
+# Build with increased memory and no source maps
+print_status "Starting build with ${NODE_MEM_LIMIT}MB memory limit (source maps disabled)..."
+print_status "This may take 5-10 minutes depending on server resources..."
+
 if npm run build; then
     print_success "Frontend build completed successfully"
 else
-    print_error "Frontend build failed"
+    BUILD_EXIT_CODE=$?
+    print_error "Frontend build failed (exit code: $BUILD_EXIT_CODE)"
+    echo ""
+    print_warning "Build failure troubleshooting:"
+    echo "  1. Check if process was killed: dmesg | grep -i 'killed process'"
+    echo "  2. Check memory usage: free -h"
+    echo "  3. Add swap space (if not exists):"
+    echo "     sudo fallocate -l 4G /swapfile"
+    echo "     sudo chmod 600 /swapfile"
+    echo "     sudo mkswap /swapfile"
+    echo "     sudo swapon /swapfile"
+    echo "     echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab"
+    echo "  4. Try building with less memory: export NODE_OPTIONS='--max-old-space-size=2048'"
+    echo "  5. Build on a machine with more RAM and copy the build/ folder"
     exit 1
 fi
 

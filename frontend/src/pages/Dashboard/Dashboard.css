@@ -165,6 +165,22 @@
   --card-accent: #5e92d6;
 }
 
+.card-orange {
+  --card-accent: #f39c12;
+  background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+  color: #fff;
+}
+
+.card-orange .card-icon {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.card-orange .card-title,
+.card-orange .card-subtitle {
+  color: #fff;
+}
+
 /* Card Elements */
 .card-icon {
   width: 80px;

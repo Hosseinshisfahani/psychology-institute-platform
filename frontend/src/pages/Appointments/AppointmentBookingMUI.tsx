@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { getWalletBalance } from '../../services/walletApi';
 import axios from 'axios';
 import BookingTimeSelectorMUI from '../../components/BookingTimeSelectorMUI';
 
@@ -63,6 +64,7 @@ const AppointmentBookingMUI: React.FC = () => {
   const [isRescheduling, setIsRescheduling] = useState<boolean>(false);
   const [existingAppointment, setExistingAppointment] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [useWallet, setUseWallet] = useState<boolean>(false);
 
   const formatCurrency = (amount?: number) => {
     const numericAmount = Number(amount || 0);
@@ -186,6 +188,13 @@ const AppointmentBookingMUI: React.FC = () => {
   const selectedDepositAmount = selectedAppointmentTypeData?.deposit_amount || 0;
   const requiresDeposit = Boolean(!isRescheduling && selectedAppointmentTypeData?.requires_deposit && selectedDepositAmount > 0);
 
+  // Fetch wallet balance (only when deposit is required)
+  const { data: walletBalance } = useQuery({
+    queryKey: ['wallet-balance'],
+    queryFn: getWalletBalance,
+    enabled: !!user && requiresDeposit,
+  });
+
   // Handle rescheduling logic
   useEffect(() => {
     if (rescheduleId && existingAppointmentData && therapists.length > 0) {
@@ -256,19 +265,39 @@ const AppointmentBookingMUI: React.FC = () => {
   // Book appointment mutation
   const bookAppointmentMutation = useMutation({
     mutationFn: async (bookingData: BookingData) => {
+      const requestData: any = { ...bookingData };
+      if (useWallet && requiresDeposit) {
+        requestData.use_wallet = true;
+      }
+      
       if (isRescheduling && rescheduleId) {
         // Update existing appointment
-        const response = await axios.patch(`/api/appointments/${rescheduleId}/`, bookingData);
+        const response = await axios.patch(`/api/appointments/${rescheduleId}/`, requestData);
         return response.data;
       } else {
         // Create new appointment
-        const response = await axios.post('/api/appointments/', bookingData);
+        const response = await axios.post('/api/appointments/', requestData);
         return response.data;
       }
     },
     onSuccess: (data, variables) => {
       if (!isRescheduling && data?.deposit?.required) {
-        if (data.deposit.payment_url) {
+        if (data.deposit.paid_with_wallet) {
+          // Paid with wallet - show success
+          queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
+          queryClient.invalidateQueries({ queryKey: ['appointments'] });
+          
+          const selectedTherapistData = therapists.find(t => t.id === variables.therapist);
+          const therapistName = selectedTherapistData?.name || 'متخصص مربوطه';
+          
+          localStorage.setItem('appointmentSuccess', JSON.stringify({
+            message: `نوبت شما با ${therapistName} با موفقیت ثبت شد. مبلغ ${data.deposit.amount} تومان از کیف پول شما کسر شد.`,
+            therapistName: therapistName
+          }));
+          
+          navigate('/appointments');
+          return;
+        } else if (data.deposit.payment_url) {
           alert('برای تکمیل رزرو، لطفاً ودیعه را پرداخت کنید. اکنون به درگاه پرداخت هدایت می‌شوید.');
           window.location.href = data.deposit.payment_url;
         } else {
@@ -941,14 +970,57 @@ const AppointmentBookingMUI: React.FC = () => {
                   </Card>
 
                   {requiresDeposit && (
-                    <Alert variant="warning" className="mb-4">
-                      <div className="d-flex align-items-start">
-                        <i className="fas fa-lock me-3 mt-1"></i>
-                        <div>
-                          <strong>توجه:</strong> برای تکمیل رزرو این نوبت، پرداخت ودیعه {formatCurrency(selectedDepositAmount)} الزامی است. پس از انتخاب دکمه زیر به درگاه پرداخت امن هدایت می‌شوید.
+                    <>
+                      <Alert variant="warning" className="mb-3">
+                        <div className="d-flex align-items-start">
+                          <i className="fas fa-lock me-3 mt-1"></i>
+                          <div>
+                            <strong>توجه:</strong> برای تکمیل رزرو این نوبت، پرداخت ودیعه {formatCurrency(selectedDepositAmount)} الزامی است. پس از انتخاب دکمه زیر به درگاه پرداخت امن هدایت می‌شوید.
+                          </div>
                         </div>
-                      </div>
-                    </Alert>
+                      </Alert>
+                      
+                      {walletBalance && parseFloat(walletBalance.balance) > 0 && (
+                        <Card className="mb-4" style={{ borderRadius: '12px', border: '1px solid #ffc107' }}>
+                          <Card.Body>
+                            <Form.Check
+                              type="checkbox"
+                              id="use-wallet-appointment"
+                              checked={useWallet}
+                              onChange={(e) => setUseWallet(e.target.checked)}
+                              label={
+                                <div>
+                                  <div className="d-flex align-items-center justify-content-between">
+                                    <div className="d-flex align-items-center">
+                                      <i className="fas fa-wallet me-2 text-warning"></i>
+                                      <span className="fw-medium">استفاده از کیف پول</span>
+                                    </div>
+                                    <Badge bg="warning" text="dark">
+                                      موجودی: {parseFloat(walletBalance.balance).toLocaleString('fa-IR')} تومان
+                                    </Badge>
+                                  </div>
+                                  {useWallet && (
+                                    <div className="mt-2">
+                                      {parseFloat(walletBalance.balance) >= selectedDepositAmount ? (
+                                        <small className="text-success">
+                                          <i className="fas fa-check-circle me-1"></i>
+                                          مبلغ کامل از کیف پول شما کسر خواهد شد.
+                                        </small>
+                                      ) : (
+                                        <small className="text-warning">
+                                          <i className="fas fa-exclamation-triangle me-1"></i>
+                                          موجودی کیف پول کافی نیست. مبلغ {parseFloat(walletBalance.balance).toLocaleString('fa-IR')} تومان از کیف پول کسر شده و مابقی از طریق درگاه پرداخت خواهد شد.
+                                        </small>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              }
+                            />
+                          </Card.Body>
+                        </Card>
+                      )}
+                    </>
                   )}
 
                   <div className="d-flex justify-content-between">

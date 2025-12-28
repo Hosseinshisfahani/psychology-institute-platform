@@ -179,7 +179,7 @@ const CoursesList: React.FC = () => {
             startIcon={<AddIcon />} 
             size="large"
             onClick={() => {
-              const apiUrl = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
+              const apiUrl = process.env.REACT_APP_API_URL || 'https://sarmadclinic.ir';
               window.location.href = `${apiUrl}/admin/courses/course/add/`;
             }}
           >

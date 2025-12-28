@@ -29,6 +29,7 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
+  Collapse,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -42,9 +43,34 @@ import {
   TrendingUp,
   Search,
   FilterList,
+  ExpandMore,
+  ExpandLess,
 } from '@mui/icons-material';
 import { workshopRegistrationApi, workshopApi } from '../../../services/workshopAdminApi';
 import { format } from 'date-fns';
+
+interface InstallmentPayment {
+  id: number;
+  installment_number: number;
+  amount: string;
+  due_date: string;
+  due_date_persian: string;
+  status: string;
+  paid_at?: string;
+  paid_at_persian?: string;
+  is_overdue: boolean;
+}
+
+interface InstallmentPlan {
+  id: number;
+  total_amount: string;
+  number_of_installments: number;
+  installment_amount: string;
+  total_paid: number;
+  remaining_amount: number;
+  is_fully_paid: boolean;
+  payments: InstallmentPayment[];
+}
 
 interface WorkshopRegistration {
   id: number;
@@ -65,6 +91,7 @@ interface WorkshopRegistration {
   last_accessed?: string;
   last_accessed_persian?: string;
   payment_status: string;
+  installment_plan?: InstallmentPlan;
 }
 
 const WorkshopParticipants: React.FC = () => {
@@ -77,6 +104,7 @@ const WorkshopParticipants: React.FC = () => {
   const [actionDialog, setActionDialog] = useState<'approve' | 'reject' | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
   const workshopId = parseInt(id || '0');
 
@@ -174,6 +202,38 @@ const WorkshopParticipants: React.FC = () => {
     return labels[paymentType as keyof typeof labels] || paymentType;
   };
 
+  const toggleRowExpansion = (registrationId: number) => {
+    setExpandedRows((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(registrationId)) {
+        newSet.delete(registrationId);
+      } else {
+        newSet.add(registrationId);
+      }
+      return newSet;
+    });
+  };
+
+  const getInstallmentStatusLabel = (status: string): string => {
+    const labels: { [key: string]: string } = {
+      pending: 'در انتظار پرداخت',
+      paid: 'پرداخت شده',
+      overdue: 'سررسید شده',
+      cancelled: 'لغو شده',
+    };
+    return labels[status] || status;
+  };
+
+  const getInstallmentStatusColor = (status: string): "success" | "warning" | "error" | "default" => {
+    const colors: { [key: string]: "success" | "warning" | "error" | "default" } = {
+      paid: 'success',
+      pending: 'warning',
+      overdue: 'error',
+      cancelled: 'default',
+    };
+    return colors[status] || 'default';
+  };
+
   if (workshopLoading || registrationsLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -238,7 +298,9 @@ const WorkshopParticipants: React.FC = () => {
               <AttachMoney color="warning" sx={{ mr: 2 }} />
               <Box>
                 <Typography variant="h6">
-                  {registrations.reduce((sum: number, r: WorkshopRegistration) => sum + r.amount_paid, 0).toLocaleString()}
+                  {registrations
+                    .reduce((sum: number, r: WorkshopRegistration) => sum + Number(r.amount_paid || 0), 0)
+                    .toLocaleString('fa-IR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   درآمد (تومان)
@@ -267,7 +329,7 @@ const WorkshopParticipants: React.FC = () => {
       {/* Filters */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
             <Box sx={{ flex: 1, minWidth: 200 }}>
               <TextField
                 fullWidth
@@ -279,7 +341,7 @@ const WorkshopParticipants: React.FC = () => {
                 }}
               />
             </Box>
-            <Box sx={{ flex: 1, minWidth: 200 }}>
+            <Box sx={{ width: { xs: '100%', sm: 250 }, flexShrink: 0 }}>
               <TextField
                 fullWidth
                 select
@@ -287,6 +349,12 @@ const WorkshopParticipants: React.FC = () => {
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 SelectProps={{ native: true }}
+                sx={{
+                  '& .MuiSelect-select': {
+                    paddingRight: '14px !important',
+                    paddingLeft: '32px !important',
+                  }
+                }}
               >
                 <option value="">همه وضعیت‌ها</option>
                 <option value="pending_payment">در انتظار پرداخت</option>
@@ -305,6 +373,7 @@ const WorkshopParticipants: React.FC = () => {
           <Table>
             <TableHead>
               <TableRow>
+                <TableCell padding="checkbox"></TableCell>
                 <TableCell>شرکت‌کننده</TableCell>
                 <TableCell>وضعیت</TableCell>
                 <TableCell>نوع پرداخت</TableCell>
@@ -315,21 +384,36 @@ const WorkshopParticipants: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {registrations.map((registration: WorkshopRegistration) => (
-                <TableRow key={registration.id}>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                        {registration.user_name.charAt(0)}
-                      </Avatar>
-                      <Box>
-                        <Typography variant="subtitle2">{registration.user_name}</Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {registration.user_email}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
+              {registrations.map((registration: WorkshopRegistration) => {
+                const isExpanded = expandedRows.has(registration.id);
+                const hasInstallments = registration.payment_type === 'installment' && registration.installment_plan?.payments && registration.installment_plan.payments.length > 0;
+                
+                return (
+                  <React.Fragment key={registration.id}>
+                    <TableRow>
+                      <TableCell>
+                        {hasInstallments && (
+                          <IconButton
+                            size="small"
+                            onClick={() => toggleRowExpansion(registration.id)}
+                          >
+                            {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                          </IconButton>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
+                            {registration.user_name.charAt(0)}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="subtitle2">{registration.user_name}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {registration.user_email}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </TableCell>
                   <TableCell>
                     <Chip
                       label={getStatusLabel(registration.status)}
@@ -345,10 +429,10 @@ const WorkshopParticipants: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {registration.amount_paid.toLocaleString()} تومان
+                      {Number(registration.amount_paid || 0).toLocaleString('fa-IR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} تومان
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      از {registration.total_amount.toLocaleString()} تومان
+                      از {Number(registration.total_amount || 0).toLocaleString('fa-IR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} تومان
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -383,16 +467,71 @@ const WorkshopParticipants: React.FC = () => {
                       {registration.registered_at_persian}
                     </Typography>
                   </TableCell>
-                  <TableCell>
-                    <IconButton
-                      onClick={(e) => handleMenuClick(e, registration)}
-                      size="small"
-                    >
-                      <MoreVert />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
+                      <TableCell>
+                        <IconButton
+                          onClick={(e) => handleMenuClick(e, registration)}
+                          size="small"
+                        >
+                          <MoreVert />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                    
+                    {/* Expanded Installments Table */}
+                    {hasInstallments && (
+                      <TableRow>
+                        <TableCell colSpan={8} sx={{ py: 0, borderBottom: 'none' }}>
+                          <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                            <Box sx={{ margin: 2 }}>
+                              <Typography variant="h6" sx={{ mb: 2 }}>
+                                اقساط
+                              </Typography>
+                              <Table size="small">
+                                <TableHead>
+                                  <TableRow>
+                                    <TableCell>قسط</TableCell>
+                                    <TableCell>مبلغ</TableCell>
+                                    <TableCell>سررسید</TableCell>
+                                    <TableCell>وضعیت</TableCell>
+                                    <TableCell>تاریخ پرداخت</TableCell>
+                                  </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                  {registration.installment_plan!.payments.map((payment) => (
+                                    <TableRow 
+                                      key={payment.id}
+                                      sx={{ 
+                                        bgcolor: payment.is_overdue ? 'error.light' : 'inherit',
+                                        opacity: payment.is_overdue ? 0.8 : 1
+                                      }}
+                                    >
+                                      <TableCell>قسط {payment.installment_number}</TableCell>
+                                      <TableCell>
+                                        {Number(payment.amount || 0).toLocaleString('fa-IR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} تومان
+                                      </TableCell>
+                                      <TableCell>{payment.due_date_persian}</TableCell>
+                                      <TableCell>
+                                        <Chip
+                                          label={getInstallmentStatusLabel(payment.status)}
+                                          color={getInstallmentStatusColor(payment.status)}
+                                          size="small"
+                                        />
+                                      </TableCell>
+                                      <TableCell>
+                                        {payment.paid_at_persian || '-'}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </Box>
+                          </Collapse>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>

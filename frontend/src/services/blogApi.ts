@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
+// Default to production, overridden by REACT_APP_API_URL env var in development
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://sarmadclinic.ir';
 
 // Create axios instance with default config for public blog API
 // Note: CSRF token is handled by the global axios interceptor in AuthContext
@@ -78,6 +79,8 @@ export const blogApi = {
     category?: string;
     tag?: string;
     search?: string;
+    search_title?: string;
+    search_content?: string;
     page?: number;
     page_size?: number;
   }) => {

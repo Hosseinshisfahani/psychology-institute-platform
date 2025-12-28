@@ -35,6 +35,7 @@ import {
   Comment as CommentIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -226,6 +227,14 @@ const BlogList: React.FC = () => {
           مدیریت بلاگ
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => navigate('/admin-panel/blog/new')}
+          >
+            پست جدید
+          </Button>
           <Button
             variant="outlined"
             startIcon={<FilterIcon />}

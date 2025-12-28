@@ -567,11 +567,8 @@ const AboutInstitute: React.FC = () => {
               با ما در تماس باشید تا بتوانیم در راستای اعتلای روانشناسی همکاری داشته باشیم
             </p>
             <div className="d-flex flex-wrap justify-content-center gap-3">
-              <Link to="/appointment/booking" className="btn btn-primary btn-lg">
-                <i className="fas fa-calendar-check me-2"></i>رزرو نوبت
-              </Link>
-              <Link to="/courses" className="btn btn-outline-primary btn-lg">
-                <i className="fas fa-graduation-cap me-2"></i>مشاهده دوره‌ها
+              <Link to="/coach" className="btn btn-primary btn-lg">
+                <i className="fas fa-envelope me-2"></i>ارتباط با ما
               </Link>
             </div>
           </div>

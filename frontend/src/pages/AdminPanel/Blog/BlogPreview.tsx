@@ -159,12 +159,8 @@ const BlogPreview: React.FC<BlogPreviewProps> = ({
           {/* Post Content */}
           <Box sx={{ mb: 3 }}>
             <div
+              className="post-content"
               dangerouslySetInnerHTML={{ __html: post.content }}
-              style={{
-                lineHeight: '1.8',
-                fontSize: '16px',
-                fontFamily: 'Vazir, Arial, sans-serif',
-              }}
             />
           </Box>
 

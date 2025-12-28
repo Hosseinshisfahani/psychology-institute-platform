@@ -21,5 +21,10 @@ urlpatterns = [
     # Orders
     path('orders/', api_views.OrderListAPIView.as_view(), name='order_list'),
     path('orders/<int:pk>/', api_views.OrderDetailAPIView.as_view(), name='order_detail'),
+    
+    # Wallet
+    path('wallet/balance/', api_views.WalletBalanceAPIView.as_view(), name='wallet_balance'),
+    path('wallet/transactions/', api_views.WalletTransactionsAPIView.as_view(), name='wallet_transactions'),
+    path('wallet/use/', api_views.use_wallet_credits, name='use_wallet_credits'),
 ]
 

@@ -11,6 +11,7 @@ from app.workshops.models import (
 from app.packages.models import Package, PackageCategory, PackagePurchase, PackageComment
 import jdatetime
 from datetime import datetime
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -1890,6 +1891,9 @@ class AdminBlogPostSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     post_count = serializers.SerializerMethodField()
     
+    # Override featured_image to accept both file uploads and URL strings
+    featured_image = serializers.CharField(allow_blank=True, allow_null=True, required=False)
+    
     class Meta:
         model = Post
         fields = [
@@ -1901,6 +1905,179 @@ class AdminBlogPostSerializer(serializers.ModelSerializer):
             'published_at', 'published_at_persian', 'post_count'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'view_count', 'like_count']
+    
+    def create(self, validated_data):
+        """
+        Handle featured_image if it's a URL string (already uploaded)
+        """
+        # ManyToMany fields must be removed before Post.objects.create(...)
+        tags = validated_data.pop('tags', [])
+        featured_image = validated_data.pop('featured_image', None)
+        image_path = None
+        
+        # If featured_image is a URL string, extract the path
+        if isinstance(featured_image, str) and featured_image.strip():
+            # Remove /media/ prefix if present
+            if featured_image.startswith('/media/'):
+                image_path = featured_image.replace('/media/', '')
+            # If it's a full URL, extract the path
+            elif featured_image.startswith('http'):
+                from urllib.parse import urlparse
+                try:
+                    parsed = urlparse(featured_image)
+                    path = parsed.path
+                    if path.startswith('/media/'):
+                        image_path = path.replace('/media/', '')
+                except Exception:
+                    image_path = None
+            else:
+                # Assume it's already a relative path
+                image_path = featured_image
+        
+        # Create the post first (log full traceback if something fails)
+        try:
+            post = Post.objects.create(**validated_data)
+        except Exception as e:
+            import logging
+            import traceback
+            logger = logging.getLogger(__name__)
+            logger.error(f"AdminBlogPostSerializer.create failed: {e}")
+            logger.error(traceback.format_exc())
+            raise
+
+        # Set M2M tags after instance exists
+        try:
+            if tags is not None:
+                post.tags.set(tags)
+        except Exception as e:
+            import logging
+            import traceback
+            logger = logging.getLogger(__name__)
+            logger.error(f"AdminBlogPostSerializer.create tags.set failed: {e}")
+            logger.error(traceback.format_exc())
+            raise
+        
+        # If we have a path string, set it on the model
+        if image_path:
+            try:
+                from django.core.files.storage import default_storage
+                from django.core.files.base import ContentFile
+                import logging
+                logger = logging.getLogger(__name__)
+                
+                # Check if file exists in storage
+                if default_storage.exists(image_path):
+                    # Read the file content
+                    with default_storage.open(image_path, 'rb') as f:
+                        file_content = f.read()
+                    
+                    # Get the filename from the path
+                    filename = image_path.split('/')[-1]
+                    
+                    # Create a ContentFile from the content and save to ImageField
+                    post.featured_image.save(
+                        filename,
+                        ContentFile(file_content),
+                        save=True
+                    )
+                    logger.info(f"Successfully set featured_image from path: {image_path}")
+                else:
+                    logger.warning(f"File does not exist at path: {image_path}")
+            except Exception as e:
+                # Log the error but don't fail the creation
+                import logging
+                import traceback
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to set featured_image: {e}")
+                logger.error(traceback.format_exc())
+        
+        return post
+    
+    def update(self, instance, validated_data):
+        """
+        Handle featured_image if it's a URL string (already uploaded)
+        """
+        # ManyToMany fields must be handled separately
+        tags = validated_data.pop('tags', None)
+        featured_image = validated_data.pop('featured_image', None)
+        image_path = None
+        
+        # If featured_image is a URL string, extract the path
+        if isinstance(featured_image, str) and featured_image.strip():
+            # Remove /media/ prefix if present
+            if featured_image.startswith('/media/'):
+                image_path = featured_image.replace('/media/', '')
+            # If it's a full URL, extract the path
+            elif featured_image.startswith('http'):
+                from urllib.parse import urlparse
+                try:
+                    parsed = urlparse(featured_image)
+                    path = parsed.path
+                    if path.startswith('/media/'):
+                        image_path = path.replace('/media/', '')
+                except Exception:
+                    image_path = None
+            else:
+                # Assume it's already a relative path
+                image_path = featured_image
+        
+        # Update other fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # Set M2M tags after saving
+        if tags is not None:
+            try:
+                instance.tags.set(tags)
+            except Exception as e:
+                import logging
+                import traceback
+                logger = logging.getLogger(__name__)
+                logger.error(f"AdminBlogPostSerializer.update tags.set failed: {e}")
+                logger.error(traceback.format_exc())
+                raise
+        
+        # Handle featured_image
+        if image_path:
+            try:
+                from django.core.files.storage import default_storage
+                from django.core.files.base import ContentFile
+                import logging
+                import traceback
+                logger = logging.getLogger(__name__)
+                
+                # Check if file exists in storage
+                if default_storage.exists(image_path):
+                    # Read the file content
+                    with default_storage.open(image_path, 'rb') as f:
+                        file_content = f.read()
+                    
+                    # Get the filename from the path
+                    filename = image_path.split('/')[-1]
+                    
+                    # Create a ContentFile from the content and save to ImageField
+                    instance.featured_image.save(
+                        filename,
+                        ContentFile(file_content),
+                        save=True
+                    )
+                    logger.info(f"Successfully updated featured_image from path: {image_path}")
+                else:
+                    logger.warning(f"File does not exist at path: {image_path}")
+            except Exception as e:
+                # Log the error but don't fail the update
+                import logging
+                import traceback
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to update featured_image: {e}")
+                logger.error(traceback.format_exc())
+        elif featured_image is None or featured_image == '':
+            # Clear featured_image if explicitly set to None or empty
+            instance.featured_image = None
+            instance.save(update_fields=['featured_image'])
+        
+        return instance
     
     def get_tags_data(self, obj):
         return [{'id': tag.id, 'name': tag.name, 'slug': tag.slug} for tag in obj.tags.all()]
@@ -3393,6 +3570,58 @@ class AdminPackageSerializer(serializers.ModelSerializer):
     
 
 
+class InstallmentPaymentAdminSerializer(serializers.ModelSerializer):
+    due_date_persian = serializers.SerializerMethodField()
+    paid_at_persian = serializers.SerializerMethodField()
+    is_overdue = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = InstallmentPayment
+        fields = [
+            'id', 'installment_number', 'amount', 'due_date', 'due_date_persian',
+            'status', 'paid_at', 'paid_at_persian', 'is_overdue'
+        ]
+    
+    def get_due_date_persian(self, obj):
+        if obj.due_date:
+            jdate = jdatetime.date.fromgregorian(date=obj.due_date)
+            return jdate.strftime('%Y/%m/%d')
+        return None
+    
+    def get_paid_at_persian(self, obj):
+        if obj.paid_at:
+            return jdatetime.datetime.fromgregorian(datetime=obj.paid_at).strftime('%Y/%m/%d %H:%M')
+        return None
+    
+    def get_is_overdue(self, obj):
+        if obj.status == 'pending' and obj.due_date:
+            return obj.due_date < timezone.now().date()
+        return False
+
+
+class InstallmentPlanAdminSerializer(serializers.ModelSerializer):
+    payments = InstallmentPaymentAdminSerializer(many=True, read_only=True)
+    total_paid = serializers.SerializerMethodField()
+    remaining_amount = serializers.SerializerMethodField()
+    is_fully_paid = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = InstallmentPlan
+        fields = [
+            'id', 'total_amount', 'number_of_installments', 'installment_amount',
+            'total_paid', 'remaining_amount', 'is_fully_paid', 'payments'
+        ]
+    
+    def get_total_paid(self, obj):
+        return sum(float(payment.amount) for payment in obj.payments.filter(status='paid'))
+    
+    def get_remaining_amount(self, obj):
+        return float(obj.total_amount) - self.get_total_paid(obj)
+    
+    def get_is_fully_paid(self, obj):
+        return obj.payments.filter(status='paid').count() == obj.number_of_installments
+
+
 class AdminWorkshopRegistrationSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.get_full_name', read_only=True)
     user_email = serializers.CharField(source='user.email', read_only=True)
@@ -3401,6 +3630,7 @@ class AdminWorkshopRegistrationSerializer(serializers.ModelSerializer):
     completed_at_persian = serializers.SerializerMethodField()
     last_accessed_persian = serializers.SerializerMethodField()
     payment_status = serializers.SerializerMethodField()
+    installment_plan = InstallmentPlanAdminSerializer(read_only=True)
     
     class Meta:
         model = WorkshopRegistration
@@ -3409,7 +3639,7 @@ class AdminWorkshopRegistrationSerializer(serializers.ModelSerializer):
             'status', 'payment_type', 'amount_paid', 'total_amount',
             'progress_percentage', 'registered_at', 'registered_at_persian',
             'completed_at', 'completed_at_persian', 'last_accessed',
-            'last_accessed_persian', 'payment_status'
+            'last_accessed_persian', 'payment_status', 'installment_plan'
         ]
         read_only_fields = ['id', 'registered_at', 'completed_at', 'last_accessed']
     

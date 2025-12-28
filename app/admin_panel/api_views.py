@@ -1251,7 +1251,9 @@ class AdminWorkshopRegistrationListAPIView(generics.ListAPIView):
         workshop_id = self.kwargs.get('workshop_id')
         return WorkshopRegistration.objects.filter(
             workshop_id=workshop_id
-        ).select_related('user', 'workshop')
+        ).select_related('user', 'workshop').prefetch_related(
+            'installment_plan__payments'
+        )
 
 @api_view(['POST'])
 @permission_classes([AdminPermission])

@@ -8,6 +8,7 @@ from django.http import JsonResponse, FileResponse, StreamingHttpResponse, Http4
 from django.views.decorators.http import require_http_methods
 from django.middleware.csrf import get_token
 from django.utils.translation import gettext_lazy as _
+from django.views.decorators.csrf import ensure_csrf_cookie
 import os
 import re
 import mimetypes
@@ -27,6 +28,24 @@ def health_check(request):
         'version': '1.0.0'
     })
 
+# CSRF token endpoint for SPA frontends
+@require_http_methods(["GET"])
+@ensure_csrf_cookie
+def csrf_token_view(request):
+    """CSRF token endpoint with CORS support"""
+    response = JsonResponse({'csrfToken': get_token(request)})
+    # Explicitly add CORS headers
+    origin = request.META.get('HTTP_ORIGIN')
+    if origin:
+        from django.conf import settings
+        if hasattr(settings, 'CORS_ALLOWED_ORIGINS') and origin in settings.CORS_ALLOWED_ORIGINS:
+            response['Access-Control-Allow-Origin'] = origin
+            response['Access-Control-Allow-Credentials'] = 'true'
+        elif getattr(settings, 'CORS_ALLOW_ALL_ORIGINS', False):
+            response['Access-Control-Allow-Origin'] = origin
+            response['Access-Control-Allow-Credentials'] = 'true'
+    return response
+
 urlpatterns = [
     # Health check
     path('health/', health_check, name='health_check'),
@@ -35,7 +54,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     # CSRF token endpoint for SPA frontends
-    path('csrf/', lambda request: JsonResponse({'csrfToken': get_token(request)}), name='csrf_token'),
+    path('csrf/', csrf_token_view, name='csrf_token'),
     
     # Authentication (Custom views)
     path('accounts/', include('app.dashboard.auth_urls')),
@@ -72,8 +91,8 @@ urlpatterns = [
 ]
 
 # Static files are now served by nginx (see /etc/nginx/sites-available/psychology-institute)
-# Only serve static files in DEBUG mode as a fallback
-if settings.DEBUG:
+# Only serve static files in DEBUG/development mode as a fallback
+if settings.DEBUG or getattr(settings, "DEVELOPMENT_MODE", False):
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 # Serve media files - Always use custom handler for proper URL decoding and range support
@@ -138,3 +157,22 @@ def media_serve(request, path):
 urlpatterns += [
     re_path(r'^media/(?P<path>.*)$', media_serve),
 ]
+
+# Serve frontend public images in DEBUG/development mode.
+# Production serves /images via nginx.
+def images_serve(request, path):
+    decoded_path = unquote(path)
+    images_root = os.path.join(str(settings.BASE_DIR), 'frontend', 'public', 'images')
+    full_path = os.path.join(images_root, decoded_path)
+
+    if not os.path.exists(full_path) or not os.path.isfile(full_path):
+        raise Http404()
+
+    content_type, _ = mimetypes.guess_type(full_path)
+    content_type = content_type or 'application/octet-stream'
+    return FileResponse(open(full_path, 'rb'), content_type=content_type)
+
+if settings.DEBUG or getattr(settings, "DEVELOPMENT_MODE", False):
+    urlpatterns += [
+        re_path(r'^images/(?P<path>.*)$', images_serve),
+    ]

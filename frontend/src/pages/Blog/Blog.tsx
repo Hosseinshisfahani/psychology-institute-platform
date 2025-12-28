@@ -35,7 +35,8 @@ interface Category {
 
 const Blog: React.FC = () => {
   const { t } = useI18n();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTitle, setSearchTitle] = useState('');
+  const [searchContent, setSearchContent] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
 
   // Ensure we always have valid arrays
@@ -45,11 +46,12 @@ const Blog: React.FC = () => {
 
   // Fetch posts
   const { data: postsData, isLoading: postsLoading } = useQuery({
-    queryKey: ['blog-posts', searchTerm, selectedCategory],
+    queryKey: ['blog-posts', searchTitle, searchContent, selectedCategory],
     queryFn: async () => {
       try {
         return await blogApi.getPosts({
-          search: searchTerm || undefined,
+          search_title: searchTitle || undefined,
+          search_content: searchContent || undefined,
           category: selectedCategory || undefined,
         });
       } catch (error) {
@@ -98,21 +100,46 @@ const Blog: React.FC = () => {
             <Card className="mb-4">
               <Card.Body>
                 <Form onSubmit={handleSearch}>
-                  <Row>
-                    <Col md={8}>
+                  <Row className="g-3">
+                    <Col md={12} lg={6}>
+                      <Form.Label>
+                        <i className="fas fa-heading me-2"></i>
+                        جستجو در عنوان پست‌ها
+                      </Form.Label>
                       <InputGroup>
                         <Form.Control
                           type="text"
-                          placeholder={t('blog.search')}
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
+                          placeholder="جستجو در عنوان..."
+                          value={searchTitle}
+                          onChange={(e) => setSearchTitle(e.target.value)}
                         />
                         <Button type="submit" variant="outline-primary">
                           <i className="fas fa-search"></i>
                         </Button>
                       </InputGroup>
                     </Col>
-                    <Col md={4}>
+                    <Col md={12} lg={6}>
+                      <Form.Label>
+                        <i className="fas fa-file-text me-2"></i>
+                        جستجو در محتوای پست‌ها
+                      </Form.Label>
+                      <InputGroup>
+                        <Form.Control
+                          type="text"
+                          placeholder="جستجو در محتوا..."
+                          value={searchContent}
+                          onChange={(e) => setSearchContent(e.target.value)}
+                        />
+                        <Button type="submit" variant="outline-primary">
+                          <i className="fas fa-search"></i>
+                        </Button>
+                      </InputGroup>
+                    </Col>
+                    <Col md={12}>
+                      <Form.Label>
+                        <i className="fas fa-filter me-2"></i>
+                        دسته‌بندی
+                      </Form.Label>
                       <Form.Select
                         value={selectedCategory}
                         onChange={(e) => setSelectedCategory(e.target.value)}

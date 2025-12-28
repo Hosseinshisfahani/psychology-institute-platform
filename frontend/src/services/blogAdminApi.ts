@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://sarmadclinic.ir';
 
 // Create axios instance with default config
 // Note: CSRF token is handled by the global axios interceptor in AuthContext
@@ -10,7 +10,68 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: true, // Important for sending cookies
+  xsrfCookieName: 'csrftoken', // CSRF cookie name
+  xsrfHeaderName: 'X-CSRFToken', // CSRF header name
 });
+
+// Helper to get CSRF token from cookie
+const getCsrfToken = () => {
+  const name = 'csrftoken=';
+  const cookies = document.cookie.split(';');
+  for (let i = 0; i < cookies.length; i++) {
+    let cookie = cookies[i].trim();
+    if (cookie.indexOf(name) === 0) {
+      return cookie.substring(name.length);
+    }
+  }
+  return '';
+};
+
+// Add request interceptor to include CSRF token
+api.interceptors.request.use(
+  async (config) => {
+    // Skip CSRF for the CSRF endpoint itself
+    if (config.url?.includes('/csrf/')) {
+      return config;
+    }
+
+    // If data is FormData, remove Content-Type header to let browser set it with boundary
+    if (config.data instanceof FormData) {
+      if (config.headers) {
+        delete config.headers['Content-Type'];
+      }
+    }
+
+    // Get CSRF token from cookie
+    let csrfToken = getCsrfToken();
+    
+    // If no CSRF token, try to fetch it first
+    if (!csrfToken && typeof window !== 'undefined') {
+      try {
+        // Use the global axios instance to fetch CSRF token
+        await axios.get('/csrf/', {
+          baseURL: API_BASE_URL,
+          withCredentials: true,
+        });
+        // Give browser a moment to set the cookie
+        await new Promise(resolve => setTimeout(resolve, 10));
+        csrfToken = getCsrfToken();
+      } catch (error) {
+        console.warn('Failed to fetch CSRF token:', error);
+      }
+    }
+
+    // Add CSRF token to headers if available
+    if (csrfToken && config.headers) {
+      config.headers['X-CSRFToken'] = csrfToken;
+    }
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 // Add response interceptor for error handling
 api.interceptors.response.use(
@@ -294,15 +355,62 @@ export const blogCommentApi = {
 export const fileUploadApi = {
   // Upload file and get URL
   uploadFile: async (file: File): Promise<string> => {
+    console.log('📤 Starting file upload:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    });
+    
     const formData = new FormData();
     formData.append('file', file);
     
-    const response = await api.post('/upload/', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data.url;
+    // Ensure CSRF token is available
+    let csrfToken = getCsrfToken();
+    if (!csrfToken) {
+      // Fetch CSRF token if not available
+      try {
+        console.log('🔑 Fetching CSRF token...');
+        await axios.get('/csrf/', {
+          baseURL: API_BASE_URL,
+          withCredentials: true,
+        });
+        await new Promise(resolve => setTimeout(resolve, 10));
+        csrfToken = getCsrfToken();
+        console.log('✅ CSRF token fetched:', csrfToken ? 'Yes' : 'No');
+      } catch (error) {
+        console.warn('❌ Failed to fetch CSRF token for upload:', error);
+      }
+    } else {
+      console.log('✅ CSRF token already available');
+    }
+    
+    // Don't set Content-Type manually - let axios/browser set it with boundary
+    // Only set CSRF token header
+    const headers: Record<string, string> = {};
+    
+    // Explicitly add CSRF token
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+      console.log('🔑 CSRF token added to headers');
+    } else {
+      console.warn('⚠️ No CSRF token available!');
+    }
+    
+    try {
+      console.log('📡 Sending upload request...');
+      const response = await api.post('/upload/', formData, {
+        headers,
+      });
+      console.log('✅ Upload successful:', response.data);
+      return response.data.url;
+    } catch (error: any) {
+      console.error('❌ Upload failed:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      });
+      throw error;
+    }
   },
 };
 
@@ -310,6 +418,9 @@ export const fileUploadApi = {
 export const blogUtils = {
   // Generate slug from title
   generateSlug: (title: string): string => {
+    if (!title || typeof title !== 'string') {
+      return '';
+    }
     return title
       .toLowerCase()
       .replace(/[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFFa-z0-9\s-]/g, '')

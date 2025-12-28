@@ -444,7 +444,7 @@ const WorkshopsList: React.FC = () => {
                               variant="outlined"
                               size="small"
                               onClick={() => {
-                                const apiUrl = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
+                                const apiUrl = process.env.REACT_APP_API_URL || 'https://sarmadclinic.ir';
                                 window.open(`${apiUrl}/admin/workshops/workshop/${workshop.id}/change/`, '_blank');
                               }}
                               sx={{ alignSelf: 'flex-start' }}

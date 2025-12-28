@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://sarmadclinic.ir';
 
 // Reuse an axios instance configured for admin endpoints
 // Note: CSRF token is handled by the global axios interceptor in AuthContext

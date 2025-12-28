@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
+// Default to production, overridden by REACT_APP_API_URL env var in development
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://sarmadclinic.ir';
 
 // Create axios instance with default config for public course API
 const api = axios.create({

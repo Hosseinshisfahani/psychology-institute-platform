@@ -277,6 +277,10 @@ const PostDetail: React.FC = () => {
 
               <div 
                 className="post-content"
+                style={{
+                  maxWidth: '100%',
+                  padding: '1rem 0',
+                }}
                 dangerouslySetInnerHTML={{ __html: post.content }}
               />
 

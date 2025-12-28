@@ -55,7 +55,10 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Configure axios defaults (Django-compatible CSRF names)
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
+// Default to production URL for safety, but can be overridden via REACT_APP_API_URL env var
+// Development: start_frontend.sh sets REACT_APP_API_URL=http://localhost:8001
+// Production: deploy.sh sets REACT_APP_API_URL=https://sarmadclinic.ir
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://sarmadclinic.ir';
 axios.defaults.baseURL = API_BASE_URL;
 axios.defaults.withCredentials = true;
 axios.defaults.xsrfCookieName = 'csrftoken';

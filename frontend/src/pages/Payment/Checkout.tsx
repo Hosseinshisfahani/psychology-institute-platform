@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
+import { getWalletBalance } from '../../services/walletApi';
 import axios from 'axios';
 
 const Checkout: React.FC = () => {
@@ -11,6 +12,7 @@ const Checkout: React.FC = () => {
   const navigate = useNavigate();
   
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('zarinpal');
+  const [useWallet, setUseWallet] = useState<boolean>(false);
   const [couponCode, setCouponCode] = useState<string>('');
   const [agreeToTerms, setAgreeToTerms] = useState<boolean>(false);
   const [couponMessage, setCouponMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -23,6 +25,13 @@ const Checkout: React.FC = () => {
       const response = await axios.get('/api/payment/cart/');
       return response.data;
     },
+  });
+
+  // Fetch wallet balance
+  const { data: walletBalance } = useQuery({
+    queryKey: ['wallet-balance'],
+    queryFn: getWalletBalance,
+    enabled: !!user,
   });
 
   // Apply coupon mutation
@@ -76,6 +85,7 @@ const Checkout: React.FC = () => {
     processPaymentMutation.mutate({
       payment_method: selectedPaymentMethod,
       coupon_code: couponCode,
+      use_wallet: useWallet,
     });
   };
 
@@ -127,6 +137,42 @@ const Checkout: React.FC = () => {
                     </div>
                   }
                 />
+                
+                {/* Wallet Payment Option */}
+                {walletBalance && parseFloat(walletBalance.balance) > 0 && (
+                  <div className="mt-3 pt-3 border-top">
+                    <Form.Check
+                      type="checkbox"
+                      id="use-wallet"
+                      checked={useWallet}
+                      onChange={(e) => setUseWallet(e.target.checked)}
+                      label={
+                        <div className="d-flex align-items-center justify-content-between w-100">
+                          <div className="d-flex align-items-center">
+                            <i className="fas fa-wallet me-3 text-warning"></i>
+                            <div>
+                              <div className="fw-medium">استفاده از کیف پول</div>
+                              <small className="text-muted">
+                                موجودی: {parseFloat(walletBalance.balance).toLocaleString('fa-IR')} تومان
+                              </small>
+                            </div>
+                          </div>
+                        </div>
+                      }
+                    />
+                    {useWallet && (
+                      <Alert variant="info" className="mt-2 mb-0 small">
+                        {parseFloat(walletBalance.balance) >= (cart?.total || cart?.subtotal || 0) - (appliedDiscount || cart?.discount || 0) ? (
+                          <span>مبلغ کامل از کیف پول شما کسر خواهد شد.</span>
+                        ) : (
+                          <span>
+                            مبلغ {parseFloat(walletBalance.balance).toLocaleString('fa-IR')} تومان از کیف پول کسر شده و مابقی از طریق درگاه پرداخت خواهد شد.
+                          </span>
+                        )}
+                      </Alert>
+                    )}
+                  </div>
+                )}
               </Card.Body>
             </Card>
 
@@ -286,10 +332,21 @@ const Checkout: React.FC = () => {
 
                 <hr />
 
+                {useWallet && walletBalance && (
+                  <div className="d-flex justify-content-between mb-2 text-warning">
+                    <span>کسر از کیف پول:</span>
+                    <span>
+                      -{formatPrice(Math.min(parseFloat(walletBalance.balance), (cart.subtotal || cart.total) - (appliedDiscount || cart.discount || 0)))} تومان
+                    </span>
+                  </div>
+                )}
+
                 <div className="d-flex justify-content-between mb-3 fs-5 fw-bold">
                   <span>مبلغ نهایی:</span>
                   <span className="text-primary">
-                    {formatPrice((cart.subtotal || cart.total) - (appliedDiscount || cart.discount || 0))} تومان
+                    {formatPrice(
+                      Math.max(0, (cart.subtotal || cart.total) - (appliedDiscount || cart.discount || 0) - (useWallet && walletBalance ? Math.min(parseFloat(walletBalance.balance), (cart.subtotal || cart.total) - (appliedDiscount || cart.discount || 0)) : 0))
+                    )} تومان
                   </span>
                 </div>
 

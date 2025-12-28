@@ -77,7 +77,7 @@ const menuItems: MenuItem[] = [
   { title: 'تنظیمات', path: '/admin-panel/settings', icon: <SettingsIcon /> },
 ];
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://185.8.175.241:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://sarmadclinic.ir';
 
 const AdminLayout: React.FC = () => {
   const theme = useTheme();
@@ -113,7 +113,7 @@ const AdminLayout: React.FC = () => {
     queryKey: ['adminNotificationCount'],
     queryFn: async () => {
       const csrfToken = getCsrfToken();
-      const response = await axios.get(`${API_BASE_URL}/api/admin/notifications/count/`, {
+      const response = await axios.get('/api/admin/notifications/count/', {
         withCredentials: true,
         headers: csrfToken ? { 'X-CSRFToken': csrfToken } : {},
       });
@@ -127,7 +127,7 @@ const AdminLayout: React.FC = () => {
     queryKey: ['adminNotifications'],
     queryFn: async () => {
       const csrfToken = getCsrfToken();
-      const response = await axios.get(`${API_BASE_URL}/api/admin/notifications/`, {
+      const response = await axios.get('/api/admin/notifications/', {
         withCredentials: true,
         headers: csrfToken ? { 'X-CSRFToken': csrfToken } : {},
         params: { limit: 10 },
