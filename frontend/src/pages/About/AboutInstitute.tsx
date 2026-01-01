@@ -429,7 +429,7 @@ const AboutInstitute: React.FC = () => {
               <Col lg={6}>
                 <div className="content-image-wrapper">
                   <img 
-                    src={getImagePath('20240725_165904.jpg')}
+                    src={getImagePath('2_20250125_115350_0001.png')}
                     onError={handleImageError}
                     alt="همکاری‌های مرکز مشاوره سرمد" 
                     className="content-image"
@@ -506,6 +506,138 @@ const AboutInstitute: React.FC = () => {
                   src={getImagePath('photo_2024-10-08_17-24-42.jpg')}
                   onError={handleImageError} 
                   alt="فعالیت‌های پژوهشی مرکز مشاوره سرمد" 
+                  className="gallery-image"
+                  loading="lazy"
+                />
+              </div>
+            </Col>
+            <Col md={4}>
+              <div className="gallery-image-wrapper">
+                <img 
+                  src={getImagePath('3_20250125_115351_0002.png')}
+                  onError={handleImageError}
+                  alt="فعالیت‌های مرکز مشاوره سرمد" 
+                  className="gallery-image"
+                  loading="lazy"
+                />
+              </div>
+            </Col>
+            <Col md={4}>
+              <div className="gallery-image-wrapper">
+                <img 
+                  src={getImagePath('4_20250125_115351_0003.png')}
+                  onError={handleImageError}
+                  alt="کارگاه‌های آموزشی مرکز مشاوره سرمد" 
+                  className="gallery-image"
+                  loading="lazy"
+                />
+              </div>
+            </Col>
+            <Col md={4}>
+              <div className="gallery-image-wrapper">
+                <img 
+                  src={getImagePath('5_20250125_115351_0004.png')}
+                  onError={handleImageError}
+                  alt="نشست‌های تخصصی مرکز مشاوره سرمد" 
+                  className="gallery-image"
+                  loading="lazy"
+                />
+              </div>
+            </Col>
+            <Col md={4}>
+              <div className="gallery-image-wrapper">
+                <img 
+                  src={getImagePath('6_20250125_115351_0005.png')}
+                  onError={handleImageError}
+                  alt="دوره‌های آموزشی مرکز مشاوره سرمد" 
+                  className="gallery-image"
+                  loading="lazy"
+                />
+              </div>
+            </Col>
+            <Col md={4}>
+              <div className="gallery-image-wrapper">
+                <img 
+                  src={getImagePath('7_20250125_115351_0006.png')}
+                  onError={handleImageError}
+                  alt="فعالیت‌های پژوهشی مرکز مشاوره سرمد" 
+                  className="gallery-image"
+                  loading="lazy"
+                />
+              </div>
+            </Col>
+            <Col md={4}>
+              <div className="gallery-image-wrapper">
+                <img 
+                  src={getImagePath('8_20250125_115351_0007.png')}
+                  onError={handleImageError}
+                  alt="فعالیت‌های مرکز مشاوره سرمد" 
+                  className="gallery-image"
+                  loading="lazy"
+                />
+              </div>
+            </Col>
+            <Col md={4}>
+              <div className="gallery-image-wrapper">
+                <img 
+                  src={getImagePath('9_20250125_115352_0008.png')}
+                  onError={handleImageError}
+                  alt="کارگاه‌های آموزشی مرکز مشاوره سرمد" 
+                  className="gallery-image"
+                  loading="lazy"
+                />
+              </div>
+            </Col>
+            <Col md={4}>
+              <div className="gallery-image-wrapper">
+                <img 
+                  src={getImagePath('10_20250125_115352_0009.png')}
+                  onError={handleImageError}
+                  alt="نشست‌های تخصصی مرکز مشاوره سرمد" 
+                  className="gallery-image"
+                  loading="lazy"
+                />
+              </div>
+            </Col>
+            <Col md={4}>
+              <div className="gallery-image-wrapper">
+                <img 
+                  src={getImagePath('11_20250125_115352_0010.png')}
+                  onError={handleImageError}
+                  alt="دوره‌های آموزشی مرکز مشاوره سرمد" 
+                  className="gallery-image"
+                  loading="lazy"
+                />
+              </div>
+            </Col>
+            <Col md={4}>
+              <div className="gallery-image-wrapper">
+                <img 
+                  src={getImagePath('12_20250125_115352_0011.png')}
+                  onError={handleImageError}
+                  alt="فعالیت‌های پژوهشی مرکز مشاوره سرمد" 
+                  className="gallery-image"
+                  loading="lazy"
+                />
+              </div>
+            </Col>
+            <Col md={4}>
+              <div className="gallery-image-wrapper">
+                <img 
+                  src={getImagePath('13_20250125_115352_0012.png')}
+                  onError={handleImageError}
+                  alt="فعالیت‌های مرکز مشاوره سرمد" 
+                  className="gallery-image"
+                  loading="lazy"
+                />
+              </div>
+            </Col>
+            <Col md={4}>
+              <div className="gallery-image-wrapper">
+                <img 
+                  src={getImagePath('14_20250125_115352_0013.png')}
+                  onError={handleImageError}
+                  alt="کارگاه‌های آموزشی مرکز مشاوره سرمد" 
                   className="gallery-image"
                   loading="lazy"
                 />
@@ -776,6 +908,7 @@ const AboutInstitute: React.FC = () => {
           height: auto;
           display: block;
           object-fit: cover;
+          object-position: center 30%;
           border-radius: 15px;
           transition: transform 0.5s ease;
         }
@@ -789,6 +922,7 @@ const AboutInstitute: React.FC = () => {
           height: auto;
           max-height: 500px;
           object-fit: cover;
+          object-position: center 30%;
           border-radius: 15px;
           box-shadow: 0 10px 30px rgba(0,0,0,0.15);
           transition: transform 0.3s ease, box-shadow 0.3s ease;
