@@ -67,7 +67,7 @@ const UserGrowthChart: React.FC<UserGrowthChartProps> = ({ data }) => {
                   border: `1px solid ${theme.palette.divider}`,
                   borderRadius: '8px',
                 }}
-                formatter={(value: number) => [value + ' کاربر', 'تعداد']}
+                formatter={(value: number | undefined) => [(value ?? 0) + ' کاربر', 'تعداد']}
                 labelStyle={{ color: theme.palette.text.primary }}
               />
               <Bar dataKey="count" radius={[8, 8, 0, 0]}>

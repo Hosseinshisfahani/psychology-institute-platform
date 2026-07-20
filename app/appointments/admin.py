@@ -5,18 +5,18 @@ from django.utils.translation import gettext_lazy as _
 from .models import (
     ClinicLocation, AppointmentType, TherapistSchedule, TherapistTimeOff,
     Appointment, AppointmentCancellation, AppointmentReschedule,
-    CancellationPolicy, AppointmentReminder
+    CancellationPolicy, AppointmentReminder, AppointmentCoupon
 )
 
 
-@admin.register(ClinicLocation)
+'''@admin.register(ClinicLocation)
 class ClinicLocationAdmin(admin.ModelAdmin):
     list_display = ['name', 'city', 'phone', 'capacity', 'is_active', 'created_at']
     list_filter = ['is_active', 'city', 'created_at']
     search_fields = ['name', 'address', 'city', 'phone']
     list_editable = ['is_active']
     ordering = ['name']
-
+'''
 
 @admin.register(AppointmentType)
 class AppointmentTypeAdmin(admin.ModelAdmin):
@@ -118,7 +118,7 @@ class AppointmentCancellationAdmin(admin.ModelAdmin):
     ordering = ['-cancelled_at']
 
 
-@admin.register(AppointmentReschedule)
+'''@admin.register(AppointmentReschedule)
 class AppointmentRescheduleAdmin(admin.ModelAdmin):
     list_display = ['original_appointment', 'new_appointment', 'rescheduled_by', 'rescheduled_at', 'reschedule_fee']
     list_filter = ['rescheduled_at', 'original_appointment__therapist']
@@ -128,18 +128,19 @@ class AppointmentRescheduleAdmin(admin.ModelAdmin):
     ]
     readonly_fields = ['rescheduled_at']
     ordering = ['-rescheduled_at']
+'''
 
-
-@admin.register(CancellationPolicy)
+'''@admin.register(CancellationPolicy)
 class CancellationPolicyAdmin(admin.ModelAdmin):
     list_display = ['name', 'hours_before_appointment', 'cancellation_fee_percentage', 'is_active', 'created_at']
     list_filter = ['is_active', 'created_at']
     search_fields = ['name', 'description']
     list_editable = ['is_active', 'cancellation_fee_percentage']
     ordering = ['-hours_before_appointment']
+'''
 
 
-@admin.register(AppointmentReminder)
+'''@admin.register(AppointmentReminder)
 class AppointmentReminderAdmin(admin.ModelAdmin):
     list_display = ['appointment', 'reminder_type', 'scheduled_time', 'status', 'sent_at']
     list_filter = ['reminder_type', 'status', 'scheduled_time']
@@ -149,3 +150,32 @@ class AppointmentReminderAdmin(admin.ModelAdmin):
     ]
     readonly_fields = ['sent_at', 'created_at']
     ordering = ['scheduled_time']
+'''
+
+@admin.register(AppointmentCoupon)
+class AppointmentCouponAdmin(admin.ModelAdmin):
+    list_display = ['code', 'title', 'coupon_type', 'discount_value', 'is_active', 'used_count', 'usage_limit', 'valid_until', 'created_at']
+    list_filter = ['is_active', 'coupon_type', 'valid_from', 'valid_until', 'created_at']
+    search_fields = ['code', 'title', 'description']
+    list_editable = ['is_active']
+    readonly_fields = ['used_count', 'created_at', 'updated_at']
+    ordering = ['-created_at']
+    
+    fieldsets = (
+        (_('اطلاعات کوپن'), {
+            'fields': ('code', 'title', 'description')
+        }),
+        (_('تنظیمات تخفیف'), {
+            'fields': ('coupon_type', 'discount_value', 'min_order_amount', 'max_discount_amount')
+        }),
+        (_('محدودیت‌ها'), {
+            'fields': ('usage_limit', 'used_count', 'is_active')
+        }),
+        (_('اعتبار'), {
+            'fields': ('valid_from', 'valid_until')
+        }),
+        (_('تاریخ‌ها'), {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )

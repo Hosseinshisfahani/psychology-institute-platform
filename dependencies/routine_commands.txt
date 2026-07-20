@@ -1,0 +1,32 @@
+cd ~/psychology-institute-platform
+
+# 1) Pull latest code
+git pull
+
+# 2) Rebuild images
+docker compose -f dependencies/docker-compose.yml build
+
+# 3) Start/update containers
+docker compose -f dependencies/docker-compose.yml up -d
+
+# 4) Run DB migrations
+docker compose -f dependencies/docker-compose.yml exec backend \
+  python dependencies/manage.py migrate
+
+# 5) Quick health checks
+docker compose -f dependencies/docker-compose.yml ps
+curl -I http://127.0.0.1:3010/health
+
+
+
+# 6)Restart app stack:
+sudo systemctl restart psychology-docker.service
+# 7) Restart nginx only:
+sudo systemctl restart nginx
+# 8) Check containers:
+docker compose -f ~/psychology-institute-platform/dependencies/docker-compose.yml ps
+# 9) Follow app logs:
+docker compose -f ~/psychology-institute-platform/dependencies/docker-compose.yml logs -f
+
+docker compose -f ~/psychology-institute-platform/dependencies/docker-compose.yml logs -f backend
+docker compose -f ~/psychology-institute-platform/dependencies/docker-compose.yml logs -f frontend

@@ -42,7 +42,14 @@ import { useAuth } from '../../../contexts/AuthContext';
 
 const schema = yup.object({
   title: yup.string().trim().required('عنوان الزامی است').min(1, 'عنوان نمی‌تواند خالی باشد'),
-  slug: yup.string().trim().required('نامک الزامی است').min(1, 'نامک نمی‌تواند خالی باشد'),
+  slug: yup.string()
+    .trim()
+    .required('نامک الزامی است')
+    .min(1, 'نامک نمی‌تواند خالی باشد')
+    .matches(
+      /^[a-z0-9_-]+$/,
+      'نامک باید فقط شامل حروف انگلیسی، اعداد، خط تیره و زیرخط باشد'
+    ),
   excerpt: yup.string().trim().required('خلاصه الزامی است').min(1, 'خلاصه نمی‌تواند خالی باشد'),
   content: yup.string().required('محتوا الزامی است').test('content-not-empty', 'محتوا نمی‌تواند خالی باشد', function(value) {
     if (!value) return false;
@@ -479,15 +486,24 @@ const BlogForm: React.FC = () => {
                   <Controller
                     name="slug"
                     control={control}
-                    render={({ field: { value, ...fieldProps } }) => (
+                    render={({ field }) => (
                       <TextField
-                        {...fieldProps}
-                        value={typeof value === 'string' ? value : ''}
+                        {...field}
+                        value={typeof field.value === 'string' ? field.value : ''}
                         label="نامک (URL)"
                         fullWidth
                         error={!!errors.slug}
-                        helperText={errors.slug?.message || 'آدرس اینترنتی پست شما'}
+                        helperText={errors.slug?.message || 'آدرس اینترنتی پست شما (فقط حروف انگلیسی، اعداد، خط تیره و زیرخط)'}
                         placeholder="post-url-slug"
+                        onChange={(e) => {
+                          // Sanitize slug input: only allow ASCII letters, numbers, hyphens, and underscores
+                          const sanitized = e.target.value
+                            .toLowerCase()
+                            .replace(/[^a-z0-9_-]/g, '') // Remove invalid characters
+                            .replace(/-+/g, '-') // Replace multiple hyphens with single
+                            .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+                          field.onChange(sanitized);
+                        }}
                       />
                     )}
                   />

@@ -47,12 +47,17 @@ import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useSnackbar } from 'notistack';
-import { blogTagApi, BlogTag } from '../../../services/blogAdminApi';
+import { blogTagApi, blogUtils, BlogTag } from '../../../services/blogAdminApi';
 import TagChip from '../../../components/Admin/Blog/TagChip';
 
 const schema = yup.object({
   name: yup.string().required('نام برچسب الزامی است'),
-  slug: yup.string().required('نامک الزامی است'),
+  slug: yup.string()
+    .required('نامک الزامی است')
+    .matches(
+      /^[a-z0-9_-]+$/,
+      'نامک باید فقط شامل حروف انگلیسی، اعداد، خط تیره و زیرخط باشد'
+    ),
 });
 
 type FormData = yup.InferType<typeof schema>;
@@ -464,14 +469,11 @@ const TagsManager: React.FC = () => {
                     helperText={errors.name?.message}
                     onChange={(e) => {
                       field.onChange(e);
-                      // Auto-generate slug
-                      const slug = e.target.value
-                        .toLowerCase()
-                        .replace(/[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFFa-z0-9\s-]/g, '')
-                        .replace(/\s+/g, '-')
-                        .replace(/-+/g, '-')
-                        .trim();
-                      setValue('slug', slug);
+                      // Auto-generate slug using the utility function
+                      const slug = blogUtils.generateSlug(e.target.value);
+                      if (slug) {
+                        setValue('slug', slug);
+                      }
                     }}
                   />
                 )}
@@ -483,10 +485,20 @@ const TagsManager: React.FC = () => {
                 render={({ field }) => (
                   <TextField
                     {...field}
+                    value={typeof field.value === 'string' ? field.value : ''}
                     label="نامک"
                     fullWidth
                     error={!!errors.slug}
-                    helperText={errors.slug?.message || 'آدرس اینترنتی برچسب'}
+                    helperText={errors.slug?.message || 'آدرس اینترنتی برچسب (فقط حروف انگلیسی، اعداد، خط تیره و زیرخط)'}
+                    onChange={(e) => {
+                      // Sanitize slug input: only allow ASCII letters, numbers, hyphens, and underscores
+                      const sanitized = e.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9_-]/g, '') // Remove invalid characters
+                        .replace(/-+/g, '-') // Replace multiple hyphens with single
+                        .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+                      field.onChange(sanitized);
+                    }}
                   />
                 )}
               />

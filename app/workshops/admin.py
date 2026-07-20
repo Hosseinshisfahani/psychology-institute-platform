@@ -151,7 +151,7 @@ class WorkshopRegistrationAdmin(admin.ModelAdmin):
         }),
     )
 
-
+'''
 @admin.register(WorkshopSessionAttendance)
 class WorkshopSessionAttendanceAdmin(admin.ModelAdmin):
     list_display = [
@@ -170,7 +170,7 @@ class WorkshopSessionAttendanceAdmin(admin.ModelAdmin):
     def user_name(self, obj):
         return obj.registration.user.full_name
     user_name.short_description = _('User')
-
+'''
 
 @admin.register(InstallmentPlan)
 class InstallmentPlanAdmin(admin.ModelAdmin):

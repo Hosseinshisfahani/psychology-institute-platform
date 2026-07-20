@@ -56,6 +56,8 @@ export default function BookingTimeSelectorMUI({
   const [selectedISODate, setSelectedISODate] = useState<string | null>(initialISODate);
   const [selectedTime, setSelectedTime] = useState<string | null>(initialTime);
   const [booked, setBooked] = useState<string[]>([]);
+  // Cache availability for all visible days to show accurate counts
+  const [availabilityCache, setAvailabilityCache] = useState<Record<string, string[]>>({});
   const slots = useMemo(() => buildSlots(startHour, endHour, stepMinutes), [startHour, endHour, stepMinutes]);
 
   const days = useMemo(() => {
@@ -74,15 +76,56 @@ export default function BookingTimeSelectorMUI({
           const bookedTimes = r.booked ?? [];
           console.log('Setting booked times:', bookedTimes);
           setBooked(bookedTimes);
+          // Update cache for this date
+          setAvailabilityCache(prev => ({
+            ...prev,
+            [selectedISODate]: bookedTimes
+          }));
         }
       })
       .catch((error) => {
         console.error('Error in availability fetch:', error);
-        if (mounted) setBooked([]);
+        if (mounted) {
+          setBooked([]);
+          setAvailabilityCache(prev => ({
+            ...prev,
+            [selectedISODate]: []
+          }));
+        }
       });
     return () => { mounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedISODate, fetchAvailability]); // Include fetchAvailability to refetch when dependencies change
+
+  // (A2) Pre-fetch availability for all visible days to show accurate counts
+  useEffect(() => {
+    const fetchAllDays = async () => {
+      const promises = days.map(async (d) => {
+        const iso = d.toISOString().slice(0, 10);
+        // Skip if already cached or if it's the selected date (already fetched above)
+        if (availabilityCache[iso] || iso === selectedISODate) return;
+        
+        try {
+          const result = await fetchAvailability(iso);
+          const bookedTimes = result.booked ?? [];
+          setAvailabilityCache(prev => ({
+            ...prev,
+            [iso]: bookedTimes
+          }));
+        } catch (error) {
+          console.error(`Error fetching availability for ${iso}:`, error);
+          setAvailabilityCache(prev => ({
+            ...prev,
+            [iso]: []
+          }));
+        }
+      });
+      await Promise.all(promises);
+    };
+    
+    fetchAllDays();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days, fetchAvailability]); // Fetch when visible days change
 
   // (B) Pick first visible day once when no date is selected
   useEffect(() => {
@@ -152,16 +195,19 @@ export default function BookingTimeSelectorMUI({
             const dayNum = fmt(d, { day: 'numeric' });
             const month = fmt(d, { month: 'long' });
 
-            // Calculate available count for this specific date
+            // Calculate available count for this specific date using cached availability
+            // Use cached data if available, otherwise use booked state for selected date, or empty array
+            const bookedForThisDate = availabilityCache[iso] !== undefined 
+              ? availabilityCache[iso] 
+              : (iso === selectedISODate ? booked : []);
             const availableCount = slots.filter(s => {
-              if (!selectedISODate) return false;
               const isTodayForThisDate = new Date(iso).toDateString() === new Date(now.getFullYear(), now.getMonth(), now.getDate()).toDateString();
               if (isTodayForThisDate) {
                 const [hh, mm] = s.value.split(':').map(Number);
                 const candidate = new Date(cutoff.getFullYear(), cutoff.getMonth(), cutoff.getDate(), hh, mm, 0);
-                return candidate >= cutoff && !booked.includes(s.value);
+                return candidate >= cutoff && !bookedForThisDate.includes(s.value);
               }
-              return !booked.includes(s.value);
+              return !bookedForThisDate.includes(s.value);
             }).length;
 
             return (

@@ -1,27 +1,34 @@
 # Import necessary modules
 import os
 from pathlib import Path
+from datetime import timedelta
 from decouple import Csv, Config, RepositoryEnv
+
 
 #some necessary variables
 BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_DIR = BASE_DIR / 'dependencies'
 
-# Choose which .env file to use
+
+# ENV_FILE_PATH
 if os.getenv('DJANGO_USE_DEV_ENV') == 'true':
     ENV_FILE = 'dev.env'  # Development mode
 else:
     ENV_FILE = '.env'  # Production mode
 
-# Create config with chosen file using RepositoryEnv
+
+# CONFIG
 ENV_FILE_PATH = ENV_DIR / ENV_FILE
 repository = RepositoryEnv(str(ENV_FILE_PATH))
 config = Config(repository)
 
-# Read settings from the chosen file
+
+# SECRET_KEY and DEBUG
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 
+
+# ALLOWED_HOSTS
 ALLOWED_HOSTS = [
     'sarmadclinic.ir',
     'www.sarmadclinic.ir',
@@ -31,7 +38,7 @@ ALLOWED_HOSTS = [
 ]
 
 
-# Application definition
+# APPLICATIONS
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -67,9 +74,12 @@ INSTALLED_APPS = [
     'app.appointments',
     'app.chat',
     'app.mmpi',
+    'psychology_institute.apps.PsychologyInstituteConfig',
+
 ]
 
-# Middleware
+
+# MIDDLEWARE
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
@@ -83,8 +93,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+
 # ROOT_URLCONF
 ROOT_URLCONF = 'psychology_institute.urls'
+
 
 # TEMPLATES
 TEMPLATES = [
@@ -104,11 +116,12 @@ TEMPLATES = [
     },
 ]
 
-# WSGI_APPLICATION
+
+# WSGI
 WSGI_APPLICATION = 'psychology_institute.wsgi.application'
 
 
-# Database configuration with environment variable support
+# DATABASE
 DATABASES = {
     'default': {
         'ENGINE': config('DATABASE_ENGINE', default='django.db.backends.postgresql'),
@@ -138,7 +151,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-# Internationalization
+# INTERNATIONALIZATION
 LANGUAGE_CODE = 'fa-ir'
 TIME_ZONE = 'Asia/Tehran'
 USE_I18N = True
@@ -150,28 +163,33 @@ LANGUAGES = [
     ('en', 'English'),
 ]
 
-# LOCALE_PATHS
+
+# LOCALE
 LOCALE_PATHS = [
     BASE_DIR / 'dependencies/locale',
 ]
 
 
-# Static files (CSS, JavaScript, Images)
+# STATIC
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'dependencies/static',
 ]
 
-# MEDIA_URL and MEDIA_ROOT
+
+# MEDIA
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'dependencies/media'
 
-# DEFAULT_AUTO_FIELD
+
+# AUTO_FIELD
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 
 # AUTH_USER_MODEL
 AUTH_USER_MODEL = 'dashboard.User'
+
 
 # AUTHENTICATION_BACKENDS
 AUTHENTICATION_BACKENDS = [
@@ -179,39 +197,50 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
+
 # SITE_ID
 SITE_ID = 1
+
 
 # ACCOUNT_EMAIL_VERIFICATION
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
 
+
 # ACCOUNT_UNIQUE_EMAIL
 ACCOUNT_UNIQUE_EMAIL = True
+
 
 # ACCOUNT_USER_MODEL_USERNAME_FIELD
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_USER_MODEL_EMAIL_FIELD = 'email'
 
+
 # ACCOUNT_LOGIN_METHODS
 ACCOUNT_LOGIN_METHODS = {'email'}
+
 
 # ACCOUNT_SIGNUP_FIELDS
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
 
-# LOGIN_URL and LOGIN_REDIRECT_URL and LOGOUT_REDIRECT_URL
+
+# Login URLs
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
-# CRISPY_ALLOWED_TEMPLATE_PACKS and CRISPY_TEMPLATE_PACK
+
+# CRISPY
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
+
 
 # REST_FRAMEWORK
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -223,7 +252,23 @@ REST_FRAMEWORK = {
     ],
 }
 
-# CORS_ALLOWED_ORIGINS
+# JWT
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': False,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+}
+
+# CORS
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -239,11 +284,10 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
-
-# CORS_ALLOW_ALL_ORIGINS
 CORS_ALLOW_ALL_ORIGINS = DEBUG  
 
-# CSRF_TRUSTED_ORIGINS
+
+# CSRF
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
@@ -264,14 +308,16 @@ CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_NAME = 'csrftoken'
 SESSION_COOKIE_SAMESITE = 'Lax'
 
-# USE_X_FORWARDED_HOST and SECURE_PROXY_SSL_HEADER and FORCE_SCRIPT_NAME
+
+# X_FORWARDED
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # For HTTPS behind reverse proxy
 FORCE_SCRIPT_NAME = ''  # Empty string means use relative URLs
 
 DEVELOPMENT_MODE = config('DEVELOPMENT_MODE', default=DEBUG, cast=bool)
 
-# Security settings for production (disabled in development mode)
+
+# SECURITY
 if not DEBUG and not DEVELOPMENT_MODE:
     SECURE_SSL_REDIRECT = True
     SECURE_HSTS_SECONDS = 31536000  # 1 year
@@ -282,10 +328,11 @@ else:
     SECURE_SSL_REDIRECT = False
     SECURE_HSTS_SECONDS = 0
 
-SESSION_COOKIE_SECURE = not DEVELOPMENT_MODE  # False in development, True in production
-CSRF_COOKIE_SECURE = not DEVELOPMENT_MODE  # False in development, True in production
+SESSION_COOKIE_SECURE = not DEVELOPMENT_MODE  # F in dev, T in pro
+CSRF_COOKIE_SECURE = not DEVELOPMENT_MODE  # F in dev, T in pro
 
-# CELERY_BROKER_URL and CELERY_RESULT_BACKEND and CELERY_ACCEPT_CONTENT and CELERY_TASK_SERIALIZER and CELERY_RESULT_SERIALIZER and CELERY_TIMEZONE
+
+# CELERY
 CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')
 CELERY_ACCEPT_CONTENT = ['json']
@@ -293,7 +340,8 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
-# EMAIL_BACKEND and EMAIL_HOST and EMAIL_PORT and EMAIL_USE_TLS and EMAIL_HOST_USER and EMAIL_HOST_PASSWORD and DEFAULT_FROM_EMAIL
+
+# EMAIL
 EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
 EMAIL_HOST = config('EMAIL_HOST', default='')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
@@ -302,17 +350,31 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@sarmadclinic.ir')
 
-# SMS_USERNAME and SMS_PASSWORD and SMS_SENDER_NUMBER
-SMS_USERNAME = config('SMS_USERNAME', default='utpsy')
-SMS_PASSWORD = config('SMS_PASSWORD', default='Sarmad@123')
-SMS_SENDER_NUMBER = config('SMS_SENDER_NUMBER', default='')  # Sender number (سرشماره) - get from insms.ir panel
 
-# SECURE_BROWSER_XSS_FILTER and SECURE_CONTENT_TYPE_NOSNIFF and X_FRAME_OPTIONS
+# SMS
+SMS_PROVIDER_WSDL = config('SMS_PROVIDER_WSDL', default='http://www.sepahansms.com/smsSendWebServiceforphp.asmx?wsdl')
+SMS_USERNAME = config('SMS_USERNAME', default='')
+SMS_PASSWORD = config('SMS_PASSWORD', default='')
+SMS_DOMAIN = config('SMS_DOMAIN', default='sepahansms')
+SMS_SENDER_NUMBER = config('SMS_SENDER_NUMBER', default='')
+SEPAHANGOSTAR_API_BASE = config('SEPAHANGOSTAR_API_BASE', default='https://api.sepahansms.com')
+SEPAHANGOSTAR_API_TOKEN = config('SEPAHANGOSTAR_API_TOKEN', default='')
+SEPAHANGOSTAR_SENDER_NUMBER = config('SEPAHANGOSTAR_SENDER_NUMBER', default='')
+
+
+# OTP
+OTP_EXPIRE_SECONDS = int(config('OTP_EXPIRE_SECONDS', default='180'))
+OTP_RESEND_COOLDOWN_SECONDS = int(config('OTP_RESEND_COOLDOWN_SECONDS', default='60'))
+OTP_MAX_ATTEMPTS = int(config('OTP_MAX_ATTEMPTS', default='5'))
+
+
+# SECURE
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
-# CACHES and SESSION_ENGINE
+
+# CACHES
 try:
     import redis
     redis.Redis(host='localhost', port=6379, db=1).ping()
@@ -335,23 +397,28 @@ except (ImportError, redis.ConnectionError, redis.RedisError):
     }
     SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
-SESSION_COOKIE_AGE = 86400  # 24 hours
+SESSION_COOKIE_AGE = 86400  #(24 hours)
 
-# CROOM_API_KEY and CROOM_API_URL
+
+# CROOM
 CROOM_API_KEY = config('CROOM_API_KEY', default='')
 CROOM_API_URL = config('CROOM_API_URL', default='')
 
-# JALALI_DATE_DEFAULT_GEOGRAPHIC_ZONE and JALALI_DATE_DEFAULT_FORMAT and JALALI_DATE_DEFAULT_DATETIME_FORMAT and JALALI_DATE_DEFAULT_DATE_FORMAT and JALALI_DATE_DEFAULT_TIME_FORMAT
+
+# JALALI_DATE
 JALALI_DATE_DEFAULT_GEOGRAPHIC_ZONE = 'Asia/Tehran'
 JALALI_DATE_DEFAULT_FORMAT = '%Y/%m/%d'
 JALALI_DATE_DEFAULT_DATETIME_FORMAT = '%Y/%m/%d %H:%M:%S'
 JALALI_DATE_DEFAULT_DATE_FORMAT = '%Y/%m/%d'
 JALALI_DATE_DEFAULT_TIME_FORMAT = '%H:%M:%S'
 
+
+# ZARINPAL
 ZARINPAL_MERCHANT_ID = config('ZARINPAL_MERCHANT_ID')
 ZARINPAL_SANDBOX = config('ZARINPAL_SANDBOX', cast=bool)
 
-# SITE_URL and FRONTEND_URL and ZARINPAL_CALLBACK_URL
+
+# SITE and FRONTEND
 SITE_URL = config('SITE_URL', default='https://sarmadclinic.ir')
 FRONTEND_URL = config('FRONTEND_URL', default='https://sarmadclinic.ir')
 ZARINPAL_CALLBACK_URL = config(

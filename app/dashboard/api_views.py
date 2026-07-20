@@ -14,8 +14,7 @@ logger = logging.getLogger(__name__)
 from datetime import timedelta
 from .models import User, Notification, OTPCode
 from .serializers import UserSerializer, UserProfileSerializer
-from .sms_service import send_otp_sms, verify_otp_sms, generate_otp_code
-from app.courses.models import CoursePurchase
+from .sms_service import send_otp_sms, verify_otp_sms, generate_otp_code, hash_otp, verify_otp
 from app.payment.models import Order
 
 logger = logging.getLogger(__name__)
@@ -717,100 +716,85 @@ class SendOTPAPIView(APIView):
     """API endpoint to send OTP code via SMS"""
     permission_classes = [permissions.AllowAny]
     authentication_classes = []  # No authentication required
-    
+
     def post(self, request):
         try:
             phone_number = request.data.get('phone_number')
             purpose = request.data.get('purpose', 'signup')  # signup, login, password_reset
-            
+
             if not phone_number:
                 return Response({
                     'success': False,
                     'message': 'Phone number is required'
                 }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Validate phone number format (Iranian mobile numbers)
+
+            if purpose not in {'signup', 'login', 'password_reset'}:
+                return Response({
+                    'success': False,
+                    'message': 'Invalid OTP purpose'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Normalize phone number (Iranian format)
             phone_number = phone_number.replace('+98', '').replace('0098', '').replace('-', '').replace(' ', '').strip()
             if not phone_number.startswith('0'):
                 phone_number = '0' + phone_number
-            
+
             if not phone_number.startswith('09') or len(phone_number) != 11:
                 return Response({
                     'success': False,
                     'message': 'Invalid phone number format. Please use format: 09123456789'
                 }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Check for recent OTP requests (rate limiting - 2 minutes cooldown)
-            try:
-                recent_otp = OTPCode.objects.filter(
-                    phone_number=phone_number,
-                    purpose=purpose,
-                    created_at__gte=timezone.now() - timedelta(minutes=2)
-                ).order_by('-created_at').first()
-                
-                if recent_otp and not recent_otp.is_expired() and not recent_otp.is_used:
-                    # If there's a valid recent OTP, check if SMS was actually sent
-                    # If SMS provider is rate-limiting, we can still return success with existing code
-                    logger.info(f"Found recent valid OTP for {phone_number}, checking if we should reuse it")
-                    
-                    # Check if the error is rate limiting (کد قبلا ارسال شده)
-                    # In this case, the SMS was likely already sent, so we return the existing code
-                    return Response({
-                        'success': True,
-                        'message': 'OTP code already sent. Please check your phone. If you did not receive it, please wait 2 minutes and try again.',
-                        'expires_at': recent_otp.expires_at,
-                        'already_sent': True
-                    })
-            except Exception as e:
-                logger.error(f"Database error checking recent OTP: {str(e)}", exc_info=True)
-                # Continue with sending new OTP if database query fails
-            
-            # ============================================================
-            # TEMPORARY: SMS PROVIDER DISABLED
-            # TODO: Re-enable when switching to Kavehnegar service
-            # ============================================================
-            
-            # # Send OTP via SMS - Let provider generate the code
-            # logger.info(f"Requesting SMS provider to send OTP to {phone_number}")
-            # try:
-            #     sms_result = send_otp_sms(phone_number)  # No code parameter - provider generates it
-            #     logger.info(f"send_otp_sms returned: {sms_result}")
-            # except Exception as e:
-            #     logger.error(f"Exception in send_otp_sms: {str(e)}", exc_info=True)
-            #     return Response({
-            #         'success': False,
-            #         'message': f'Error sending OTP: {str(e)}'
-            #     }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-            # TEMPORARY: Generate a fixed code for testing (use "1234" for any signup)
-            logger.warning(f"[TEMP] SMS provider disabled - using fixed test code for {phone_number}")
-            test_code = "1234"  # Fixed code for testing
-            
-            # Save OTP to database with the test code
-            try:
-                otp_obj = OTPCode.objects.create(
-                    phone_number=phone_number,
-                    code=test_code,  # Store the test code
-                    transaction_id=f"TEST-{timezone.now().timestamp()}",  # Fake transaction ID
-                    purpose=purpose,
-                    expires_at=timezone.now() + timedelta(minutes=5)
-                )
-                logger.info(f"[SendOTP] Created test OTP record with code: {test_code}")
-            except Exception as e:
-                logger.error(f"Database error saving OTP: {str(e)}", exc_info=True)
+
+            cooldown_seconds = int(getattr(settings, 'OTP_RESEND_COOLDOWN_SECONDS', 60))
+            expire_seconds = int(getattr(settings, 'OTP_EXPIRE_SECONDS', 180))
+
+            recent_otp = OTPCode.objects.filter(
+                phone_number=phone_number,
+                purpose=purpose,
+                is_used=False,
+                is_verified=False,
+                created_at__gte=timezone.now() - timedelta(seconds=cooldown_seconds),
+            ).order_by('-created_at').first()
+
+            if recent_otp and not recent_otp.is_expired():
+                return Response({
+                    'success': True,
+                    'message': 'OTP was recently sent. Please wait before requesting again.',
+                    'already_sent': True,
+                    'expires_at': recent_otp.expires_at
+                })
+
+            # Generate OTP locally in Django
+            otp_code = generate_otp_code(6)
+            otp_hash = hash_otp(otp_code)
+            expires_at = timezone.now() + timedelta(seconds=expire_seconds)
+
+            # Provider is only SMS transport
+            sms_result = send_otp_sms(phone_number, otp_code)
+            if not sms_result.ok:
                 return Response({
                     'success': False,
-                    'message': 'Failed to save OTP record. Please try again.'
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-            # TEMPORARY: Return message with test code
+                    'message': 'Failed to send OTP. Please try again.',
+                    'provider_error_code': sms_result.error_code
+                }, status=status.HTTP_502_BAD_GATEWAY)
+
+            otp_obj = OTPCode.objects.create(
+                phone_number=phone_number,
+                code=None,  # Never store raw OTP
+                code_hash=otp_hash,
+                transaction_id=sms_result.message_id,
+                purpose=purpose,
+                expires_at=expires_at,
+                is_used=False,
+                is_verified=False,
+            )
+
             return Response({
                 'success': True,
-                'message': f'[TEST MODE] Use code: {test_code} (SMS disabled temporarily)',
+                'message': 'OTP sent successfully',
                 'expires_at': otp_obj.expires_at,
-                'test_mode': True,
-                'test_code': test_code  # Only for development!
             })
+
         except Exception as e:
             logger.error(f"Unexpected error in SendOTPAPIView: {str(e)}", exc_info=True)
             return Response({
@@ -818,111 +802,98 @@ class SendOTPAPIView(APIView):
                 'message': 'An unexpected error occurred. Please try again later.'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+            
 @method_decorator(csrf_exempt, name='dispatch')
 class VerifyOTPAPIView(APIView):
     """API endpoint to verify OTP code"""
     permission_classes = [permissions.AllowAny]
-    authentication_classes = []  # No authentication required
-    
+    authentication_classes = []
+
     def post(self, request):
         phone_number = request.data.get('phone_number')
         otp_code = request.data.get('otp_code') or request.data.get('code')
         purpose = request.data.get('purpose', 'signup')
-        
+
         if not phone_number or not otp_code:
             return Response({
                 'success': False,
                 'message': 'Phone number and OTP code are required'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Normalize phone number
+
+        if purpose not in {'signup', 'login', 'password_reset'}:
+            return Response({
+                'success': False,
+                'message': 'Invalid OTP purpose'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         phone_number = phone_number.replace('+98', '').replace('0098', '').replace('-', '').replace(' ', '').strip()
         if not phone_number.startswith('0'):
             phone_number = '0' + phone_number
-        
-        # Normalize OTP code (remove spaces, ensure it's a string)
+
         otp_code = str(otp_code).replace(' ', '').replace('-', '').strip()
-        
-        logger.info(f"[VerifyOTP] Attempting to verify OTP for {phone_number}, code: {otp_code}, purpose: {purpose}")
-        
-        # Find the most recent OTP request for this phone/purpose
+        if not otp_code.isdigit() or len(otp_code) != 6:
+            return Response({
+                'success': False,
+                'message': 'Invalid OTP format'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         otp_obj = OTPCode.objects.filter(
             phone_number=phone_number,
             purpose=purpose,
             is_used=False,
-            is_verified=False
+            is_verified=False,
         ).order_by('-created_at').first()
-        
+
         if not otp_obj:
-            logger.warning(f"[VerifyOTP] No pending OTP found for {phone_number}, purpose: {purpose}")
             return Response({
                 'success': False,
                 'message': 'No pending OTP request found. Please request a new code.'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Check if expired
+
         if otp_obj.is_expired():
-            logger.warning(f"[VerifyOTP] OTP expired for {phone_number}")
+            otp_obj.is_used = True
+            otp_obj.save(update_fields=['is_used'])
             return Response({
                 'success': False,
                 'message': 'OTP code has expired. Please request a new one.'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Verify with SMS provider
-        sms_configured = all([
-            getattr(settings, 'SMS_USERNAME', ''),
-            getattr(settings, 'SMS_PASSWORD', ''),
-            getattr(settings, 'SMS_SENDER_NUMBER', '')
-        ])
-        
-        if not sms_configured:
-            logger.error("[VerifyOTP] SMS provider not configured!")
+
+        max_attempts = int(getattr(settings, 'OTP_MAX_ATTEMPTS', 5))
+
+        if otp_obj.attempts >= max_attempts:
+            otp_obj.is_used = True
+            otp_obj.save(update_fields=['is_used'])
             return Response({
                 'success': False,
-                'message': 'SMS verification service is not configured.'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        try:
-            # ============================================================
-            # TEMPORARY: SMS VERIFICATION SIMPLIFIED (SMS provider disabled)
-            # TODO: Restore proper SMS provider verification when switching to Kavehnegar
-            # ============================================================
-            # Since SMS provider is temporarily disabled, we verify by:
-            # 1. There's a valid OTP request for this phone/purpose
-            # 2. The code format is valid (4-6 digits)
-            # 3. It's not expired
-            # 4. In test mode: Any valid format code is accepted
-            
-            logger.info(f"[VerifyOTP] [TEST MODE] Verifying OTP for {phone_number} with code: {otp_code}")
-            
-            # Validate code format
-            if not otp_code.isdigit() or len(otp_code) not in [4, 6]:
-                logger.warning(f"[VerifyOTP] Invalid code format: {otp_code}")
-                return Response({
-                    'success': False,
-                    'message': 'Invalid OTP code format. Please enter 4-6 digits.'
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Mark as verified
-            otp_obj.code = otp_code  # Store the entered code
-            otp_obj.is_verified = True
-            otp_obj.verified_at = timezone.now()
-            otp_obj.save()
-            
-            logger.info(f"[VerifyOTP] [TEST MODE] OTP verified successfully for {phone_number}")
-            return Response({
-                'success': True,
-                'message': 'OTP verified successfully',
-                'test_mode': True  # Indicate this is test mode
-            })
-                
-        except Exception as e:
-            logger.error(f"[VerifyOTP] Exception during OTP verification: {str(e)}", exc_info=True)
+                'message': 'Maximum verification attempts exceeded. Please request a new OTP.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verify against local hashed OTP (provider is transport only)
+        if not verify_otp(otp_code, otp_obj.code_hash):
+            otp_obj.attempts += 1
+            update_fields = ['attempts']
+
+            if otp_obj.attempts >= max_attempts:
+                otp_obj.is_used = True
+                update_fields.append('is_used')
+
+            otp_obj.save(update_fields=update_fields)
+
+            remaining = max(0, max_attempts - otp_obj.attempts)
             return Response({
                 'success': False,
-                'message': 'Error verifying OTP. Please try again.'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                'message': 'Invalid OTP code',
+                'remaining_attempts': remaining
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        otp_obj.is_verified = True
+        otp_obj.verified_at = timezone.now()
+        otp_obj.save(update_fields=['is_verified', 'verified_at'])
+
+        return Response({
+            'success': True,
+            'message': 'OTP verified successfully'
+        })
 
 
 @api_view(['GET'])
@@ -930,13 +901,11 @@ class VerifyOTPAPIView(APIView):
 def sms_config_check(request):
     """Diagnostic endpoint to check if SMS credentials are loaded"""
     from django.conf import settings
-    from .sms_service import SMS_USERNAME, SMS_PASSWORD, SMS_SENDER_NUMBER
-    
     return Response({
-        'sms_username': SMS_USERNAME if SMS_USERNAME else 'NOT SET',
-        'sms_password_set': bool(SMS_PASSWORD),
-        'sms_sender_number': SMS_SENDER_NUMBER if SMS_SENDER_NUMBER else 'NOT SET',
-        'settings_sms_username': getattr(settings, 'SMS_USERNAME', 'NOT FOUND'),
-        'settings_sms_password_set': bool(getattr(settings, 'SMS_PASSWORD', '')),
-        'settings_sms_sender': getattr(settings, 'SMS_SENDER_NUMBER', 'NOT FOUND'),
+        'sms_username': getattr(settings, 'SMS_USERNAME', 'NOT SET'),
+        'sms_password_set': bool(getattr(settings, 'SMS_PASSWORD', '')),
+        'sms_sender_number': getattr(settings, 'SMS_SENDER_NUMBER', 'NOT SET'),
+        'sepahangostar_api_base': getattr(settings, 'SEPAHANGOSTAR_API_BASE', 'NOT SET'),
+        'sepahangostar_api_token_set': bool(getattr(settings, 'SEPAHANGOSTAR_API_TOKEN', '')),
+        'sepahangostar_sender_number': getattr(settings, 'SEPAHANGOSTAR_SENDER_NUMBER', 'NOT SET'),
     })

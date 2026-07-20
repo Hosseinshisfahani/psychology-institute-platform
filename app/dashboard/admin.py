@@ -39,7 +39,7 @@ class UserAdmin(BaseUserAdmin):
     
     readonly_fields = ('date_joined', 'last_login')
 
-
+'''
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
     """Admin configuration for UserProfile model"""
@@ -75,4 +75,4 @@ class OTPCodeAdmin(admin.ModelAdmin):
     ordering = ('-created_at',)
     
     def get_queryset(self, request):
-        return super().get_queryset(request)
+        return super().get_queryset(request)'''

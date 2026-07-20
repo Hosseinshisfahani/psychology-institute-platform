@@ -3,6 +3,7 @@ from django.utils import timezone
 from datetime import timedelta
 from app.courses.models import Coupon
 from app.packages.models import PackageCoupon
+from app.appointments.models import AppointmentCoupon
 
 
 class Command(BaseCommand):
@@ -71,10 +72,39 @@ class Command(BaseCommand):
             package_coupon.save()
             self.stdout.write(self.style.WARNING(f'⟳ Updated existing package coupon: {package_coupon.code}'))
         
+        # Create appointment coupon
+        appointment_coupon, created = AppointmentCoupon.objects.get_or_create(
+            code='ALLFREE',
+            defaults={
+                'title': 'تخفیف ۱۰۰٪ - رایگان',
+                'description': 'کد تخفیف رایگان برای همه نوبت‌ها',
+                'coupon_type': 'percentage',
+                'discount_value': 100.00,
+                'min_order_amount': 0,
+                'max_discount_amount': None,
+                'usage_limit': None,  # Unlimited usage
+                'used_count': 0,
+                'is_active': True,
+                'valid_from': valid_from,
+                'valid_until': valid_until,
+            }
+        )
+        
+        if created:
+            self.stdout.write(self.style.SUCCESS(f'✓ Created appointment coupon: {appointment_coupon.code}'))
+        else:
+            # Update existing coupon to ensure it's active and valid
+            appointment_coupon.is_active = True
+            appointment_coupon.valid_from = valid_from
+            appointment_coupon.valid_until = valid_until
+            appointment_coupon.discount_value = 100.00
+            appointment_coupon.save()
+            self.stdout.write(self.style.WARNING(f'⟳ Updated existing appointment coupon: {appointment_coupon.code}'))
+        
         self.stdout.write(self.style.SUCCESS('\n═══════════════════════════════════════════════════════'))
         self.stdout.write(self.style.SUCCESS('  Discount Code: ALLFREE'))
         self.stdout.write(self.style.SUCCESS('  Type: 100% Percentage Discount'))
-        self.stdout.write(self.style.SUCCESS('  Applies to: All Courses and Packages'))
+        self.stdout.write(self.style.SUCCESS('  Applies to: All Courses, Packages, and Appointments'))
         self.stdout.write(self.style.SUCCESS('  Usage Limit: Unlimited'))
         self.stdout.write(self.style.SUCCESS(f'  Valid Until: {valid_until.strftime("%Y-%m-%d %H:%M")}'))
         self.stdout.write(self.style.SUCCESS('═══════════════════════════════════════════════════════\n'))

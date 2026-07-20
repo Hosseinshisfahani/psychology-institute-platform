@@ -65,6 +65,10 @@ const AppointmentBookingMUI: React.FC = () => {
   const [existingAppointment, setExistingAppointment] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [useWallet, setUseWallet] = useState<boolean>(false);
+  const [couponCode, setCouponCode] = useState<string>('');
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [couponApplied, setCouponApplied] = useState<boolean>(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
 
   const formatCurrency = (amount?: number) => {
     const numericAmount = Number(amount || 0);
@@ -187,6 +191,9 @@ const AppointmentBookingMUI: React.FC = () => {
 
   const selectedDepositAmount = selectedAppointmentTypeData?.deposit_amount || 0;
   const requiresDeposit = Boolean(!isRescheduling && selectedAppointmentTypeData?.requires_deposit && selectedDepositAmount > 0);
+  
+  // Calculate final deposit amount after discount
+  const finalDepositAmount = Math.max(0, selectedDepositAmount - discountAmount);
 
   // Fetch wallet balance (only when deposit is required)
   const { data: walletBalance } = useQuery({
@@ -281,8 +288,22 @@ const AppointmentBookingMUI: React.FC = () => {
       }
     },
     onSuccess: (data, variables) => {
-      if (!isRescheduling && data?.deposit?.required) {
-        if (data.deposit.paid_with_wallet) {
+      if (!isRescheduling && data?.deposit) {
+        // Check if deposit is free (0) after discount
+        if (data.deposit.free_with_coupon || (data.deposit.amount === '0' && !data.deposit.required)) {
+          queryClient.invalidateQueries({ queryKey: ['appointments'] });
+          
+          const selectedTherapistData = therapists.find(t => t.id === variables.therapist);
+          const therapistName = selectedTherapistData?.name || 'متخصص مربوطه';
+          
+          localStorage.setItem('appointmentSuccess', JSON.stringify({
+            message: `نوبت شما با ${therapistName} با موفقیت ثبت شد. با اعمال کد تخفیف، ودیعه رایگان شد.`,
+            therapistName: therapistName
+          }));
+          
+          navigate('/appointments');
+          return;
+        } else if (data.deposit.paid_with_wallet) {
           // Paid with wallet - show success
           queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
           queryClient.invalidateQueries({ queryKey: ['appointments'] });
@@ -389,7 +410,7 @@ const AppointmentBookingMUI: React.FC = () => {
 
     const scheduledDateTime = `${payload.date}T${payload.time}:00`;
     
-    const bookingData: BookingData = {
+    const bookingData: BookingData & { coupon_code?: string } = {
       therapist: selectedTherapist,
       appointment_type: selectedType,
       location: selectedLocation,
@@ -397,9 +418,53 @@ const AppointmentBookingMUI: React.FC = () => {
       duration_minutes: selectedAppointmentTypeData?.default_duration_minutes || 60,
       notes: notes || undefined,
     };
+    
+    // Add coupon code if applied
+    if (couponCode && couponApplied) {
+      bookingData.coupon_code = couponCode;
+    }
 
     bookAppointmentMutation.mutate(bookingData);
   };
+  
+  // Validate and apply coupon code
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      setCouponError('لطفاً کد تخفیف را وارد کنید');
+      return;
+    }
+    
+    if (!requiresDeposit || selectedDepositAmount <= 0) {
+      setCouponError('کد تخفیف فقط برای نوبت‌هایی که نیاز به ودیعه دارند قابل استفاده است');
+      return;
+    }
+    
+    try {
+      // For ALLFREE code, apply 100% discount directly
+      if (couponCode.trim().toUpperCase() === 'ALLFREE') {
+        setDiscountAmount(selectedDepositAmount);
+        setCouponApplied(true);
+        setCouponError(null);
+      } else {
+        // For other codes, you could add API validation here
+        setCouponError('کد تخفیف نامعتبر است');
+        setCouponApplied(false);
+        setDiscountAmount(0);
+      }
+    } catch (error) {
+      setCouponError('خطا در اعمال کد تخفیف');
+      setCouponApplied(false);
+      setDiscountAmount(0);
+    }
+  };
+  
+  // Reset coupon when appointment type changes
+  useEffect(() => {
+    setCouponCode('');
+    setDiscountAmount(0);
+    setCouponApplied(false);
+    setCouponError(null);
+  }, [selectedType]);
 
   return (
     <>
@@ -944,9 +1009,19 @@ const AppointmentBookingMUI: React.FC = () => {
                           <div className="mb-2">
                             <strong>هزینه جلسه:</strong> {formatCurrency(selectedAppointmentTypeData?.price)}
                           </div>
-                          <div className="mb-0">
+                          <div className="mb-2">
                             <strong>ودیعه:</strong> {requiresDeposit ? formatCurrency(selectedDepositAmount) : 'نیاز ندارد'}
                           </div>
+                          {couponApplied && discountAmount > 0 && (
+                            <>
+                              <div className="mb-2 text-success">
+                                <strong>تخفیف:</strong> -{formatCurrency(discountAmount)}
+                              </div>
+                              <div className="mb-0">
+                                <strong>ودیعه نهایی:</strong> <span className="text-success fw-bold">{formatCurrency(finalDepositAmount)}</span>
+                              </div>
+                            </>
+                          )}
                         </Card.Body>
                       </Card>
                     </Col>
@@ -971,11 +1046,80 @@ const AppointmentBookingMUI: React.FC = () => {
 
                   {requiresDeposit && (
                     <>
+                      <Card className="mb-4" style={{ borderRadius: '12px', border: '1px solid #28a745' }}>
+                        <Card.Body>
+                          <h6 className="mb-3">
+                            <i className="fas fa-tag me-2 text-success"></i>
+                            کد تخفیف
+                          </h6>
+                          <Row className="g-2">
+                            <Col xs={12} md={8}>
+                              <InputGroup>
+                                <InputGroup.Text>
+                                  <i className="fas fa-ticket-alt"></i>
+                                </InputGroup.Text>
+                                <Form.Control
+                                  type="text"
+                                  placeholder="کد تخفیف را وارد کنید"
+                                  value={couponCode}
+                                  onChange={(e) => {
+                                    setCouponCode(e.target.value);
+                                    setCouponError(null);
+                                    if (!e.target.value.trim()) {
+                                      setCouponApplied(false);
+                                      setDiscountAmount(0);
+                                    }
+                                  }}
+                                  disabled={couponApplied}
+                                  style={{ borderRadius: '8px' }}
+                                />
+                                <Button
+                                  variant={couponApplied ? "success" : "outline-success"}
+                                  onClick={handleApplyCoupon}
+                                  disabled={couponApplied || !couponCode.trim()}
+                                  style={{ borderRadius: '8px' }}
+                                >
+                                  {couponApplied ? (
+                                    <>
+                                      <i className="fas fa-check me-2"></i>
+                                      اعمال شد
+                                    </>
+                                  ) : (
+                                    <>
+                                      <i className="fas fa-check me-2"></i>
+                                      اعمال
+                                    </>
+                                  )}
+                                </Button>
+                              </InputGroup>
+                              {couponError && (
+                                <small className="text-danger mt-2 d-block">
+                                  <i className="fas fa-exclamation-circle me-1"></i>
+                                  {couponError}
+                                </small>
+                              )}
+                              {couponApplied && (
+                                <small className="text-success mt-2 d-block">
+                                  <i className="fas fa-check-circle me-1"></i>
+                                  کد تخفیف با موفقیت اعمال شد. تخفیف: {discountAmount.toLocaleString('fa-IR')} تومان
+                                </small>
+                              )}
+                            </Col>
+                          </Row>
+                        </Card.Body>
+                      </Card>
+                    </>
+                  )}
+
+                  {requiresDeposit && (
+                    <>
                       <Alert variant="warning" className="mb-3">
                         <div className="d-flex align-items-start">
                           <i className="fas fa-lock me-3 mt-1"></i>
                           <div>
-                            <strong>توجه:</strong> برای تکمیل رزرو این نوبت، پرداخت ودیعه {formatCurrency(selectedDepositAmount)} الزامی است. پس از انتخاب دکمه زیر به درگاه پرداخت امن هدایت می‌شوید.
+                            <strong>توجه:</strong> برای تکمیل رزرو این نوبت، پرداخت ودیعه {formatCurrency(finalDepositAmount)} الزامی است. {finalDepositAmount < selectedDepositAmount && (
+                              <span className="text-success">(با اعمال کد تخفیف)</span>
+                            )} پس از انتخاب دکمه زیر به درگاه پرداخت امن هدایت می‌شوید.
                           </div>
                         </div>
                       </Alert>
@@ -1001,7 +1145,7 @@ const AppointmentBookingMUI: React.FC = () => {
                                   </div>
                                   {useWallet && (
                                     <div className="mt-2">
-                                      {parseFloat(walletBalance.balance) >= selectedDepositAmount ? (
+                                      {parseFloat(walletBalance.balance) >= finalDepositAmount ? (
                                         <small className="text-success">
                                           <i className="fas fa-check-circle me-1"></i>
                                           مبلغ کامل از کیف پول شما کسر خواهد شد.
@@ -1098,3 +1242,4 @@ const AppointmentBookingMUI: React.FC = () => {
 };
 
 export default AppointmentBookingMUI;
+

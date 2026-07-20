@@ -2,7 +2,6 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
 from .models import (
-# from psychology_institute.admin import persian_admin_site
     PackageCategory, Package, PackagePurchase, PackageEnrollment,
     PackageProgress, PackageReview, PackageCoupon, PackageLike, PackageComment
 )
@@ -153,32 +152,6 @@ class PackageEnrollmentAdmin(admin.ModelAdmin):
     progress_display.short_description = _('Progress')
 
 
-@admin.register(PackageProgress)
-class PackageProgressAdmin(admin.ModelAdmin):
-    list_display = [
-        'user_name', 'package_title', 'overall_progress_display',
-        'completed_courses', 'updated_at'
-    ]
-    list_filter = ['updated_at']
-    search_fields = [
-        'purchase__user__email',
-        'purchase__user__first_name',
-        'purchase__package__title'
-    ]
-    readonly_fields = ['updated_at']
-    
-    def user_name(self, obj):
-        return obj.purchase.user.full_name
-    user_name.short_description = _('User')
-    
-    def package_title(self, obj):
-        return obj.purchase.package.title
-    package_title.short_description = _('Package')
-    
-    def overall_progress_display(self, obj):
-        return f"{obj.overall_progress_percentage:.1f}%"
-    overall_progress_display.short_description = _('Overall Progress')
-
 
 @admin.register(PackageReview)
 class PackageReviewAdmin(admin.ModelAdmin):
@@ -230,6 +203,19 @@ class PackageReviewAdmin(admin.ModelAdmin):
         updated = queryset.update(is_approved=False)
         self.message_user(request, _(f'{updated} reviews rejected.'))
     reject_reviews.short_description = _('Reject selected reviews')
+
+
+@admin.register(PackageLike)
+class PackageLikeAdmin(admin.ModelAdmin):
+    """Admin configuration for PackageLike model"""
+    
+    list_display = ('package', 'user', 'created_at')
+    list_filter = ('created_at', 'package__category')
+    search_fields = ('package__title', 'user__first_name', 'user__last_name', 'user__email')
+    readonly_fields = ('created_at',)
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('package', 'user')
 
 
 @admin.register(PackageCoupon)
@@ -284,19 +270,34 @@ class PackageCouponAdmin(admin.ModelAdmin):
     deactivate_coupons.short_description = _('Deactivate selected coupons')
 
 
-@admin.register(PackageLike)
-class PackageLikeAdmin(admin.ModelAdmin):
-    """Admin configuration for PackageLike model"""
+'''
+@admin.register(PackageProgress)
+class PackageProgressAdmin(admin.ModelAdmin):
+    list_display = [
+        'user_name', 'package_title', 'overall_progress_display',
+        'completed_courses', 'updated_at'
+    ]
+    list_filter = ['updated_at']
+    search_fields = [
+        'purchase__user__email',
+        'purchase__user__first_name',
+        'purchase__package__title'
+    ]
+    readonly_fields = ['updated_at']
     
-    list_display = ('package', 'user', 'created_at')
-    list_filter = ('created_at', 'package__category')
-    search_fields = ('package__title', 'user__first_name', 'user__last_name', 'user__email')
-    readonly_fields = ('created_at',)
+    def user_name(self, obj):
+        return obj.purchase.user.full_name
+    user_name.short_description = _('User')
     
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related('package', 'user')
+    def package_title(self, obj):
+        return obj.purchase.package.title
+    package_title.short_description = _('Package')
+    
+    def overall_progress_display(self, obj):
+        return f"{obj.overall_progress_percentage:.1f}%"
+    overall_progress_display.short_description = _('Overall Progress')
 
-
+   
 @admin.register(PackageComment)
 class PackageCommentAdmin(admin.ModelAdmin):
     """Admin configuration for PackageComment model"""
@@ -338,3 +339,5 @@ class PackageCommentAdmin(admin.ModelAdmin):
     
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('package', 'author', 'parent')
+
+'''

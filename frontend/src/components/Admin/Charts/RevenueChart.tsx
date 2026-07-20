@@ -76,7 +76,7 @@ const RevenueChart: React.FC<RevenueChartProps> = ({ data }) => {
                   border: `1px solid ${theme.palette.divider}`,
                   borderRadius: '8px',
                 }}
-                formatter={(value: number) => [formatCurrency(value) + ' تومان', 'درآمد']}
+                formatter={(value: number | undefined) => [formatCurrency(value ?? 0) + ' تومان', 'درآمد']}
                 labelStyle={{ color: theme.palette.text.primary }}
               />
               <Area

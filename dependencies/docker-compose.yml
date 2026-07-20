@@ -1,0 +1,28 @@
+services:
+  frontend:
+    image: psychology-frontend:latest
+    container_name: psychology_frontend
+    restart: always
+    ports:
+      - "3010:80"
+    depends_on:
+      - backend
+
+  backend:
+    image: psychology-backend:py312
+    container_name: psychology_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ..:/app
+      - ./patches/jalali_tags.py:/usr/local/lib/python3.12/site-packages/jalali_date/templatetags/jalali_tags.py:ro
+    command: >
+      sh -c "
+      python dependencies/manage.py migrate &&
+      python dependencies/manage.py runserver 0.0.0.0:8000
+      "

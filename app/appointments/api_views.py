@@ -88,12 +88,34 @@ class AppointmentListAPIView(generics.ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
 
         use_wallet = request.data.get('use_wallet', False)
+        applied_coupon = None
 
         with transaction.atomic():
+            # Pass context to serializer to get applied coupon
+            serializer.context['request'] = request
             appointment = serializer.save(client=request.user)
+            
+            # Increment coupon usage count if coupon was applied
+            if hasattr(serializer, 'context') and 'applied_coupon' in serializer.context:
+                applied_coupon = serializer.context['applied_coupon']
+                if applied_coupon:
+                    applied_coupon.used_count += 1
+                    applied_coupon.save(update_fields=['used_count'])
+            
             deposit_payload = None
 
-            if appointment.deposit_required and appointment.deposit_amount > Decimal('0'):
+            # If deposit amount is 0 after discount, mark as paid automatically
+            if appointment.deposit_required and appointment.deposit_amount <= Decimal('0'):
+                appointment.mark_deposit_paid()
+                appointment.status = 'scheduled'
+                appointment.save(update_fields=['deposit_paid', 'deposit_paid_at', 'status'])
+                deposit_payload = {
+                    'required': False,
+                    'paid_with_wallet': False,
+                    'amount': '0',
+                    'free_with_coupon': True
+                }
+            elif appointment.deposit_required and appointment.deposit_amount > Decimal('0'):
                 # Check if user wants to use wallet
                 if use_wallet:
                     from app.payment.models import Wallet

@@ -430,3 +430,63 @@ class AppointmentReminder(models.Model):
     
     def __str__(self):
         return f"یادآوری {self.get_reminder_type_display()} برای نوبت {self.appointment.id}"
+
+
+class AppointmentCoupon(models.Model):
+    """Discount coupons specifically for appointments"""
+    
+    COUPON_TYPES = [
+        ('percentage', _('Percentage')),
+        ('fixed', _('Fixed Amount')),
+    ]
+    
+    code = models.CharField(max_length=50, unique=True, verbose_name='کد کوپن')
+    title = models.CharField(max_length=200, verbose_name='عنوان')
+    description = models.TextField(blank=True, null=True, verbose_name='توضیحات')
+    coupon_type = models.CharField(max_length=20, choices=COUPON_TYPES, verbose_name='نوع کوپن')
+    discount_value = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='مقدار تخفیف')
+    min_order_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='حداقل مبلغ سفارش')
+    max_discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name='حداکثر مبلغ تخفیف')
+    
+    # Usage limits
+    usage_limit = models.PositiveIntegerField(blank=True, null=True, verbose_name='حد استفاده')
+    used_count = models.PositiveIntegerField(default=0, verbose_name='تعداد استفاده')
+    
+    # Validity
+    is_active = models.BooleanField(default=True, verbose_name='فعال')
+    valid_from = models.DateTimeField(verbose_name='معتبر از')
+    valid_until = models.DateTimeField(verbose_name='معتبر تا')
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
+    
+    class Meta:
+        verbose_name = _('کوپن نوبت')
+        verbose_name_plural = _('کوپن‌های نوبت')
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.code} - {self.title}"
+    
+    def is_valid(self):
+        now = timezone.now()
+        return (
+            self.is_active and
+            self.valid_from <= now <= self.valid_until and
+            (self.usage_limit is None or self.used_count < self.usage_limit)
+        )
+    
+    def calculate_discount(self, order_amount):
+        """Calculate discount amount for given order amount"""
+        if not self.is_valid() or order_amount < self.min_order_amount:
+            return 0
+        
+        if self.coupon_type == 'percentage':
+            discount = (order_amount * self.discount_value) / 100
+        else:  # fixed
+            discount = self.discount_value
+        
+        if self.max_discount_amount:
+            discount = min(discount, self.max_discount_amount)
+        
+        return min(discount, order_amount)

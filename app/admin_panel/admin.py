@@ -1,8 +1,7 @@
 from django.contrib import admin
 from .models import AdminDashboard, AdminWidget, AdminLog, AdminNotification, AdminSetting, AdminBackup  
-# from psychology_institute.admin import persian_admin_site
 
-@admin.register(AdminDashboard)
+'''@admin.register(AdminDashboard)
 class AdminDashboardAdmin(admin.ModelAdmin):
     list_display = ['title', 'is_active', 'created_at']
     list_filter = ['is_active', 'created_at']
@@ -48,4 +47,4 @@ class AdminBackupAdmin(admin.ModelAdmin):
     list_display = ['name', 'backup_type', 'status', 'file_size', 'created_by', 'created_at']
     list_filter = ['backup_type', 'status', 'created_at']
     search_fields = ['name']
-    readonly_fields = ['created_at', 'started_at', 'completed_at']
+    readonly_fields = ['created_at', 'started_at', 'completed_at']'''

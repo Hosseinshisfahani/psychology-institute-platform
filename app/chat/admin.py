@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from .models import ChatThread, ChatMessage
 
-
+'''
 @admin.register(ChatThread)
 class ChatThreadAdmin(admin.ModelAdmin):
     list_display = ('user', 'assigned_admin', 'created_at', 'updated_at')
@@ -16,3 +16,4 @@ class ChatMessageAdmin(admin.ModelAdmin):
     list_filter = ('is_from_admin', 'created_at')
     search_fields = ('message', 'sender__email', 'thread__user__email')
     autocomplete_fields = ('thread', 'sender')
+'''

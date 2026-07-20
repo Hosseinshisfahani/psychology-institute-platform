@@ -9,6 +9,12 @@ start_frontend.sh
 .env.local
 .env.production
 .env.staging
+dependencies/dev.env
+dependencies/.env
+
+# Deployment artifacts (local/server-only)
+dependencies/*.tar.gz
+dependencies/db_backup*.json
 
 # Python
 __pycache__/

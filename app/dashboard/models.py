@@ -169,8 +169,12 @@ class OTPCode(models.Model):
     """OTP code for SMS verification"""
     
     phone_number = models.CharField(max_length=15, verbose_name='شماره تلفن')
-    code = models.CharField(max_length=10, verbose_name='کد تایید', blank=True, null=True)
+    code = models.CharField(max_length=10, verbose_name='کد تایید', blank=True, null=True)  # Deprecated: use code_hash instead
+    code_hash = models.CharField(max_length=128, help_text='Hashed OTP code (PBKDF2)')
+    attempts = models.PositiveIntegerField(default=0, help_text='Number of verification attempts')
     transaction_id = models.CharField(max_length=50, verbose_name='شناسه تراکنش', blank=True, null=True, help_text='Transaction ID from SMS provider')
+    provider_status = models.CharField(max_length=32, null=True, blank=True, help_text='SMS delivery status')
+    provider_error = models.CharField(max_length=32, null=True, blank=True, help_text='Provider error code')
     purpose = models.CharField(
         max_length=20,
         choices=[
@@ -208,3 +212,15 @@ class OTPCode(models.Model):
     def is_valid(self):
         """Check if OTP code is valid (not expired, not used, not verified)"""
         return not self.is_expired() and not self.is_used and not self.is_verified
+        
+    def mark_verified(self):
+        """Mark OTP as verified"""
+        from django.utils import timezone
+        self.is_verified = True
+        self.verified_at = timezone.now()
+        self.save(update_fields=['is_verified', 'verified_at'])
+
+    def mark_used(self):
+        """Mark OTP as used to prevent reuse"""
+        self.is_used = True
+        self.save(update_fields=['is_used'])    

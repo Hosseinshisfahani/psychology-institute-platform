@@ -109,11 +109,13 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
 
 class AppointmentCreateSerializer(serializers.ModelSerializer):
+    coupon_code = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    
     class Meta:
         model = Appointment
         fields = [
             'therapist', 'appointment_type', 'location',
-            'scheduled_datetime', 'duration_minutes', 'notes'
+            'scheduled_datetime', 'duration_minutes', 'notes', 'coupon_code'
         ]
     
     def validate(self, data):
@@ -203,14 +205,34 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         appointment_type = validated_data['appointment_type']
+        coupon_code = validated_data.pop('coupon_code', '').strip().upper()
+        
         requires_deposit = bool(
             appointment_type.requires_deposit and appointment_type.deposit_amount > Decimal('0')
         )
 
+        deposit_amount = appointment_type.deposit_amount if requires_deposit else Decimal('0.00')
+        
+        # Apply discount if coupon code is provided
+        if coupon_code and deposit_amount > Decimal('0'):
+            from .models import AppointmentCoupon
+            from django.db import OperationalError, ProgrammingError
+            try:
+                coupon = AppointmentCoupon.objects.get(code=coupon_code)
+                if coupon.is_valid():
+                    discount = coupon.calculate_discount(deposit_amount)
+                    deposit_amount = max(Decimal('0.00'), deposit_amount - discount)
+                    # Store coupon in context for later use (e.g., incrementing used_count)
+                    self.context['applied_coupon'] = coupon
+            except (AppointmentCoupon.DoesNotExist, OperationalError, ProgrammingError):
+                # Invalid coupon code or table doesn't exist yet - ignore it
+                # This allows the code to work even if migrations haven't been run
+                pass
+
         if requires_deposit:
             validated_data['deposit_required'] = True
-            validated_data['deposit_amount'] = appointment_type.deposit_amount
-            validated_data['status'] = 'pending_deposit'
+            validated_data['deposit_amount'] = deposit_amount
+            validated_data['status'] = 'pending_deposit' if deposit_amount > Decimal('0') else 'scheduled'
         else:
             validated_data['deposit_required'] = False
             validated_data['deposit_amount'] = Decimal('0.00')

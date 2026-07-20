@@ -227,6 +227,8 @@ const AppointmentsList: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'pending_deposit':
+        return 'warning';
       case 'scheduled':
         return 'primary';
       case 'confirmed':

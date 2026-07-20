@@ -43,12 +43,17 @@ import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useSnackbar } from 'notistack';
-import { blogCategoryApi, BlogCategory } from '../../../services/blogAdminApi';
+import { blogCategoryApi, blogUtils, BlogCategory } from '../../../services/blogAdminApi';
 import CategoryChip from '../../../components/Admin/Blog/CategoryChip';
 
 const schema = yup.object({
   name: yup.string().required('نام دسته‌بندی الزامی است'),
-  slug: yup.string().required('نامک الزامی است'),
+  slug: yup.string()
+    .required('نامک الزامی است')
+    .matches(
+      /^[a-z0-9_-]+$/,
+      'نامک باید فقط شامل حروف انگلیسی، اعداد، خط تیره و زیرخط باشد'
+    ),
   description: yup.string(),
   color: yup.string().required('رنگ الزامی است'),
   icon: yup.string(),
@@ -509,6 +514,14 @@ const CategoriesManager: React.FC = () => {
                     fullWidth
                     error={!!errors.name}
                     helperText={errors.name?.message}
+                    onChange={(e) => {
+                      field.onChange(e);
+                      // Auto-generate slug using the utility function
+                      const slug = blogUtils.generateSlug(e.target.value);
+                      if (slug) {
+                        setValue('slug', slug);
+                      }
+                    }}
                   />
                 )}
               />
@@ -519,10 +532,20 @@ const CategoriesManager: React.FC = () => {
                 render={({ field }) => (
                   <TextField
                     {...field}
+                    value={typeof field.value === 'string' ? field.value : ''}
                     label="نامک"
                     fullWidth
                     error={!!errors.slug}
-                    helperText={errors.slug?.message || 'آدرس اینترنتی دسته‌بندی'}
+                    helperText={errors.slug?.message || 'آدرس اینترنتی دسته‌بندی (فقط حروف انگلیسی، اعداد، خط تیره و زیرخط)'}
+                    onChange={(e) => {
+                      // Sanitize slug input: only allow ASCII letters, numbers, hyphens, and underscores
+                      const sanitized = e.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9_-]/g, '') // Remove invalid characters
+                        .replace(/-+/g, '-') // Replace multiple hyphens with single
+                        .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+                      field.onChange(sanitized);
+                    }}
                   />
                 )}
               />

@@ -13,13 +13,13 @@ class CourseVideoInline(admin.TabularInline):
     extra = 1
     fields = ['title', 'description', 'video_file', 'video_url', 'attachment_file', 'duration_minutes', 'order', 'is_preview', 'allow_download', 'is_active']
 
-
+'''
 class LessonInline(admin.TabularInline):
     """Inline admin for course lessons"""
     model = Lesson
     extra = 0
     fields = ['title', 'description', 'duration', 'order', 'is_published']
-
+'''
 
 @admin.register(CourseCategory)
 class CourseCategoryAdmin(admin.ModelAdmin):
@@ -101,7 +101,7 @@ class CourseAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(CourseModule)
+'''@admin.register(CourseModule)
 class CourseModuleAdmin(admin.ModelAdmin):
     """Admin configuration for CourseModule model"""
     
@@ -109,10 +109,10 @@ class CourseModuleAdmin(admin.ModelAdmin):
     list_filter = ('is_required', 'course__category', 'course')
     search_fields = ('title', 'description', 'course__title')
     ordering = ('course', 'order')
-    inlines = [LessonInline]
+#    inlines = [LessonInline]
+'''
 
-
-@admin.register(Lesson)
+'''@admin.register(Lesson)
 class LessonAdmin(admin.ModelAdmin):
     """Admin configuration for Lesson model"""
     
@@ -132,7 +132,7 @@ class LessonAdmin(admin.ModelAdmin):
             'fields': ('duration_minutes', 'is_required', 'is_preview')
         }),
     )
-
+'''
 
 @admin.register(Enrollment)
 class EnrollmentAdmin(admin.ModelAdmin):
@@ -157,7 +157,7 @@ class EnrollmentAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(LessonProgress)
+'''@admin.register(LessonProgress)
 class LessonProgressAdmin(admin.ModelAdmin):
     """Admin configuration for LessonProgress model"""
     
@@ -178,7 +178,7 @@ class LessonProgressAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
-
+'''
 
 @admin.register(CoursePurchase)
 class CoursePurchaseAdmin(admin.ModelAdmin):
@@ -203,7 +203,7 @@ class CoursePurchaseAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(CourseReview)
+'''@admin.register(CourseReview)
 class CourseReviewAdmin(admin.ModelAdmin):
     """Admin configuration for CourseReview model"""
     
@@ -224,6 +224,7 @@ class CourseReviewAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+'''
 
 
 @admin.register(Coupon)
