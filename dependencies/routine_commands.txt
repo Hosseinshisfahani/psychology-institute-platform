@@ -30,3 +30,22 @@ docker compose -f ~/psychology-institute-platform/dependencies/docker-compose.ym
 
 docker compose -f ~/psychology-institute-platform/dependencies/docker-compose.yml logs -f backend
 docker compose -f ~/psychology-institute-platform/dependencies/docker-compose.yml logs -f frontend
+
+
+# see if it is enabled/running
+sudo systemctl status psychology-docker.service
+
+# start (boot the Docker containers)
+sudo systemctl start psychology-docker.service
+
+# stop (usually docker compose down)
+sudo systemctl stop psychology-docker.service
+
+# apply a restart after code/image changes
+sudo systemctl restart psychology-docker.service
+
+# start automatically on reboot
+sudo systemctl enable psychology-docker.service
+
+# disable autostart
+sudo systemctl disable psychology-docker.service

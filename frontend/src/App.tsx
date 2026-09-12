@@ -17,6 +17,7 @@ import PostDetail from './pages/Blog/PostDetail';
 import Dashboard from './pages/Dashboard/Dashboard';
 import Login from './pages/Auth/Login';
 import Signup from './pages/Auth/Signup';
+import ForgotPassword from './pages/Auth/ForgotPassword';
 import Tests from './pages/Tests/Tests';
 import TestDetail from './pages/Tests/TestDetail';
 import Courses from './pages/Courses/Courses';
@@ -240,6 +241,9 @@ function App() {
                             {/* Auth Routes */}
                             <Route path="/login" element={<Login />} />
                             <Route path="/signup" element={<Signup />} />
+                            <Route path="/forgot-password" element={<ForgotPassword />} />
+                            <Route path="/forgotpassword" element={<Navigate to="/forgot-password" replace />} />
+                            <Route path="/reset-password" element={<Navigate to="/forgot-password" replace />} />
                             
                             {/* Protected Routes */}
                             <Route path="/dashboard" element={<Dashboard />} />

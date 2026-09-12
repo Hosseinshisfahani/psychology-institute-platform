@@ -5,6 +5,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 from django.utils import timezone
@@ -18,6 +20,21 @@ from .sms_service import send_otp_sms, verify_otp_sms, generate_otp_code, hash_o
 from app.payment.models import Order
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_iranian_phone(phone_number):
+    if not phone_number:
+        return ''
+    phone_number = str(phone_number).replace('+98', '').replace('0098', '').replace('-', '').replace(' ', '').strip()
+    if phone_number and not phone_number.startswith('0'):
+        phone_number = '0' + phone_number
+    return phone_number
+
+
+def _mask_phone(phone_number):
+    if not phone_number or len(phone_number) < 7:
+        return phone_number
+    return f"{phone_number[:4]}***{phone_number[-2:]}"
 
 
 @api_view(['GET'])
@@ -720,13 +737,9 @@ class SendOTPAPIView(APIView):
     def post(self, request):
         try:
             phone_number = request.data.get('phone_number')
+            email = (request.data.get('email') or '').strip()
             purpose = request.data.get('purpose', 'signup')  # signup, login, password_reset
-
-            if not phone_number:
-                return Response({
-                    'success': False,
-                    'message': 'Phone number is required'
-                }, status=status.HTTP_400_BAD_REQUEST)
+            reset_user = None
 
             if purpose not in {'signup', 'login', 'password_reset'}:
                 return Response({
@@ -734,16 +747,57 @@ class SendOTPAPIView(APIView):
                     'message': 'Invalid OTP purpose'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
+            if purpose == 'password_reset' and email and not phone_number:
+                try:
+                    reset_user = User.objects.get(email__iexact=email)
+                except User.DoesNotExist:
+                    return Response({
+                        'success': False,
+                        'message': 'حسابی با این ایمیل یافت نشد.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+                if not reset_user.is_active:
+                    return Response({
+                        'success': False,
+                        'message': 'حساب کاربری شما غیرفعال است. لطفاً با پشتیبانی تماس بگیرید.'
+                    }, status=status.HTTP_403_FORBIDDEN)
+
+                if not reset_user.phone_number:
+                    return Response({
+                        'success': False,
+                        'message': 'برای این حساب شماره تلفنی ثبت نشده است. لطفاً با پشتیبانی تماس بگیرید.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+                phone_number = reset_user.phone_number
+
+            if not phone_number:
+                return Response({
+                    'success': False,
+                    'message': 'Phone number is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
             # Normalize phone number (Iranian format)
-            phone_number = phone_number.replace('+98', '').replace('0098', '').replace('-', '').replace(' ', '').strip()
-            if not phone_number.startswith('0'):
-                phone_number = '0' + phone_number
+            phone_number = _normalize_iranian_phone(phone_number)
 
             if not phone_number.startswith('09') or len(phone_number) != 11:
                 return Response({
                     'success': False,
                     'message': 'Invalid phone number format. Please use format: 09123456789'
                 }, status=status.HTTP_400_BAD_REQUEST)
+
+            if purpose == 'password_reset':
+                if reset_user is None:
+                    reset_user = User.objects.filter(phone_number=phone_number).first()
+                if not reset_user:
+                    return Response({
+                        'success': False,
+                        'message': 'حسابی با این شماره تلفن یافت نشد.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                if not reset_user.is_active:
+                    return Response({
+                        'success': False,
+                        'message': 'حساب کاربری شما غیرفعال است. لطفاً با پشتیبانی تماس بگیرید.'
+                    }, status=status.HTTP_403_FORBIDDEN)
 
             cooldown_seconds = int(getattr(settings, 'OTP_RESEND_COOLDOWN_SECONDS', 60))
             expire_seconds = int(getattr(settings, 'OTP_EXPIRE_SECONDS', 180))
@@ -761,7 +815,8 @@ class SendOTPAPIView(APIView):
                     'success': True,
                     'message': 'OTP was recently sent. Please wait before requesting again.',
                     'already_sent': True,
-                    'expires_at': recent_otp.expires_at
+                    'expires_at': recent_otp.expires_at,
+                    'phone_hint': _mask_phone(phone_number),
                 })
 
             # Generate OTP locally in Django
@@ -793,6 +848,7 @@ class SendOTPAPIView(APIView):
                 'success': True,
                 'message': 'OTP sent successfully',
                 'expires_at': otp_obj.expires_at,
+                'phone_hint': _mask_phone(phone_number),
             })
 
         except Exception as e:
@@ -893,6 +949,123 @@ class VerifyOTPAPIView(APIView):
         return Response({
             'success': True,
             'message': 'OTP verified successfully'
+        })
+
+
+class PasswordResetAPIView(APIView):
+    """Reset password after verifying a password_reset OTP."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        phone_number = request.data.get('phone_number')
+        email = (request.data.get('email') or '').strip()
+        otp_code = request.data.get('otp_code') or request.data.get('code')
+        password1 = request.data.get('password1') or request.data.get('new_password')
+        password2 = request.data.get('password2') or request.data.get('confirm_password')
+
+        if not otp_code or not password1 or not password2 or (not phone_number and not email):
+            return Response({
+                'success': False,
+                'message': 'ایمیل یا شماره تلفن، کد تایید و رمز عبور جدید الزامی است'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if password1 != password2:
+            return Response({
+                'success': False,
+                'message': 'رمزهای عبور مطابقت ندارند'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        user = None
+        if email:
+            user = User.objects.filter(email__iexact=email).first()
+            if user and user.phone_number:
+                phone_number = user.phone_number
+
+        phone_number = _normalize_iranian_phone(phone_number)
+        if not phone_number.startswith('09') or len(phone_number) != 11:
+            return Response({
+                'success': False,
+                'message': 'فرمت شماره تلفن صحیح نیست. مثال: 09123456789'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        otp_code = str(otp_code).replace(' ', '').replace('-', '').strip()
+        if not otp_code.isdigit() or len(otp_code) not in {4, 6}:
+            return Response({
+                'success': False,
+                'message': 'کد تایید نامعتبر است'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if user is None:
+            user = User.objects.filter(phone_number=phone_number).first()
+
+        if not user or not user.is_active:
+            return Response({
+                'success': False,
+                'message': 'حساب کاربری یافت نشد.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        otp_obj = OTPCode.objects.filter(
+            phone_number=phone_number,
+            purpose='password_reset',
+            is_used=False,
+        ).order_by('-created_at').first()
+
+        if not otp_obj:
+            return Response({
+                'success': False,
+                'message': 'کد تایید یافت نشد. لطفاً ابتدا کد جدیدی درخواست دهید.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if otp_obj.is_expired():
+            otp_obj.is_used = True
+            otp_obj.save(update_fields=['is_used'])
+            return Response({
+                'success': False,
+                'message': 'کد تایید منقضی شده است. لطفاً کد جدیدی درخواست دهید.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        max_attempts = int(getattr(settings, 'OTP_MAX_ATTEMPTS', 5))
+        if otp_obj.attempts >= max_attempts:
+            otp_obj.is_used = True
+            otp_obj.save(update_fields=['is_used'])
+            return Response({
+                'success': False,
+                'message': 'تعداد تلاش‌های تایید به پایان رسیده است. لطفاً کد جدیدی درخواست دهید.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if not verify_otp(otp_code, otp_obj.code_hash):
+            otp_obj.attempts += 1
+            update_fields = ['attempts']
+            if otp_obj.attempts >= max_attempts:
+                otp_obj.is_used = True
+                update_fields.append('is_used')
+            otp_obj.save(update_fields=update_fields)
+            remaining = max(0, max_attempts - otp_obj.attempts)
+            return Response({
+                'success': False,
+                'message': 'کد تایید نامعتبر است',
+                'remaining_attempts': remaining
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            validate_password(password1, user=user)
+        except ValidationError as e:
+            return Response({
+                'success': False,
+                'message': ' '.join(e.messages)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(password1)
+        user.save(update_fields=['password'])
+
+        otp_obj.is_verified = True
+        otp_obj.is_used = True
+        otp_obj.verified_at = timezone.now()
+        otp_obj.save(update_fields=['is_verified', 'is_used', 'verified_at'])
+
+        return Response({
+            'success': True,
+            'message': 'رمز عبور با موفقیت تغییر کرد. اکنون می‌توانید وارد شوید.'
         })
 
 

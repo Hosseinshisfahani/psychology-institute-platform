@@ -46,8 +46,9 @@ interface AuthContextType {
   login: (email: string, password: string, otpCode?: string, phoneNumber?: string) => Promise<void>;
   logout: () => Promise<void>;
   signup: (email: string, password1: string, password2: string, first_name: string, last_name: string, phone_number: string, otp_code: string) => Promise<void>;
-  sendOTP: (phoneNumber: string, purpose?: string) => Promise<void>;
+  sendOTP: (phoneNumber: string, purpose?: string, email?: string) => Promise<{ already_sent?: boolean; phone_hint?: string }>;
   verifyOTP: (phoneNumber: string, otpCode: string, purpose?: string) => Promise<void>;
+  resetPassword: (identifier: { phoneNumber?: string; email?: string }, otpCode: string, password1: string, password2: string) => Promise<void>;
   updateProfile: (data: Partial<User['profile']>) => Promise<void>;
   checkAuthStatus: () => Promise<void>;
 }
@@ -411,18 +412,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const sendOTP = async (phoneNumber: string, purpose: string = 'signup') => {
-    console.log('[AuthContext] sendOTP called', { phoneNumber, purpose });
+  const sendOTP = async (phoneNumber: string, purpose: string = 'signup', email?: string) => {
+    console.log('[AuthContext] sendOTP called', { phoneNumber, purpose, email });
     try {
       console.log('[AuthContext] Fetching CSRF token...');
       await getCsrf();
       const csrfToken = getCsrfToken();
       console.log('[AuthContext] CSRF token obtained', { hasToken: !!csrfToken });
       
-      const requestData = {
-        phone_number: phoneNumber,
+      const requestData: Record<string, string> = {
         purpose,
       };
+      if (phoneNumber && phoneNumber.trim()) {
+        requestData.phone_number = phoneNumber.trim();
+      }
+      if (email && email.trim()) {
+        requestData.email = email.trim();
+      }
       console.log('[AuthContext] Making POST request to /api/dashboard/otp/send/', requestData);
       
       const response = await axios.post('/api/dashboard/otp/send/', requestData, {
@@ -440,6 +446,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       
       console.log('[AuthContext] OTP sent successfully');
+      return {
+        already_sent: response.data.already_sent,
+        phone_hint: response.data.phone_hint,
+      };
     } catch (error: any) {
       console.error('[AuthContext] Error in sendOTP', {
         message: error.message,
@@ -500,6 +510,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const resetPassword = async (
+    identifier: { phoneNumber?: string; email?: string },
+    otpCode: string,
+    password1: string,
+    password2: string
+  ) => {
+    try {
+      await getCsrf();
+      const csrfToken = getCsrfToken();
+      const requestData: Record<string, string> = {
+        otp_code: otpCode,
+        password1,
+        password2,
+      };
+      if (identifier.phoneNumber) {
+        requestData.phone_number = identifier.phoneNumber;
+      }
+      if (identifier.email) {
+        requestData.email = identifier.email;
+      }
+      const response = await axios.post('/api/dashboard/password-reset/', requestData, {
+        headers: {
+          'X-CSRFToken': csrfToken || '',
+        },
+      });
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'بازیابی رمز عبور ناموفق بود');
+      }
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || error.message || 'بازیابی رمز عبور ناموفق بود');
+    }
+  };
+
   const updateProfile = async (data: Partial<User['profile']>) => {
     try {
       const response = await axios.patch('/api/dashboard/profile/', data);
@@ -518,6 +562,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     signup,
     sendOTP,
     verifyOTP,
+    resetPassword,
     updateProfile,
     checkAuthStatus,
   };

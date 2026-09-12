@@ -14,6 +14,7 @@ urlpatterns = [
     path('otp/send/', api_views.SendOTPAPIView.as_view(), name='send_otp'),
     path('otp/verify/', api_views.VerifyOTPAPIView.as_view(), name='verify_otp'),
     path('otp/config-check/', api_views.sms_config_check, name='sms_config_check'),
+    path('password-reset/', api_views.PasswordResetAPIView.as_view(), name='password_reset'),
     
     # Profile
     path('profile/', api_views.ProfileAPIView.as_view(), name='profile'),
