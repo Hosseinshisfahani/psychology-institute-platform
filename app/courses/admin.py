@@ -47,7 +47,8 @@ class CourseVideoAdmin(admin.ModelAdmin):
             'fields': ('course', 'title', 'description', 'order')
         }),
         (_('Video'), {
-            'fields': ('video_file', 'video_url', 'duration_minutes')
+            'fields': ('video_file', 'video_url', 'duration_minutes'),
+            'description': _('حداکثر حجم مجاز برای مدیران ۱ گیگابایت (۱۰۰۰ مگابایت) است.'),
         }),
         (_('Attachment'), {
             'fields': ('attachment_file',),
@@ -85,7 +86,8 @@ class CourseAdmin(admin.ModelAdmin):
             'fields': ('is_free', 'price')
         }),
         (_('Content'), {
-            'fields': ('thumbnail', 'video_intro')
+            'fields': ('thumbnail', 'video_intro'),
+            'description': _('حداکثر حجم مجاز برای مدیران ۱ گیگابایت (۱۰۰۰ مگابایت) است. ویدیوهای بزرگ را در صورت امکان جداگانه بارگذاری کنید.'),
         }),
         (_('Status'), {
             'fields': ('status',)

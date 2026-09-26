@@ -88,6 +88,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'psychology_institute.upload_limits.AdminUploadLimitMiddleware',
     'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -152,7 +153,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 # INTERNATIONALIZATION
-LANGUAGE_CODE = 'fa-ir'
+LANGUAGE_CODE = 'fa'
 TIME_ZONE = 'Asia/Tehran'
 USE_I18N = True
 USE_L10N = True
@@ -160,7 +161,6 @@ USE_TZ = True
 LANGUAGE_BIDI = True
 LANGUAGES = [
     ('fa', 'فارسی'),
-    ('en', 'English'),
 ]
 
 
@@ -179,8 +179,19 @@ STATICFILES_DIRS = [
 
 
 # MEDIA
+# Nginx must serve this same directory at /media/ (not a separate copy).
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'dependencies/media'
+
+
+# UPLOAD LIMITS
+# Admin course/workshop uploads: 1000 MB. Public/API: 100 MB.
+# Nginx location limits must stay in sync (/admin/ and /api/admin/ = 1000M).
+ADMIN_UPLOAD_MAX_BYTES = 1000 * 1024 * 1024
+PUBLIC_UPLOAD_MAX_BYTES = 100 * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = ADMIN_UPLOAD_MAX_BYTES
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
 
 
 # AUTO_FIELD

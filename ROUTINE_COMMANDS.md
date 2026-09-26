@@ -83,10 +83,16 @@ systemctl restart nginx
 5) DATABASE
 ==========================================
 
+# Any one-off Django command MUST mount the jalali_date patch
+# (Python 3.12 has no distutils; without this, manage.py crashes).
+# Same mount as psychology-backend.service.
+
 # Backup (JSON dump via Django)
 cd /root/psychology-institute-platform
 docker run --rm --network host \
-  -v /root/psychology-institute-platform:/app -w /app \
+  -v /root/psychology-institute-platform:/app \
+  -v /root/psychology-institute-platform/dependencies/patches/jalali_tags.py:/usr/local/lib/python3.12/site-packages/jalali_date/templatetags/jalali_tags.py:ro \
+  -w /app \
   psychology-backend:py312 \
   python dependencies/manage.py dumpdata \
     --exclude contenttypes --exclude auth.permission \
@@ -100,13 +106,17 @@ sudo -u postgres psql -d psychology_institute
 
 # Open a Django shell
 docker run --rm -it --network host \
-  -v /root/psychology-institute-platform:/app -w /app \
+  -v /root/psychology-institute-platform:/app \
+  -v /root/psychology-institute-platform/dependencies/patches/jalali_tags.py:/usr/local/lib/python3.12/site-packages/jalali_date/templatetags/jalali_tags.py:ro \
+  -w /app \
   psychology-backend:py312 \
   python dependencies/manage.py shell
 
 # Create a superuser
 docker run --rm -it --network host \
-  -v /root/psychology-institute-platform:/app -w /app \
+  -v /root/psychology-institute-platform:/app \
+  -v /root/psychology-institute-platform/dependencies/patches/jalali_tags.py:/usr/local/lib/python3.12/site-packages/jalali_date/templatetags/jalali_tags.py:ro \
+  -w /app \
   psychology-backend:py312 \
   python dependencies/manage.py createsuperuser
 

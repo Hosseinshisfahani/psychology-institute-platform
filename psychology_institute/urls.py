@@ -9,6 +9,7 @@ from django.views.decorators.http import require_http_methods
 from django.middleware.csrf import get_token
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.csrf import ensure_csrf_cookie
+from psychology_institute.error_views import request_entity_too_large
 import os
 import re
 import mimetypes
@@ -49,6 +50,9 @@ def csrf_token_view(request):
 urlpatterns = [
     # Health check
     path('health/', health_check, name='health_check'),
+
+    # Standard Persian 413 page (also used as a named fallback)
+    path('errors/413/', request_entity_too_large, name='error_413'),
     
     # Admin
     path('admin/', admin.site.urls),
@@ -176,3 +180,5 @@ if settings.DEBUG or getattr(settings, "DEVELOPMENT_MODE", False):
     urlpatterns += [
         re_path(r'^images/(?P<path>.*)$', images_serve),
     ]
+
+handler400 = 'psychology_institute.error_views.bad_request'

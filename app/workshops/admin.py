@@ -59,7 +59,8 @@ class WorkshopAdmin(admin.ModelAdmin):
             'fields': ('total_hours', 'language')
         }),
         (_('Media'), {
-            'fields': ('thumbnail', 'intro_video')
+            'fields': ('thumbnail', 'intro_video'),
+            'description': _('حداکثر حجم مجاز برای مدیران ۱ گیگابایت (۱۰۰۰ مگابایت) است.'),
         }),
         (_('Statistics'), {
             'fields': ('rating', 'review_count')

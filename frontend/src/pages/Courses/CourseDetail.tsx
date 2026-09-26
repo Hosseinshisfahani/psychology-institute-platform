@@ -32,6 +32,16 @@ interface EnrollmentStatus {
   is_purchased?: boolean;
 }
 
+const getCourseVideoPlayback = (video: CourseVideo): { kind: 'file' | 'url'; src: string } | null => {
+  if (video.video_file) {
+    return { kind: 'file', src: video.video_file };
+  }
+  if (video.video_url) {
+    return { kind: 'url', src: video.video_url };
+  }
+  return null;
+};
+
 interface CourseDetail {
   id: number;
   title: string;
@@ -1172,34 +1182,41 @@ const CourseDetail: React.FC = () => {
               className="ratio ratio-16x9"
               style={{ position: 'relative', pointerEvents: 'none' }}
             >
-              {selectedVideo.video_url ? (
-                <iframe
-                  src={selectedVideo.video_url}
-                  allowFullScreen
-                  style={{ borderRadius: '10px', border: 'none', pointerEvents: 'auto' }}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  sandbox="allow-same-origin allow-scripts allow-presentation"
-                ></iframe>
-              ) : selectedVideo.video_file ? (
-                <video
-                  controls
-                  controlsList="nodownload noremoteplayback"
-                  disablePictureInPicture
-                  style={{ 
-                    borderRadius: '10px', 
-                    width: '100%', 
-                    height: '100%', 
-                    pointerEvents: 'auto',
-                    outline: 'none'
-                  }}
-                  src={selectedVideo.video_file}
-                  onEnded={() => handleAutoCompleteVideo(selectedVideo.id)}
-                >
-                  مرورگر شما از پخش ویدیو پشتیبانی نمی‌کند.
-                </video>
-              ) : (
-                <Alert variant="warning">ویدیو در دسترس نیست</Alert>
-              )}
+              {(() => {
+                const playback = getCourseVideoPlayback(selectedVideo);
+                if (playback?.kind === 'url') {
+                  return (
+                    <iframe
+                      src={playback.src}
+                      allowFullScreen
+                      style={{ borderRadius: '10px', border: 'none', pointerEvents: 'auto' }}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      sandbox="allow-same-origin allow-scripts allow-presentation"
+                    ></iframe>
+                  );
+                }
+                if (playback?.kind === 'file') {
+                  return (
+                    <video
+                      controls
+                      controlsList="nodownload noremoteplayback"
+                      disablePictureInPicture
+                      style={{ 
+                        borderRadius: '10px', 
+                        width: '100%', 
+                        height: '100%', 
+                        pointerEvents: 'auto',
+                        outline: 'none'
+                      }}
+                      src={playback.src}
+                      onEnded={() => handleAutoCompleteVideo(selectedVideo.id)}
+                    >
+                      مرورگر شما از پخش ویدیو پشتیبانی نمی‌کند.
+                    </video>
+                  );
+                }
+                return <Alert variant="warning">ویدیو در دسترس نیست</Alert>;
+              })()}
             </div>
           )}
           {selectedVideo && (
